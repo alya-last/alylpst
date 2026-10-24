@@ -631,6 +631,7 @@ Kurallar:
     ...gecmis.map(m => ({ role: m.role, content: m.content }) as AiMesaj),
   ]
   const kullanilan: string[] = []
+  const excelYollari: string[] = []   // araç çıktısında üretilen Excel adresleri (cevapta yazılmasa da indirme düğmesi çıksın)
   for (let tur = 0; tur < 8; tur++) {
     const m = await aiCagir({ messages: msgs, tools: araclar, maxTokens: 4000 })
     if (m.tool_calls?.length) {
@@ -640,10 +641,13 @@ Kurallar:
         try { args = JSON.parse(c.function.arguments || '{}') } catch { /* boş */ }
         kullanilan.push(c.function.name)
         msgs.push({ role: 'tool', tool_call_id: c.id, content: izinli.has(c.function.name) && !(c.function.name === 'excel_olustur' && args.arac && !izinli.has(String(args.arac))) ? await calistir(sb, c.function.name, args) : 'HATA: Bu kullanıcının bu araca yetkisi yok.' })
+        for (const x of String((msgs[msgs.length - 1] as { content?: unknown }).content || '').matchAll(/\/api\/admin\/ai-excel\?id=[0-9a-f-]{36}/g)) if (!excelYollari.includes(x[0])) excelYollari.push(x[0])
       }
       continue
     }
-    return { yanit: (m.content || '').trim() || 'Bir yanıt üretemedim.', araclar: kullanilan }
+    const yanit = (m.content || '').trim() || 'Bir yanıt üretemedim.'
+    const eksik = excelYollari.filter(y => !yanit.includes(y))
+    return { yanit: eksik.length ? yanit + '\n\n' + eksik.join('\n') : yanit, araclar: kullanilan }
   }
   return { yanit: 'Soru çok fazla adım gerektirdi; lütfen daha spesifik sorun.', araclar: kullanilan }
 }
