@@ -6,7 +6,7 @@ import { HREFLANG, type Dil } from "@/lib/diller";
 import { M, dilYolu, bolumYolu } from "@/lib/site-metin";
 import { UI } from "@/lib/urun-sayfasi";
 
-const SITE_URL = "https://alyatest-alyis.vercel.app";
+const SITE_URL = "https://alylpst.vercel.app";
 
 export default function SchemaOrg({
   settings,

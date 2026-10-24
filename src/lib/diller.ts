@@ -1,5 +1,5 @@
 // Saf sabitler ve yardımcılar — istemci bileşenleri de kullanır; bu yüzden veritabanı istemcisini (supabase) İÇE AKTARMAZ.
-export const SITE_URL = "https://alyatest-alyis.vercel.app";
+export const SITE_URL = "https://alylpst.vercel.app";
 export const DILLER = ["tr", "en", "ru", "zh"] as const;
 export type Dil = (typeof DILLER)[number];
 export const DIL_AD: Record<Dil, string> = { tr: "Türkçe", en: "English", ru: "Русский", zh: "中文" };
