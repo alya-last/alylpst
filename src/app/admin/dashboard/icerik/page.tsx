@@ -48,7 +48,7 @@ export default function AdminIcerikPage() {
           <p style={{ fontSize:13, color:'var(--adm-tx3)' }}>
             Site üzerindeki metinleri buradan düzenleyebilirsin. Kaydettiğinde site otomatik güncellenir.
           </p>
-          <a href="https://alyatest-alyis.vercel.app" target="_blank" rel="noopener noreferrer nofollow"
+          <a href="https://alylpst.vercel.app" target="_blank" rel="noopener noreferrer nofollow"
             className="adm-btn-ghost" style={{ fontSize:12, flexShrink:0 }}>
             <Eye size={13}/>Siteyi Gör
           </a>

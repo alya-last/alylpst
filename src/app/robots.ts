@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
-  const url = "https://alyatest-alyis.vercel.app";
+  const url = "https://alylpst.vercel.app";
   return {
     rules: [
       {

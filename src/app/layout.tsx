@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import VisitTracker from "@/components/VisitTracker";
 
-const SITE_URL = "https://alyatest-alyis.vercel.app";
+const SITE_URL = "https://alylpst.vercel.app";
 const SITE_NAME = "Alya Plastik";
 
 export const metadata: Metadata = {
