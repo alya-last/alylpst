@@ -632,6 +632,7 @@ Kurallar:
     ...gecmis.map(m => ({ role: m.role, content: m.content }) as AiMesaj),
   ]
   const kullanilan: string[] = []
+  let sonVeriAraci: { ad: string; args: Record<string, any> } | null = null
   const excelYollari: string[] = []   // araç çıktısında üretilen Excel adresleri (cevapta yazılmasa da indirme düğmesi çıksın)
   for (let tur = 0; tur < 8; tur++) {
     const m = await aiCagir({ messages: msgs, tools: araclar, maxTokens: 4000 })
@@ -640,6 +641,9 @@ Kurallar:
       for (const c of m.tool_calls.slice(0, 6)) {
         let args: Record<string, any> = {}
         try { args = JSON.parse(c.function.arguments || '{}') } catch { /* boş */ }
+        // Model excel_olustur'u veri belirtmeden çağırırsa (arac yok, dolu sayfalar yok) bir önceki veri aracının sonucunu kullan
+        if (c.function.name === 'excel_olustur' && !args.arac && !(Array.isArray(args.sayfalar) && args.sayfalar.some((x: any) => Array.isArray(x?.satirlar) && x.satirlar.length)) && sonVeriAraci) { args.arac = sonVeriAraci.ad; args.arac_args = sonVeriAraci.args }
+        if (c.function.name !== 'excel_olustur') sonVeriAraci = { ad: c.function.name, args }
         kullanilan.push(c.function.name)
         msgs.push({ role: 'tool', tool_call_id: c.id, content: izinli.has(c.function.name) && !(c.function.name === 'excel_olustur' && args.arac && !izinli.has(String(args.arac))) ? await calistir(sb, c.function.name, args) : 'HATA: Bu kullanıcının bu araca yetkisi yok.' })
         for (const x of String((msgs[msgs.length - 1] as { content?: unknown }).content || '').matchAll(/\/api\/admin\/ai-excel\?id=[0-9a-f-]{36}/g)) if (!excelYollari.includes(x[0])) excelYollari.push(x[0])
