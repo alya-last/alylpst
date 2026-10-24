@@ -1,0 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Barlow+Condensed:ital,wght@0,700;0,900;1,700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-bg:      #eae6dd;
+  --color-bg2:     #e3ddcf;
+  --color-dark:    #0b0e0b;
+  --color-dark2:   #111511;
+  --color-dark3:   #181d18;
+  --color-light:   #eae6dd;
+  --color-muted:   #6b7366;
+  --color-orange:  #e55f28;
+  --color-orange2: #c94f1e;
+  --color-border:  rgba(11,14,11,0.1);
+
+  --font-head: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
+  --font-body: 'Inter', Arial, sans-serif;
+
+  --spacing-pad: clamp(20px, 5vw, 80px);
+}
+
+/* ── Reset ───────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { overflow-x: hidden; scroll-padding-top: 96px; scroll-behavior: smooth; }
+html, body { scrollbar-width: none; }
+::-webkit-scrollbar { display: none; }
+body {
+  background-color: #eae6dd;
+  color: #0b0e0b;
+  font-family: 'Inter', Arial, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'Hiragino Sans GB', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+::selection { background: #e55f28; color: #fff; }
+/* Katmanlı: Tailwind yardımcı sınıfları (text-white vb.) bu varsayılanları ezebilsin diye @layer base içinde. */
+@layer base {
+  a { color: inherit; text-decoration: none; }
+  button { cursor: pointer; border: 0; background: none; font: inherit; color: inherit; padding: 0; }
+}
+img { max-width: 100%; display: block; }
+
+/* ── Custom classes ──────────────────────── */
+.heading {
+  font-family: 'Barlow Condensed', 'Arial Narrow', Arial, 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+}
+.eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* ── Marquee ─────────────────────────────── */
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-inner {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 28s linear infinite;
+}
+
+/* ── Scroll reveal ───────────────────────── */
+[data-reveal] {
+  transition: opacity 0.7s cubic-bezier(0.16,1,0.3,1),
+              transform 0.7s cubic-bezier(0.16,1,0.3,1);
+}
+.js-ready [data-reveal]          { opacity: 0; transform: translateY(28px); }
+.js-ready [data-reveal="fade"]   { transform: none; }
+.js-ready [data-reveal].visible  { opacity: 1 !important; transform: none !important; }
+
+[data-delay="1"] { transition-delay: 0.07s; }
+[data-delay="2"] { transition-delay: 0.14s; }
+[data-delay="3"] { transition-delay: 0.21s; }
+[data-delay="4"] { transition-delay: 0.28s; }
+[data-delay="5"] { transition-delay: 0.35s; }
+
+/* ── Grain noise ─────────────────────────── */
+.grain::after {
+  content: '';
+  position: absolute; inset: 0;
+  pointer-events: none; z-index: 20;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px;
+}
+
+/* ── Cursor ──────────────────────────────────────────────
+   Gerçek imleç yalnızca özel cursor-dot/cursor-ring JS'i fiilen
+   çalışmaya başladığında (html'e .cursor-live eklendiğinde) gizlenir.
+   Önceden a/button üzerinde koşulsuz "cursor:none" uygulanıyordu; GSAP
+   geç yüklenirse veya sonradan DOM'a eklenen linkler/butonlar (ör.
+   menü, ürün kartları) JS'in yetişemediği bir anda hoverlanırsa imleç
+   hem gerçek hem özel haliyle tamamen kayboluyordu. */
+@media (pointer: fine) { html.cursor-live a, html.cursor-live button { cursor: none !important; } }
+.cursor-dot {
+  position: fixed; top: 0; left: 0; z-index: 9999;
+  width: 7px; height: 7px; border-radius: 9999px;
+  background: #e55f28; pointer-events: none;
+  transform: translate(-50%,-50%);
+}
+.cursor-ring {
+  position: fixed; top: 0; left: 0; z-index: 9998;
+  width: 34px; height: 34px; border-radius: 9999px;
+  border: 1px solid rgba(229,95,40,0.4); pointer-events: none;
+  transform: translate(-50%,-50%);
+  transition: width 0.25s, height 0.25s, border-color 0.25s;
+}
+.cursor-ring.hovered { width: 54px; height: 54px; border-color: #e55f28; }
+
+/* ── Scroll progress bar ─────────────────── */
+.scroll-progress {
+  position: fixed; top: 0; right: 0; z-index: 200;
+  width: 3px; height: 0%;
+  background: #e55f28;
+  transform-origin: top;
+}
+
+/* ── 3D tilt card ────────────────────────── */
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.1s ease-out;
+}
+.tilt-card-inner {
+  transform: translateZ(20px);
+}
+
+/* ── Text scramble ───────────────────────── */
+.scramble { will-change: contents; }
+
+/* ── Slot ticker ─────────────────────────── */
+.slot-ticker {
+  display: inline-flex;
+  flex-direction: column;
+  overflow: hidden;
+  line-height: 1;
+}
+.slot-ticker-inner {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* ── Horizontal pinned ───────────────────── */
+.h-pin-track {
+  display: flex;
+  will-change: transform;
+}
+
+/* ── Split hero ──────────────────────────── */
+.split-line {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: #e55f28;
+  transform-origin: top;
+}
+
+/* ── 360 product spin ────────────────────── */
+.product-spin {
+  transition: transform 0.6s cubic-bezier(0.25,0.46,0.45,0.94);
+}
+
+/* ── Progress indicator dots ─────────────── */
+.progress-dots {
+  position: fixed;
+  right: clamp(16px,3vw,40px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.progress-dot {
+  width: 5px; height: 5px;
+  border-radius: 9999px;
+  background: rgba(11,14,11,0.18);
+  transition: all 0.4s ease;
+}
+.progress-dot.active {
+  height: 22px;
+  background: #e55f28;
+  border-radius: 3px;
+}
+
+/* ── Krem / koyu bölüm varyantları ────────── */
+.section-cream { background: #eae6dd; color: #0b0e0b; }
+.section-cream .eyebrow { color: #6b7366; }
+.section-cream .heading { color: #0b0e0b; }
+.section-dark { background: #0b0e0b; color: #eae6dd; }
+.section-dark .eyebrow { color: #e55f28; }
+.section-dark .heading { color: #eae6dd; }
+
+/* Çok dilli düzeltmeler: Çince başlıklarda satır aralığı, Rusça uzun kelimelerde taşma */
+html:lang(zh-Hans) .heading { line-height: 1.15 !important; letter-spacing: 0 !important; }
+html:lang(ru) .heading { overflow-wrap: anywhere; }
+html:lang(ru) #hero h1 { font-size: clamp(30px, 8.4vw, 56px) !important; }
+@media (min-width: 768px) { html:lang(ru) #hero h1 { font-size: clamp(44px, 5.2vw, 84px) !important; } }
