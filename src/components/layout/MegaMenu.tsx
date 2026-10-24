@@ -9,11 +9,11 @@ import type { Dil } from "@/lib/urun-sayfasi";
 // Görseller ilgili kategorideki bir ürünün GÜNCEL (yapay zeka üretimi) image_url'i — eski
 // stok/Cloudinary/yerel görseller kaldırıldığında bunlar da güncellenmeli.
 const KATEGORILER: { slug: string; gorsel: string; yeni?: boolean }[] = [
-  { slug: "saksi", gorsel: "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/4fb43d0b-5488-4b13-875d-c7969fe68978/1790527399471.png" },
-  { slug: "sepet", gorsel: "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/057d9e2a-e24f-4f9c-8702-37c24cf8267e/1790527369354.png" },
-  { slug: "sandik", gorsel: "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/8b287240-2941-46d8-bdfd-db73edb4fd58/1790527387849.png" },
-  { slug: "ev", gorsel: "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/25686cfc-1359-4a27-b479-1dc04afef371/1790527404229.png" },
-  { slug: "bahce", gorsel: "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/61104650-a2cc-4e57-8bc5-b19f490dbf51/1790599070623.png", yeni: true },
+  { slug: "saksi", gorsel: "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/4fb43d0b-5488-4b13-875d-c7969fe68978/1790527399471.png" },
+  { slug: "sepet", gorsel: "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/057d9e2a-e24f-4f9c-8702-37c24cf8267e/1790527369354.png" },
+  { slug: "sandik", gorsel: "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/8b287240-2941-46d8-bdfd-db73edb4fd58/1790527387849.png" },
+  { slug: "ev", gorsel: "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/25686cfc-1359-4a27-b479-1dc04afef371/1790527404229.png" },
+  { slug: "bahce", gorsel: "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/61104650-a2cc-4e57-8bc5-b19f490dbf51/1790599070623.png", yeni: true },
 ];
 
 const METIN: Record<Dil, { baslik: string; alt: string; tumu: string; yeni: string }> = {
