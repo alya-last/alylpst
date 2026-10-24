@@ -4,13 +4,13 @@
 // bileşeninden istemciye geçerken tüm objeyle birlikte sayfa verisine (RSC payload) gömülüyordu.
 // Kullanılmayan anahtarlar kaldırıldı (bkz. TEMA_ALANLARI ile bire bir eşleşme).
 export const IMG = {
-  fikir:    "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/tema/fikir/1790527824319.png",
-  ufo:      "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/tema/ufo/1790527881493.png",
-  dantel:   "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/tema/dantel/1790527954856.png",
-  d3:       "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/tema/d3/1790528029203.png",
-  venusAsk: "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/tema/venusAsk/1790528088874.png",
-  kordon:   "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/tema/kordon/1790528232838.png",
-  hero2:    "https://cwhxrusysuumndijapeb.supabase.co/storage/v1/object/public/urun-gorselleri/tema/hero2/1790528769900.png",
+  fikir:    "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/tema/fikir/1790527824319.png",
+  ufo:      "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/tema/ufo/1790527881493.png",
+  dantel:   "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/tema/dantel/1790527954856.png",
+  d3:       "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/tema/d3/1790528029203.png",
+  venusAsk: "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/tema/venusAsk/1790528088874.png",
+  kordon:   "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/tema/kordon/1790528232838.png",
+  hero2:    "https://mourbmejcpqrhppztioa.supabase.co/storage/v1/object/public/urun-gorselleri/tema/hero2/1790528769900.png",
 };
 
 // "Tema Yönetimi" admin ekranında AI ile yeniden tasarlanabilen sabit vitrin/dekoratif görseller.
