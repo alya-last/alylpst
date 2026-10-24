@@ -419,7 +419,8 @@ export async function araciCalistir(sb: SupabaseClient, ad: string, a: Record<st
         if (a.arac === 'urun_satis' || a.arac === 'mekan_satis') {
           // Ürün satış listesi: yıllık satış dosyasıyla aynı düzende (stok kodu, aylık adet + belge değeri, stok adedi) hazır Excel
           const ma = JSON.stringify(a.arac_args || {}) + ' ' + String(a.baslik || ''), mekan = /d[iı]ş|\bdis\b/i.test(ma) && !/i[çc]\s*mekan/i.test(ma) ? 'dis' : /i[çc]\s*mekan|\bic\b/i.test(ma) && !/d[iı]ş/i.test(ma) ? 'ic' : 'hepsi'
-          return kisalt({ excel_yolu: `/api/admin/satis-excel?mekan=${mekan}`, not: 'Dosya hazır (yıllık satış dosyasıyla aynı düzende). excel_yolu değerini cevapta aynen yaz, ne içerdiğini 1-2 cümleyle söyle.' })
+          const yillik = /y[ıi]ll[ıi]k|son\s*(1|bir|12|on\s*iki)\s*(y[ıi]l|ay)|12\s*ay/i.test(ma) ? '&donem=son12' : ''
+          return kisalt({ excel_yolu: `/api/admin/satis-excel?mekan=${mekan}${yillik}`, not: 'Dosya hazır (yıllık satış dosyasıyla aynı düzende). excel_yolu değerini cevapta aynen yaz, ne içerdiğini 1-2 cümleyle söyle.' })
         }
         const { excelKaydet, jsonTablolar } = await import('@/lib/ai-excel')
         let sayfalar: any[] = Array.isArray(a.sayfalar) ? a.sayfalar : []

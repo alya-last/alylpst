@@ -273,6 +273,7 @@ export default function MuhasebeAiPage() {
               {sohbetId && <button className="adm-btn-ghost" style={{ fontSize: 12 }} onClick={sohbetSil}><Trash2 size={12} />Bu sohbeti sil</button>}
               <a className="adm-btn" style={{ fontSize: 12, textDecoration: 'none' }} href="/api/admin/satis-excel?mekan=dis"><FileSpreadsheet size={12} />Dış mekan satışları</a>
               <a className="adm-btn" style={{ fontSize: 12, textDecoration: 'none' }} href="/api/admin/satis-excel?mekan=ic"><FileSpreadsheet size={12} />İç mekan satışları</a>
+              <a className="adm-btn" style={{ fontSize: 12, textDecoration: 'none' }} href="/api/admin/satis-excel?mekan=hepsi&donem=son12"><FileSpreadsheet size={12} />Yıllık satışlar (son 1 yıl)</a>
               <span style={{ fontSize: 11, color: 'var(--adm-tx3)', marginLeft: 'auto' }}>Sohbetler yalnızca sana görünür</span>
             </div>
             {belgeBaglam && <div style={{ padding: '8px 16px', borderBottom: '1px solid var(--adm-bdr)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, background: 'var(--adm-s2)' }}><FileText size={13} />Belge bağlamı: <b>{belgeBaglam.ad}</b><button className="adm-btn-ghost" style={{ padding: '2px 8px', fontSize: 11.5, marginLeft: 'auto' }} onClick={() => setBelgeBaglam(null)}><X size={11} />Kaldır</button></div>}
