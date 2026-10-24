@@ -565,6 +565,7 @@ export async function araciCalistir(sb: SupabaseClient, ad: string, a: Record<st
     }
   } catch (e: any) {
     const m = String(e?.message || e)
+    console.error(`[ai-arac:${ad}${a?.arac ? '>' + a.arac : ''}]`, m.slice(0, 500))
     return /yetkisiz/i.test(m) ? 'HATA: Bu kullanıcının bu veriye erişim yetkisi yok.' : `HATA: ${m.slice(0, 200)}`
   }
 }
