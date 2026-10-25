@@ -1,9 +1,15 @@
 import Link from "next/link";
-import { Instagram, Facebook, Linkedin, Phone, Mail, MapPin, Clock, MessageCircle } from "lucide-react";
+import { Phone, Mail, MapPin, Clock, MessageCircle } from "lucide-react";
 import { guvenliUrl, type Settings } from "@/lib/supabase";
 import { type Dil, kurumsalYolu } from "@/lib/diller";
 import { M, dilYolu } from "@/lib/site-metin";
 import { Y } from "./metin";
+
+// lucide-react bu sürümde marka ikonları içermiyor: basit satır içi SVG'ler
+const Ikon = ({ d, size = 19 }: { d: string; size?: number }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={d} /></svg>;
+const Instagram = ({ size }: { size?: number }) => <Ikon size={size} d="M7.5 2h9A5.5 5.5 0 0 1 22 7.5v9a5.5 5.5 0 0 1-5.5 5.5h-9A5.5 5.5 0 0 1 2 16.5v-9A5.5 5.5 0 0 1 7.5 2Zm0 2A3.5 3.5 0 0 0 4 7.5v9A3.5 3.5 0 0 0 7.5 20h9a3.5 3.5 0 0 0 3.5-3.5v-9A3.5 3.5 0 0 0 16.5 4h-9ZM12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10Zm0 2a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm5.25-3.25a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5Z" />;
+const Facebook = ({ size }: { size?: number }) => <Ikon size={size} d="M13.5 22v-8.2h2.8l.5-3.3h-3.3V8.4c0-.95.4-1.7 1.8-1.7H17V3.8c-.3 0-1.3-.1-2.4-.1-2.5 0-4.1 1.5-4.1 4.2v2.6H7.7v3.3h2.8V22h3Z" />;
+const Linkedin = ({ size }: { size?: number }) => <Ikon size={size} d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5ZM3 9.75h4V21H3V9.75Zm6.5 0h3.8v1.55h.05c.55-1 1.9-1.9 3.9-1.9 4.1 0 4.75 2.55 4.75 5.85V21h-4v-5.2c0-1.25 0-2.85-1.75-2.85S13.5 14.3 13.5 15.7V21h-4V9.75Z" />;
 
 const EK: Record<Dil, { slogan: string; ctaBaslik: string; ctaAlt: string; wa: string; kategoriler: string; calisma: string; ihracat: string }> = {
   tr: { slogan: "1968'den beri İstanbul'da plastik saksı, sepet ve depolama ürünleri üretiyoruz.", ctaBaslik: "Toptan sipariş ve özel üretim için bize ulaşın", ctaAlt: "Teklifiniz 72 saat içinde hazır.", wa: "WhatsApp'tan yaz", kategoriler: "Ürün Grupları", calisma: "Çalışma saatleri", ihracat: "İhracat" },
