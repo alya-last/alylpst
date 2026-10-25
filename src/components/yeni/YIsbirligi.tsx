@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { type Dil, kurumsalYolu } from "@/lib/diller";
-import { dilYolu } from "@/lib/site-metin";
 import { Y } from "./metin";
 
 // İki panel: metin solda, ürün görseli kendi yuvasında sağda (yazının üstüne binmez).
@@ -31,7 +30,7 @@ export default function YIsbirligi({ dil = "tr", gorselSol, gorselSag }: { dil?:
         <Link href={kurumsalYolu(dil, "katalog")} className="yt-btn">{k.dugme}</Link>
       </Panel>
       <Panel etiket={b.etiket} baslik={b.baslik} alt={b.alt} gorsel={gorselSag}>
-        <a href={`${dilYolu(dil)}#iletisim`.replace("//", "/")} className="yt-btn">{b.dugme}</a>
+        <a href={kurumsalYolu(dil, "iletisim")} className="yt-btn">{b.dugme}</a>
       </Panel>
     </section>
   );

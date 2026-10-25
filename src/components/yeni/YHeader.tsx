@@ -19,13 +19,12 @@ export default function YHeader({ settings, dil = "tr", urunler, altDiller }: { 
     if (n.length < 2) return [];
     return urunler.filter(p => norm(`${ad(p, dil)} ${p.code}`).includes(n)).slice(0, 6);
   }, [q, urunler, dil]);
-  const bolum = (k: string) => `${dilYolu(dil)}#${k}`.replace("//", "/");
   const nav = [
     { href: dilYolu(dil), label: t.nav.anasayfa },
     { href: kurumsalYolu(dil, "hakkimizda"), label: t.nav.kurumsal },
     { href: kurumsalYolu(dil, "urunler"), label: t.nav.urunler },
     { href: kurumsalYolu(dil, "katalog"), label: t.nav.katalog },
-    { href: bolum("iletisim"), label: t.nav.iletisim },
+    { href: kurumsalYolu(dil, "iletisim"), label: t.nav.iletisim },
   ];
 
   return (
@@ -81,7 +80,7 @@ export default function YHeader({ settings, dil = "tr", urunler, altDiller }: { 
           <nav className="hidden md:flex items-center gap-7 ms-auto">
             {nav.map(l => <a key={l.label} href={l.href} className="text-[16px] font-semibold text-[#1b1b1b] hover:text-[var(--yt-accent)] transition-colors">{l.label}</a>)}
           </nav>
-          <a href={bolum("iletisim")} className="hidden md:inline-flex yt-btn">{t.nav.teklif}</a>
+          <a href={kurumsalYolu(dil, "iletisim")} className="hidden md:inline-flex yt-btn">{t.nav.teklif}</a>
 
           <button onClick={() => setAcik(p => !p)} aria-label={t.nav.menu} className="md:hidden ms-auto w-10 h-10 flex items-center justify-center">
             {acik ? <X size={26} /> : <Menu size={26} />}
@@ -95,7 +94,7 @@ export default function YHeader({ settings, dil = "tr", urunler, altDiller }: { 
             <input value={q} onChange={e => setQ(e.target.value)} placeholder={t.nav.ara} className="border-b border-black/30 h-11 mb-2 bg-transparent outline-none" />
             {sonuc.map(p => <Link key={p.id} href={urunLinki(p, dil)} className="py-2 text-[15px]">{ad(p, dil)} <span className="text-black/40 text-[12px]">{p.code}</span></Link>)}
             {nav.map(l => <a key={l.label} href={l.href} onClick={() => setAcik(false)} className="py-3 text-[18px] font-semibold border-b border-black/6">{l.label}</a>)}
-            <a href={bolum("iletisim")} onClick={() => setAcik(false)} className="yt-btn mt-4 justify-center">{t.nav.teklif}</a>
+            <a href={kurumsalYolu(dil, "iletisim")} onClick={() => setAcik(false)} className="yt-btn mt-4 justify-center">{t.nav.teklif}</a>
           </div>
         </div>
       )}

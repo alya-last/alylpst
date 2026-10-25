@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Phone, Mail, MapPin, Clock, MessageCircle } from "lucide-react";
 import { guvenliUrl, type Settings } from "@/lib/supabase";
 import { type Dil, kurumsalYolu } from "@/lib/diller";
-import { M, dilYolu } from "@/lib/site-metin";
+import { M } from "@/lib/site-metin";
 import { Y } from "./metin";
 
 // lucide-react bu sürümde marka ikonları içermiyor: basit satır içi SVG'ler
@@ -28,7 +28,7 @@ export default function YFooter({ settings, dil = "tr", kategoriler = [] }: { se
     { a: "Facebook", I: Facebook, u: guvenliUrl(s?.facebook) },
     { a: "LinkedIn", I: Linkedin, u: guvenliUrl(s?.linkedin) },
   ].filter(x => x.u);
-  const iletisim = `${dilYolu(dil)}#iletisim`.replace("//", "/");
+  const iletisim = kurumsalYolu(dil, "iletisim");
   const urun = kurumsalYolu(dil, "urunler");
 
   return (
