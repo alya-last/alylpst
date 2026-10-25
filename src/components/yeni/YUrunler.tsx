@@ -26,7 +26,7 @@ export default function YUrunler({ products, dil = "tr" }: { products: Product[]
         <div className="flex items-end justify-between gap-4 mb-10">
           <h2 className="font-semibold tracking-[-0.02em]" style={{ fontSize: "clamp(32px,4.4vw,56px)" }}>{t.baslik}</h2>
           <div className="flex items-center gap-4">
-            <Link href={kurumsalYolu(dil, "katalog")} className="font-semibold border-b-2 border-black pb-0.5 hover:text-[var(--yt-accent)] hover:border-[var(--yt-accent)]">{t.tum}</Link>
+            <Link href={kurumsalYolu(dil, "urunler")} className="font-semibold border-b-2 border-black pb-0.5 hover:text-[var(--yt-accent)] hover:border-[var(--yt-accent)]">{t.tum}</Link>
             <div className="hidden md:flex gap-2">
               <button onClick={() => kaydir(-1)} aria-label="‹" className="w-10 h-10 rounded-full border border-black/25 flex items-center justify-center hover:bg-black/5"><ChevronLeft size={18} /></button>
               <button onClick={() => kaydir(1)} aria-label="›" className="w-10 h-10 rounded-full border border-black/25 flex items-center justify-center hover:bg-black/5"><ChevronRight size={18} /></button>

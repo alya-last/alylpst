@@ -23,7 +23,7 @@ export default function YHeader({ settings, dil = "tr", urunler, altDiller }: { 
   const nav = [
     { href: dilYolu(dil), label: t.nav.anasayfa },
     { href: kurumsalYolu(dil, "hakkimizda"), label: t.nav.kurumsal },
-    { href: bolum("urunler"), label: t.nav.urunler },
+    { href: kurumsalYolu(dil, "urunler"), label: t.nav.urunler },
     { href: kurumsalYolu(dil, "katalog"), label: t.nav.katalog },
     { href: bolum("iletisim"), label: t.nav.iletisim },
   ];

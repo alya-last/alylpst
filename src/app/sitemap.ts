@@ -4,7 +4,7 @@ import { DILLER, HREFLANG, SITE_URL, getTumUrunler, mevcutDiller, urunUrl } from
 export const revalidate = 3600;
 
 // Türkçe'ye özel, dil dışı statik kurumsal sayfalar (yalnızca tr-TR + x-default).
-const STATIK_SAYFALAR = ["hakkimizda", "uretim-sureci", "sertifikalar", "kvkk"];
+const STATIK_SAYFALAR = ["hakkimizda", "uretim-sureci", "sertifikalar", "kvkk", "urunler"];
 
 // Ana sayfa + statik sayfalar + her ürün sayfası. Yabancı dil adresleri yalnızca çevirisi girilmiş ürünler için listelenir (hreflang karşılıklı).
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

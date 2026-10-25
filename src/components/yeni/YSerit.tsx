@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { Product } from "@/lib/supabase";
-import { type Dil, urunLinki, ad } from "@/lib/diller";
+import { type Dil, urunLinki, ad, kurumsalYolu } from "@/lib/diller";
 import { M, kategoriGoster } from "@/lib/site-metin";
 import { Y } from "./metin";
 
@@ -33,7 +33,7 @@ export default function YSerit({ kategoriler, products, dil = "tr" }: { kategori
             <p className="text-[13px] tracking-[0.2em] text-black/45 mb-3">{t.etiket}</p>
             <h2 className="font-semibold tracking-[-0.02em]" style={{ fontSize: "clamp(32px,4.4vw,56px)" }}>{t.baslik}</h2>
           </div>
-          <p className="text-black/55 text-[17px]">{t.alt}</p>
+          <Link href={kurumsalYolu(dil, "urunler")} className="font-semibold border-b-2 border-black pb-0.5 hover:text-[var(--yt-accent)] hover:border-[var(--yt-accent)]">{Y[dil].yeni.tum}</Link>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-5">
