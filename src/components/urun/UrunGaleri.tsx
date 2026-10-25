@@ -26,7 +26,7 @@ export default function UrunGaleri({
 
   return (
     <div className="min-w-0 w-full max-w-full">
-      <div className="bg-[#e3ddcf] flex items-center justify-center overflow-hidden w-full max-w-full" style={{ aspectRatio: "1 / 1" }}>
+      <div className="bg-[#f5f5f2] rounded-2xl flex items-center justify-center overflow-hidden w-full max-w-full" style={{ aspectRatio: "1 / 1" }}>
         {renkGorsel ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={renkGorsel} alt={alt} className="w-full h-full object-contain" style={{ padding: "clamp(16px,4vw,48px)" }} />
@@ -67,7 +67,7 @@ export default function UrunGaleri({
           {/* İlk küçük resim: ana gösterimi (3D/360/ilk foto) temsil eder */}
           <li>
             <button type="button" onClick={() => thumbSec(0)} aria-label={`${alt} — 1`} aria-current={secili === 0 && !renkGorsel}
-              className="block w-full bg-[#e3ddcf] aspect-square transition-opacity"
+              className="block w-full bg-[#f5f5f2] rounded-xl aspect-square transition-opacity"
               style={{ outline: secili === 0 ? "2px solid #e55f28" : "2px solid transparent", outlineOffset: -2, opacity: secili === 0 ? 1 : 0.75 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={resimler[0]} alt="" loading="lazy" className="w-full h-full object-contain p-2" />
@@ -78,7 +78,7 @@ export default function UrunGaleri({
             return (
               <li key={r}>
                 <button type="button" onClick={() => thumbSec(idx)} aria-label={`${alt} — ${idx + 1}`} aria-current={secili === idx && !renkGorsel}
-                  className="block w-full bg-[#e3ddcf] aspect-square transition-opacity"
+                  className="block w-full bg-[#f5f5f2] rounded-xl aspect-square transition-opacity"
                   style={{ outline: secili === idx ? "2px solid #e55f28" : "2px solid transparent", outlineOffset: -2, opacity: secili === idx ? 1 : 0.75 }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={r} alt="" loading="lazy" className="w-full h-full object-contain p-2" />

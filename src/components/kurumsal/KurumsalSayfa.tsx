@@ -1,28 +1,26 @@
 import type { ReactNode } from "react";
 import type { Settings } from "@/lib/supabase";
 import type { Dil } from "@/lib/diller";
-import { HREFLANG } from "@/lib/diller";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
+import YCerceve from "@/components/yeni/YCerceve";
 
-// Kurumsal içerik sayfaları (Hakkımızda, Üretim Süreci, Sertifikalar, KVKK) için ortak sayfa
-// iskeleti — anasayfayla aynı Header/Footer'ı kullanır. dil verilmezse (kök /hakkimizda vb.)
-// Türkçe varsayılır; /en, /ru, /zh altındaki karşılıkları dil geçer, böylece dil değiştirici
-// bu sayfalarda da doğru dile kalır (bkz. altDiller).
+// Kurumsal içerik sayfaları (Hakkımızda, Üretim Süreci, Sertifikalar, KVKK) için ortak sayfa iskeleti.
+// dil verilmezse Türkçe; altDiller dil değiştiricinin aynı sayfada kalmasını sağlar.
 export default function KurumsalSayfa({ settings, dil = "tr", altDiller, etiket, baslik, children }: { settings: Settings | null; dil?: Dil; altDiller?: Partial<Record<Dil, string>>; etiket: string; baslik: string; children: ReactNode }) {
   return (
-    <div lang={HREFLANG[dil]}>
-      <Header settings={settings} dil={dil} altDiller={altDiller} />
-      <main className="bg-[#eae6dd] min-h-svh pt-[84px]">
-        <div style={{ paddingInline: "clamp(20px,5vw,80px)", paddingBlock: "clamp(48px,7vw,96px)" }}>
-          <p className="eyebrow text-[#e55f28] mb-3">{etiket}</p>
-          <h1 className="heading text-[#0b0e0b] mb-10" style={{ fontSize: "clamp(36px,6vw,68px)", lineHeight: 0.98, maxWidth: "18ch" }}>{baslik}</h1>
-          <div className="flex flex-col gap-5 text-[#3c4238]" style={{ maxWidth: "72ch", fontSize: "clamp(15px,1.6vw,17px)", lineHeight: 1.85 }}>
-            {children}
+    <YCerceve settings={settings} dil={dil} altDiller={altDiller}>
+      <main>
+        <section className="bg-[#f5f5f2]" style={{ paddingBlock: "clamp(40px,6vw,88px)" }}>
+          <div className="yt-wrap">
+            <p className="text-[13px] tracking-[0.2em] text-[var(--yt-accent)] font-semibold mb-4">{etiket.replace("—", "").trim().toUpperCase()}</p>
+            <h1 className="font-semibold tracking-[-0.025em] leading-[1.05] max-w-[20ch]" style={{ fontSize: "clamp(34px,5.4vw,68px)" }}>{baslik}</h1>
           </div>
-        </div>
+        </section>
+        <section className="bg-white" style={{ paddingBlock: "clamp(40px,6vw,88px)" }}>
+          <div className="yt-wrap">
+            <div className="yt-prose">{children}</div>
+          </div>
+        </section>
       </main>
-      <Footer settings={settings} dil={dil} />
-    </div>
+    </YCerceve>
   );
 }
