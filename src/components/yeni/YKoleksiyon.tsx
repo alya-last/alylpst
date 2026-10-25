@@ -15,7 +15,7 @@ export default function YKoleksiyon({ dil = "tr", icGorsel, disGorsel }: { dil?:
         </div>
         <div className="grid md:grid-cols-2 gap-6">
           {kartlar.map(c => (
-            <Link key={c.k} href={`${kurumsalYolu(dil, "katalog")}?mekan=${c.k}`} className="group relative block aspect-[4/3] md:aspect-[5/4] rounded-2xl overflow-hidden bg-[#1c1c1c] text-white">
+            <Link key={c.k} href={`${kurumsalYolu(dil, "urunler")}?mekan=${c.k}`} className="group relative block aspect-[4/3] md:aspect-[5/4] rounded-2xl overflow-hidden bg-[#1c1c1c] text-white">
               {c.g && /* eslint-disable-next-line @next/next/no-img-element */ <img src={c.g} alt={c.ad} loading="lazy" className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]" />}
               <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,.78) 0%, rgba(0,0,0,.05) 60%)" }} />
               <div className="absolute left-7 right-7 bottom-7 flex items-end justify-between">

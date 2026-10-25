@@ -29,7 +29,7 @@ export default function YFooter({ settings, dil = "tr", kategoriler = [] }: { se
     { a: "LinkedIn", I: Linkedin, u: guvenliUrl(s?.linkedin) },
   ].filter(x => x.u);
   const iletisim = `${dilYolu(dil)}#iletisim`.replace("//", "/");
-  const urun = `${dilYolu(dil)}#collection`.replace("//", "/");
+  const urun = kurumsalYolu(dil, "urunler");
 
   return (
     <footer className="bg-[#232323] text-white/80">
@@ -74,7 +74,7 @@ export default function YFooter({ settings, dil = "tr", kategoriler = [] }: { se
         <div>
           <h3 className="font-bold text-white mb-5">{e.kategoriler}</h3>
           <ul className="space-y-3">
-            {kategoriler.map(c => <li key={c.k}><a href={`${urun.split("#")[0]}?kategori=${c.k}#collection`} className="hover:text-white transition-colors">{kat[c.k] ?? c.k}</a></li>)}
+            {kategoriler.map(c => <li key={c.k}><a href={`${urun}?kategori=${c.k}`} className="hover:text-white transition-colors">{kat[c.k] ?? c.k}</a></li>)}
             <li><a href={iletisim} className="hover:text-white transition-colors">{t.alt.ozel}</a></li>
           </ul>
         </div>
