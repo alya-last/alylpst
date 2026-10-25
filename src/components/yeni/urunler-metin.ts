@@ -5,3 +5,10 @@ export const UM: Record<Dil, { etiket: string; baslik: string; aciklama: string;
   ru: { etiket: "ПРОДУКЦИЯ", baslik: "Вся наша продукция", aciklama: "Горшки, корзины, ящики и товары для дома — фильтр по категории и назначению.", ara: "Поиск по названию или коду", tumu: "Все", ic: "Для дома", dis: "Для улицы", mekan: "Назначение", kategori: "Категория", bulunamadi: "Нет товаров, подходящих под фильтр.", urun: "товаров", temizle: "Сбросить фильтры", meta: "Продукция | Alya Plastik" },
   zh: { etiket: "产品", baslik: "全部产品", aciklama: "花盆、篮子、箱子和家居用品——按类别和使用场景筛选。", ara: "按产品名称或编号搜索", tumu: "全部", ic: "室内", dis: "户外", mekan: "场景", kategori: "类别", bulunamadi: "没有符合筛选条件的产品。", urun: "款产品", temizle: "清除筛选", meta: "产品 | Alya Plastik" },
 };
+
+export const IM: Record<Dil, { baslik: string; aciklama: string }> = {
+  tr: { baslik: "İletişim", aciklama: "Toptan sipariş, özel kalıp, ihracat ve katalog talepleriniz için bize ulaşın. Teklifiniz 72 saat içinde hazır." },
+  en: { baslik: "Contact", aciklama: "Reach us for wholesale orders, custom molds, export and catalog requests. Your quote is ready within 72 hours." },
+  ru: { baslik: "Контакты", aciklama: "Свяжитесь с нами по вопросам опта, индивидуальных пресс-форм, экспорта и каталога. Предложение — в течение 72 часов." },
+  zh: { baslik: "联系我们", aciklama: "批发订单、定制模具、出口和目录需求，欢迎联系我们。72小时内提供报价。" },
+};

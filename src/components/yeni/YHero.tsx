@@ -13,7 +13,7 @@ export default function YHero({ dil = "tr", gorseller }: { dil?: Dil; gorseller:
     const id = setInterval(() => setI(p => (p + 1) % n), 7000);
     return () => clearInterval(id);
   }, [n, i]);
-  const git = (k: string) => k === "uretim" ? kurumsalYolu(dil, "uretim-sureci") : k === "katalog" ? kurumsalYolu(dil, "katalog") : `${dilYolu(dil)}#${k}`.replace("//", "/");
+  const git = (k: string) => k === "iletisim" ? kurumsalYolu(dil, "iletisim") : k === "uretim" ? kurumsalYolu(dil, "uretim-sureci") : k === "katalog" ? kurumsalYolu(dil, "katalog") : `${dilYolu(dil)}#${k}`.replace("//", "/");
 
   return (
     <section className="relative h-[clamp(480px,62vh,660px)] bg-[#1c1c1c] overflow-hidden text-white">
