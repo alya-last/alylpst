@@ -51,7 +51,7 @@ export default async function Page({ params }: { params: Promise<{ lang: string 
           <div className="yt-wrap">
             {katalog?.url ? (
               <div className="rounded-3xl overflow-hidden bg-[#0b0e0b]">
-                <KatalogGoruntuleyici pdfUrl={katalog.url} dil=dil />
+                <KatalogGoruntuleyici pdfUrl={katalog.url} dil={dil} />
               </div>
             ) : (
               <p className="text-black/60" style={{ maxWidth: "60ch" }}>{t.hazirlaniyor}</p>
