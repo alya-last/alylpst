@@ -71,7 +71,7 @@ export default async function Anasayfa({ dil }: { dil: Dil }) {
         <YIhracat countries={countries} dil={dil} />
         <YIletisim settings={settings} dil={dil} />
       </main>
-      <YFooter settings={settings} dil={dil} />
+      <YFooter settings={settings} dil={dil} kategoriler={kat} />
       <WhatsAppFab settings={settings} dil={dil} />
       <ChatAsistan dil={dil} />
     </div>
