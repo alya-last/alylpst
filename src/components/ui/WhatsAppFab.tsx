@@ -22,7 +22,7 @@ export default function WhatsAppFab({ settings, dil = "tr" }: { settings: Settin
     <a href={wa} target="_blank" rel="noopener noreferrer nofollow" aria-label={w.buton} title={w.buton}
       className="fixed z-85 flex items-center justify-center rounded-full shadow-2xl hover:scale-105 transition-all duration-300"
       style={{
-        bottom: 80, right: "clamp(12px,3vw,40px)", width: 58, height: 58, background: "#22c55e", color: "#fff", border: "3px solid #fff",
+        bottom: 24, right: "clamp(12px,3vw,40px)", width: 58, height: 58, background: "#22c55e", color: "#fff", border: "3px solid #fff",
         opacity: visible ? 1 : 0,
         transform: visible ? "translateY(0)" : "translateY(12px)",
         pointerEvents: visible ? "auto" : "none",
