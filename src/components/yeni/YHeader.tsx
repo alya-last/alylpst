@@ -1,11 +1,47 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Search, Menu, X, Phone } from "lucide-react";
+import { Search, Menu, X, Phone, Globe, ChevronDown, Check } from "lucide-react";
 import type { Settings, Product } from "@/lib/supabase";
-import { DILLER, type Dil, kurumsalYolu, urunLinki, ad } from "@/lib/diller";
+import { DILLER, DIL_AD, HREFLANG, type Dil, kurumsalYolu, urunLinki, ad } from "@/lib/diller";
 import { dilYolu } from "@/lib/site-metin";
 import { Y } from "./metin";
+
+const BAYRAK: Record<Dil, string> = { tr: "🇹🇷", en: "🇬🇧", ru: "🇷🇺", zh: "🇨🇳" };
+
+// Dil seçici: küre ikonlu açılır düğme (bayrak + dil adı)
+function DilSecici({ dil, altDiller }: { dil: Dil; altDiller?: Partial<Record<Dil, string>> }) {
+  const [acik, setAcik] = useState(false);
+  const kutu = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!acik) return;
+    const d = (e: MouseEvent) => { if (kutu.current && !kutu.current.contains(e.target as Node)) setAcik(false); };
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") setAcik(false); };
+    document.addEventListener("mousedown", d); document.addEventListener("keydown", k);
+    return () => { document.removeEventListener("mousedown", d); document.removeEventListener("keydown", k); };
+  }, [acik]);
+  return (
+    <div ref={kutu} className="relative">
+      <button type="button" onClick={() => setAcik(p => !p)} aria-expanded={acik} aria-haspopup="listbox" aria-label={DIL_AD[dil]}
+        className="flex items-center gap-1.5 h-7 px-2.5 rounded-full border border-white/25 hover:border-white/60 text-white transition-colors">
+        <Globe size={14} /><span className="text-[13px] font-semibold">{dil.toUpperCase()}</span><ChevronDown size={12} className={`transition-transform ${acik ? "rotate-180" : ""}`} />
+      </button>
+      {acik && (
+        <ul role="listbox" className="absolute end-0 top-[calc(100%+8px)] min-w-[170px] py-1.5 bg-white text-[#1b1b1b] rounded-xl shadow-2xl border border-black/10 z-[90]">
+          {DILLER.map(d => (
+            <li key={d} role="option" aria-selected={d === dil}>
+              {d === dil ? (
+                <span className="flex items-center gap-2.5 px-3.5 py-2.5 font-semibold"><span className="text-[17px]">{BAYRAK[d]}</span><span className="flex-1">{DIL_AD[d]}</span><Check size={15} className="text-[var(--yt-accent)]" /></span>
+              ) : (
+                <Link href={altDiller?.[d] ?? dilYolu(d)} hrefLang={HREFLANG[d]} onClick={() => setAcik(false)} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-black/[0.05]"><span className="text-[17px]">{BAYRAK[d]}</span><span>{DIL_AD[d]}</span></Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const norm = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9çğıöşü]+/g, " ").trim();
 
@@ -39,11 +75,7 @@ export default function YHeader({ settings, dil = "tr", urunler, altDiller }: { 
           </nav>
           <div className="flex items-center gap-5 ms-auto">
             <a href={`tel:${phone.replace(/\D/g, "")}`} className="hidden sm:inline-flex items-center gap-1.5 hover:text-white"><Phone size={13} />{phone}</a>
-            <div className="flex items-center gap-2.5 font-medium">
-              {DILLER.map(d => d === dil
-                ? <span key={d} className="text-[var(--yt-accent)] font-bold">{d.toUpperCase()}</span>
-                : <Link key={d} href={altDiller?.[d] ?? dilYolu(d)} className="hover:text-white">{d.toUpperCase()}</Link>)}
-            </div>
+            <DilSecici dil={dil} altDiller={altDiller} />
           </div>
         </div>
       </div>
