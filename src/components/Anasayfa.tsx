@@ -3,20 +3,17 @@ import { resolveImg } from "@/data/images";
 import type { Dil } from "@/lib/urun-sayfasi";
 import HtmlLang         from "@/components/layout/HtmlLang";
 import HashDuzelt       from "@/components/layout/HashDuzelt";
-import Header           from "@/components/layout/Header";
-import Footer           from "@/components/layout/Footer";
-import Animations       from "@/components/layout/Animations";
 import SchemaOrg        from "@/components/layout/SchemaOrg";
 import WhatsAppFab      from "@/components/ui/WhatsAppFab";
 import ChatAsistan      from "@/components/ui/ChatAsistan";
-import ProgressDots     from "@/components/ui/ProgressDots";
-import Hero             from "@/components/sections/Hero";
-import Marquee          from "@/components/sections/Marquee";
-import FeaturedProducts from "@/components/sections/FeaturedProducts";
-import HorizontalPin    from "@/components/sections/HorizontalPin";
-import Collection       from "@/components/sections/Collection";
-import FullscreenFeature from "@/components/sections/FullscreenFeature";
-import Why              from "@/components/sections/Why";
+import YHeader from "@/components/yeni/YHeader";
+import YHero from "@/components/yeni/YHero";
+import YSerit from "@/components/yeni/YSerit";
+import YUrunler from "@/components/yeni/YUrunler";
+import YKoleksiyon from "@/components/yeni/YKoleksiyon";
+import YUretim from "@/components/yeni/YUretim";
+import YIsbirligi from "@/components/yeni/YIsbirligi";
+import YFooter from "@/components/yeni/YFooter";
 import Export           from "@/components/sections/Export";
 import Contact          from "@/components/sections/Contact";
 
@@ -48,28 +45,32 @@ export default async function Anasayfa({ dil }: { dil: Dil }) {
   const gorunenler = resimli(all);
   const img = resolveImg(temaOverride);
 
+  // Yeni açık renkli tasarım: yeni ürünler (yoksa öne çıkanlar) kaydırıcıda, koleksiyon kartları mekan görselleriyle
+  const yeniler = gorunenler.filter(p => p.is_new);
+  const vitrin = (yeniler.length ? yeniler : featured.length ? featured : gorunenler).slice(0, 14);
+  const ilk = (mekan: "ic" | "dis") => gorunenler.find(p => p.mekan === mekan)?.image_url;
+  const kat = Object.entries(gorunenler.reduce<Record<string, number>>((a, p) => { if (p.category) a[p.category] = (a[p.category] || 0) + 1; return a; }, {})).map(([k, adet]) => ({ k, adet })).sort((x, y) => y.adet - x.adet);
+  const slaytGorsel = [img.hero2, img.fikir, img.ufo];
+
   return (
-    <>
+    <div className="yt">
       <HtmlLang dil={dil} />
       <HashDuzelt />
       <SchemaOrg settings={settings} stats={stats} dil={dil} />
-      <Animations />
-      <ProgressDots />
-      <Header settings={settings} dil={dil} />
+      <YHeader settings={settings} dil={dil} urunler={gorunenler} />
       <main>
-        <Hero stats={stats} settings={settings} dil={dil} img={img} />
-        <Marquee dil={dil} />
-        <FeaturedProducts products={featured} dil={dil} />
-        <HorizontalPin products={gorunenler} dil={dil} />
-        <Collection products={gorunenler} dil={dil} />
-        <FullscreenFeature dil={dil} img={img} />
-        <Why stats={stats} dil={dil} img={img} />
-        <Export countries={countries} dil={dil} />
-        <Contact settings={settings} dil={dil} />
+        <YHero dil={dil} gorseller={slaytGorsel} />
+        <YSerit kategoriler={kat} dil={dil} />
+        <YUrunler products={vitrin} dil={dil} />
+        <YKoleksiyon dil={dil} icGorsel={ilk("ic")} disGorsel={ilk("dis")} />
+        <YUretim dil={dil} stats={stats} settings={settings} gorsel={img.hero2} />
+        <YIsbirligi dil={dil} gorselSol={gorunenler[0]?.image_url} gorselSag={gorunenler[1]?.image_url} />
+        <div id="ihracat"><Export countries={countries} dil={dil} /></div>
+        <div id="iletisim"><Contact settings={settings} dil={dil} /></div>
       </main>
-      <Footer settings={settings} dil={dil} />
+      <YFooter settings={settings} dil={dil} />
       <WhatsAppFab settings={settings} dil={dil} />
       <ChatAsistan dil={dil} />
-    </>
+    </div>
   );
 }
