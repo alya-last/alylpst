@@ -45,6 +45,7 @@ export function applyQuery(q: any, sp: URLSearchParams) {
 const NO_CREATED_BY = new Set([
   'depolar', 'hammadde_lotlari', 'ihracat_detaylari', 'kalip_bakim_kayitlari', 'kalite_kontrol_kayitlari', 'recete_kalemleri',
   'satinalma_siparisi_kalemleri', 'satis_siparisi_kalemleri', 'uretim_hareketleri', 'roller', 'fiyat_listesi_kalemleri', 'iskonto_kademeleri',
+  'maliyet_ayar', 'maliyet_hammadde', 'maliyet_makine', 'maliyet_urun',
 ])
 const NO_UPDATED_BY = new Set([...NO_CREATED_BY, 'banka_ekstre_kayitlari', 'fire_kayitlari', 'stok_hareketleri'])
 
