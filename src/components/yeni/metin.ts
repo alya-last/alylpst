@@ -5,7 +5,7 @@ export type YMetin = {
   ustLink: { hakkimizda: string; uretim: string; sertifika: string; katalog: string };
   nav: { anasayfa: string; kurumsal: string; urunler: string; katalog: string; iletisim: string; teklif: string; ara: string; sonucYok: string; menu: string };
   slayt: { etiket: string; baslik: string; alt: string; dugme: string; href: "uretim" | "urunler" | "iletisim" | "katalog" }[];
-  seritBaslik: string;
+  katBolum: { etiket: string; baslik: string; alt: string; model: string; tumUrun: string; temizle: string };
   yeni: { baslik: string; tum: string; yeni: string };
   koleksiyon: { baslik: string; alt: string; ic: { ad: string; alt: string }; dis: { ad: string; alt: string }; incele: string };
   uretim: { etiket: string; baslik: (m: number) => string; alt: string; yil: string; ulke: string; model: string; kesfet: string };
@@ -24,7 +24,7 @@ export const Y: Record<Dil, YMetin> = {
       { etiket: "GENİŞ ÜRÜN GAMI", baslik: "200'den fazla model, tek çatı altında", alt: "İç mekan ve dış mekan koleksiyonlarımızı keşfedin", dugme: "Ürünleri inceleyin", href: "urunler" },
       { etiket: "İHRACAT", baslik: "20'den fazla ülkeye ihracat", alt: "Toptan sipariş, özel kalıp ve markalı üretim için ekibimizle görüşün", dugme: "Teklif iste", href: "iletisim" },
     ],
-    seritBaslik: "Ürün grupları",
+    katBolum: { etiket: "ÜRÜN GRUPLARI", baslik: "Kategoriye göre keşfedin", alt: "Bir kategori seçin, ürünler aşağıda süzülsün", model: "model", tumUrun: "Tüm ürünler", temizle: "Süzgeci temizle" },
     yeni: { baslik: "Yeni modeller", tum: "Tümünü gör", yeni: "YENİ" },
     koleksiyon: { baslik: "Koleksiyonlarımız", alt: "İki koleksiyon, tek üretici", ic: { ad: "İç Mekan", alt: "Salon, balkon ve ev için" }, dis: { ad: "Dış Mekan", alt: "Bahçe, teras ve peyzaj için" }, incele: "İncele" },
     uretim: { etiket: "ÜRETİM", baslik: m => `${m}'den fazla model, kendi tesisimizde`, alt: "İstanbul OSB'deki tesisimizde kalıptan sevkiyata tüm süreci kendimiz yönetiyoruz.", yil: "kuruluş", ulke: "ihracat ülkesi", model: "model", kesfet: "Üretimi keşfedin" },
@@ -41,7 +41,7 @@ export const Y: Record<Dil, YMetin> = {
       { etiket: "WIDE PRODUCT RANGE", baslik: "200+ models under one roof", alt: "Discover our indoor and outdoor collections", dugme: "Browse products", href: "urunler" },
       { etiket: "EXPORT", baslik: "Exporting to 20+ countries", alt: "Talk to our team about wholesale, custom molds and private label", dugme: "Get a quote", href: "iletisim" },
     ],
-    seritBaslik: "Product groups",
+    katBolum: { etiket: "PRODUCT GROUPS", baslik: "Explore by category", alt: "Pick a category to filter the products below", model: "models", tumUrun: "All products", temizle: "Clear filter" },
     yeni: { baslik: "New models", tum: "View all", yeni: "NEW" },
     koleksiyon: { baslik: "Our collections", alt: "Two collections, one manufacturer", ic: { ad: "Indoor", alt: "For living rooms, balconies and homes" }, dis: { ad: "Outdoor", alt: "For gardens, terraces and landscaping" }, incele: "Explore" },
     uretim: { etiket: "PRODUCTION", baslik: m => `${m}+ models made in our own facility`, alt: "At our Istanbul OSB plant we manage everything from mold to shipment ourselves.", yil: "founded", ulke: "export countries", model: "models", kesfet: "Discover production" },
@@ -58,7 +58,7 @@ export const Y: Record<Dil, YMetin> = {
       { etiket: "ШИРОКИЙ АССОРТИМЕНТ", baslik: "Более 200 моделей под одной крышей", alt: "Коллекции для дома и для сада", dugme: "Смотреть продукцию", href: "urunler" },
       { etiket: "ЭКСПОРТ", baslik: "Экспорт в более чем 20 стран", alt: "Опт, индивидуальные формы и собственная торговая марка — свяжитесь с нами", dugme: "Запросить цену", href: "iletisim" },
     ],
-    seritBaslik: "Группы товаров",
+    katBolum: { etiket: "ГРУППЫ ТОВАРОВ", baslik: "Выберите категорию", alt: "Выберите категорию — товары ниже отфильтруются", model: "моделей", tumUrun: "Вся продукция", temizle: "Сбросить фильтр" },
     yeni: { baslik: "Новые модели", tum: "Смотреть все", yeni: "НОВИНКА" },
     koleksiyon: { baslik: "Наши коллекции", alt: "Две коллекции, один производитель", ic: { ad: "Для дома", alt: "Для комнат, балконов и интерьера" }, dis: { ad: "Для улицы", alt: "Для сада, террасы и ландшафта" }, incele: "Смотреть" },
     uretim: { etiket: "ПРОИЗВОДСТВО", baslik: m => `Более ${m} моделей на собственном заводе`, alt: "На нашем заводе в Стамбуле мы сами ведём весь процесс — от пресс-формы до отгрузки.", yil: "основана", ulke: "стран экспорта", model: "моделей", kesfet: "О производстве" },
@@ -75,7 +75,7 @@ export const Y: Record<Dil, YMetin> = {
       { etiket: "丰富产品线", baslik: "200多款型号，一站式提供", alt: "探索我们的室内和户外系列", dugme: "浏览产品", href: "urunler" },
       { etiket: "出口", baslik: "出口至20多个国家", alt: "批发、定制模具和贴牌生产，欢迎联系我们", dugme: "获取报价", href: "iletisim" },
     ],
-    seritBaslik: "产品分类",
+    katBolum: { etiket: "产品分类", baslik: "按类别浏览", alt: "选择类别，下方产品将自动筛选", model: "款", tumUrun: "全部产品", temizle: "清除筛选" },
     yeni: { baslik: "新品", tum: "查看全部", yeni: "新品" },
     koleksiyon: { baslik: "我们的系列", alt: "两大系列，同一制造商", ic: { ad: "室内", alt: "适用于客厅、阳台和家居" }, dis: { ad: "户外", alt: "适用于花园、露台和园林" }, incele: "查看" },
     uretim: { etiket: "生产", baslik: m => `${m}多款型号，自有工厂生产`, alt: "在伊斯坦布尔工厂，我们自行管理从模具到发货的全部流程。", yil: "成立", ulke: "出口国家", model: "款型号", kesfet: "了解生产" },
