@@ -12,6 +12,7 @@ const TABLES = new Set([
   'kalite_kontrol_kayitlari','fire_kayitlari',
   'roller','kasa_banka_hesaplari',
   'fiyat_listeleri','fiyat_listesi_kalemleri','iskonto_kademeleri','banka_ekstre_kayitlari',
+  'maliyet_ayar','maliyet_hammadde','maliyet_makine','maliyet_urun',
 ])
 
 // Salt-okunur view'lar — sadece GET (select) izinli, hiçbir yazma işlemi yapılamaz.

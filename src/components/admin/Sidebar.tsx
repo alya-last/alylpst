@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import SifreDegistir from './SifreDegistir'
 import MfaAyar from './MfaAyar'
 import { useEffect, useState } from 'react'
-import { GraduationCap, Target, Scale, Building2, Share2, LayoutDashboard, Package, Tag, MessageSquare, Settings, BarChart2, TrendingUp, Eye, Image, LogOut, ExternalLink, FileText, Bell, Activity, Layers, DollarSign, Receipt, Users2, PieChart, Landmark, FileSignature, Warehouse, Boxes, ArrowLeftRight, Cog, Wrench, FlaskConical, Factory, Zap, ClipboardList, PackageSearch, Truck, ShieldCheck, FlameKindling, UserCog, ScanLine, Sparkles, KeyRound, Palette, BookOpen, Database } from 'lucide-react'
+import { Calculator, GraduationCap, Target, Scale, Building2, Share2, LayoutDashboard, Package, Tag, MessageSquare, Settings, BarChart2, TrendingUp, Eye, Image, LogOut, ExternalLink, FileText, Bell, Activity, Layers, DollarSign, Receipt, Users2, PieChart, Landmark, FileSignature, Warehouse, Boxes, ArrowLeftRight, Cog, Wrench, FlaskConical, Factory, Zap, ClipboardList, PackageSearch, Truck, ShieldCheck, FlameKindling, UserCog, ScanLine, Sparkles, KeyRound, Palette, BookOpen, Database } from 'lucide-react'
 
 const NAV = [
   { g:'Genel', mod:['dashboard'], items:[
@@ -57,6 +57,7 @@ const NAV = [
     { href:'/admin/dashboard/uretim/makine',  label:'Makineler',        Icon:Cog,          mod:['uretim'] },
     { href:'/admin/dashboard/uretim/kalip',   label:'Kalıplar',         Icon:Wrench,       mod:['uretim'] },
     { href:'/admin/dashboard/uretim/recete',  label:'BOM / Reçeteler',  Icon:FlaskConical, mod:['uretim'] },
+    { href:'/admin/dashboard/uretim/maliyet', label:'Ürün Maliyeti',    Icon:Calculator,   mod:['uretim'] },
     { href:'/admin/dashboard/uretim/emirler', label:'Üretim Emirleri',  Icon:Factory,      mod:['uretim'] },
     { href:'/admin/dashboard/uretim/canli',   label:'Canlı Üretim',     Icon:Zap,          mod:['uretim'] },
   ]},
