@@ -1,6 +1,6 @@
 import { getFeaturedProducts, getAllProducts, getStats, getSettings, getExportCountries, getTemaGorselleri } from "@/lib/supabase";
 import { resolveImg } from "@/data/images";
-import { Outfit } from "next/font/google";
+import { outfit } from "@/components/yeni/font";
 import type { Dil } from "@/lib/urun-sayfasi";
 import HtmlLang         from "@/components/layout/HtmlLang";
 import HashDuzelt       from "@/components/layout/HashDuzelt";
@@ -17,8 +17,6 @@ import YIsbirligi from "@/components/yeni/YIsbirligi";
 import YFooter from "@/components/yeni/YFooter";
 import YIhracat from "@/components/yeni/YIhracat";
 import YIletisim from "@/components/yeni/YIletisim";
-
-const outfit = Outfit({ subsets: ["latin", "latin-ext"], weight: ["300", "400", "500", "600", "700"], display: "swap" });
 
 // Ana sayfa gövdesi — tüm diller için ortak (tr: "/", diğerleri: "/en", "/ru", "/zh").
 export default async function Anasayfa({ dil }: { dil: Dil }) {

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
+import YCerceve from "@/components/yeni/YCerceve";
 import { getKatalog, getSettings } from "@/lib/supabase";
 import { DILLER, HREFLANG, SITE_URL, kurumsalYolu } from "@/lib/diller";
 import { KATALOG } from "@/lib/kurumsal-metin";
@@ -27,22 +26,26 @@ export default async function KatalogPage() {
   const altDiller = Object.fromEntries(DILLER.map(d => [d, kurumsalYolu(d, "katalog")]));
 
   return (
-    <div lang="tr">
-      <Header settings={settings} dil="tr" altDiller={altDiller} />
-      <main className="bg-[#0b0e0b] min-h-svh pt-[84px]">
-        <div style={{ paddingInline: "clamp(20px,5vw,80px)", paddingBlock: "clamp(32px,5vw,56px)" }}>
-          <p className="eyebrow text-[#e55f28] mb-3">— {t.etiket}</p>
-          <h1 className="heading text-[#eae6dd] mb-8" style={{ fontSize: "clamp(32px,5vw,56px)", lineHeight: 0.98 }}>{t.baslik}</h1>
-        </div>
-        {katalog?.url ? (
-          <KatalogGoruntuleyici pdfUrl={katalog.url} dil="tr" />
-        ) : (
-          <div style={{ paddingInline: "clamp(20px,5vw,80px)", paddingBottom: 96 }}>
-            <p className="text-[#9aa294]" style={{ maxWidth: "60ch" }}>{t.hazirlaniyor}</p>
+    <YCerceve settings={settings} dil={"tr"} altDiller={altDiller}>
+      <main>
+        <section className="bg-[#f5f5f2]" style={{ paddingBlock: "clamp(32px,5vw,64px)" }}>
+          <div className="yt-wrap">
+            <p className="text-[13px] tracking-[0.2em] text-[var(--yt-accent)] font-semibold mb-3">{t.etiket.toUpperCase()}</p>
+            <h1 className="font-semibold tracking-[-0.025em] leading-[1.05]" style={{ fontSize: "clamp(32px,5vw,60px)" }}>{t.baslik}</h1>
           </div>
-        )}
+        </section>
+        <section className="bg-white" style={{ paddingBlock: "clamp(24px,4vw,56px)" }}>
+          <div className="yt-wrap">
+            {katalog?.url ? (
+              <div className="rounded-3xl overflow-hidden bg-[#0b0e0b]">
+                <KatalogGoruntuleyici pdfUrl={katalog.url} dil="tr" />
+              </div>
+            ) : (
+              <p className="text-black/60" style={{ maxWidth: "60ch" }}>{t.hazirlaniyor}</p>
+            )}
+          </div>
+        </section>
       </main>
-      <Footer settings={settings} dil="tr" />
-    </div>
+    </YCerceve>
   );
 }
