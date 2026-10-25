@@ -5,7 +5,7 @@ import { muh } from './muhasebe-client'
 
 // Üretim & kalite sayfalarının ortak veri yükleyicisi — sadece istenen veri kümelerini çeker.
 const FETCH = {
-  products:        () => muh.all('products', 'id,name,code,mekan'),
+  products:        () => muh.all('products', 'id,name,code,mekan,image_url'),
   variants:        () => muh.all('product_variants', 'id,product_id,name,color,size,stock,sort_order,hex,gorsel'),
   hammaddeler:     () => erp.all('hammaddeler', '*', q => q.order('ad', { ascending: true })),
   makineler:       () => erp.all('makineler', '*', q => q.order('ad', { ascending: true })),

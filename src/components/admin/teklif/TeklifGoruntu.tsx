@@ -5,8 +5,8 @@ const para = (n: number, pb: string) => `${new Intl.NumberFormat('tr-TR', { mini
 const tarih = (t: string) => (t ? t.split('-').reverse().join('.') : '')
 const S = { td: { border: '1px solid #999', padding: '4px 6px', verticalAlign: 'top' as const, fontSize: 11 }, th: { border: '1px solid #999', padding: '4px 6px', background: '#eee', fontSize: 10.5, textAlign: 'left' as const } }
 
-export default function TeklifGoruntu({ no, dil, firma, musteri, tarihi, gecerlilik, paraBirimi, kdvOrani, kalemler, kosullar }: {
-  no: string; dil: Dil; firma: string; musteri: string; tarihi: string; gecerlilik: string; paraBirimi: string; kdvOrani: number; kalemler: TKalem[]; kosullar: string
+export default function TeklifGoruntu({ no, dil, firma, musteri, tarihi, gecerlilik, paraBirimi, kdvOrani, kalemler, kosullar, gorseller }: {
+  gorseller?: Record<string, string>; no: string; dil: Dil; firma: string; musteri: string; tarihi: string; gecerlilik: string; paraBirimi: string; kdvOrani: number; kalemler: TKalem[]; kosullar: string
 }) {
   const T = etiket(dil), s = teklifHesapla(kalemler, kdvOrani), sat = kalemler.filter(k => k.urun_adi.trim()), iskVar = sat.some(k => +k.iskonto_yuzde > 0)
   return (
@@ -18,7 +18,7 @@ export default function TeklifGoruntu({ no, dil, firma, musteri, tarihi, gecerli
       <div style={{ fontSize: 12, marginBottom: 10 }}>{T.sayin}: <b>{musteri.split('\n')[0]}</b>{musteri.includes('\n') && <div style={{ whiteSpace: 'pre-line', color: '#444', fontSize: 11 }}>{musteri.split('\n').slice(1).join('\n')}</div>}</div>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr><th style={S.th}>#</th><th style={S.th}>{T.urun}</th><th style={{ ...S.th, textAlign: 'right' }}>{T.miktar}</th><th style={S.th}>{T.birim}</th><th style={{ ...S.th, textAlign: 'right' }}>{T.fiyat}</th>{iskVar && <th style={{ ...S.th, textAlign: 'right' }}>{T.isk}</th>}<th style={{ ...S.th, textAlign: 'right' }}>{T.tutar}</th></tr></thead>
-        <tbody>{sat.map((k, i) => <tr key={i}><td style={S.td}>{i + 1}</td><td style={S.td}>{k.urun_adi}{k.aciklama && <div style={{ color: '#555', fontSize: 10 }}>{k.aciklama}</div>}</td><td style={{ ...S.td, textAlign: 'right' }}>{new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 3 }).format(k.miktar)}</td><td style={S.td}>{k.birim}</td><td style={{ ...S.td, textAlign: 'right' }}>{para(k.birim_fiyat, paraBirimi)}</td>{iskVar && <td style={{ ...S.td, textAlign: 'right' }}>{k.iskonto_yuzde ? `%${k.iskonto_yuzde}` : ''}</td>}<td style={{ ...S.td, textAlign: 'right' }}>{para(satirNet(k), paraBirimi)}</td></tr>)}</tbody>
+        <tbody>{sat.map((k, i) => <tr key={i}><td style={S.td}>{i + 1}</td><td style={S.td}><div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>{gorseller?.[k.variant_id] && <img src={gorseller[k.variant_id]} alt="" crossOrigin="anonymous" style={{ width: 46, height: 46, objectFit: 'contain', border: '1px solid #ddd', borderRadius: 3, background: '#fff', flexShrink: 0 }} />}<div>{k.urun_adi}{k.aciklama && <div style={{ color: '#555', fontSize: 10 }}>{k.aciklama}</div>}</div></div></td><td style={{ ...S.td, textAlign: 'right' }}>{new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 3 }).format(k.miktar)}</td><td style={S.td}>{k.birim}</td><td style={{ ...S.td, textAlign: 'right' }}>{para(k.birim_fiyat, paraBirimi)}</td>{iskVar && <td style={{ ...S.td, textAlign: 'right' }}>{k.iskonto_yuzde ? `%${k.iskonto_yuzde}` : ''}</td>}<td style={{ ...S.td, textAlign: 'right' }}>{para(satirNet(k), paraBirimi)}</td></tr>)}</tbody>
         <tfoot>
           <tr><td colSpan={iskVar ? 6 : 5} style={{ ...S.td, textAlign: 'right' }}>{T.ara}</td><td style={{ ...S.td, textAlign: 'right' }}>{para(s.ara, paraBirimi)}</td></tr>
           <tr><td colSpan={iskVar ? 6 : 5} style={{ ...S.td, textAlign: 'right' }}>{T.kdv} (%{kdvOrani})</td><td style={{ ...S.td, textAlign: 'right' }}>{para(s.kdv, paraBirimi)}</td></tr>

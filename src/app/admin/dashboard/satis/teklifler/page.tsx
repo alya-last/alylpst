@@ -41,6 +41,8 @@ export default function TekliflerPage() {
   const cari = useMemo(() => byId(d.cariTam), [d.cariTam])
   const urun = useMemo(() => byId(d.products), [d.products])
   const vList = useMemo(() => d.variants.map((v: any) => ({ id: v.id, label: [urun[v.product_id]?.name, v.name, v.color, v.size].filter(Boolean).filter((a: any, i: number, arr: any[]) => arr.indexOf(a) === i).join(' · ') || v.name })), [d.variants, urun])
+  // Katalogdan seçilen kalemlerin resmi: önce renk/varyant görseli, yoksa ürün ana görseli
+  const gorseller = useMemo(() => Object.fromEntries(d.variants.map((v: any) => [v.id, v.gorsel || urun[v.product_id]?.image_url]).filter(([, g]: any) => g)), [d.variants, urun]) as Record<string, string>
   const varsayilanListe = d.fiyatListeleri.find((l: any) => l.varsayilan)?.id
   function fiyatBul(variantId: string, cariId: string, miktar: number) {
     const lid = cari[cariId]?.fiyat_listesi_id || varsayilanListe
@@ -203,7 +205,7 @@ export default function TekliflerPage() {
         {ed && s && <>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}><Badge tone={DURUM[ed.durum]?.tone}>{DURUM[ed.durum]?.l}</Badge>{kilitli && <span style={{ fontSize: 12.5, color: 'var(--adm-tx3)' }}>Kabul edilmiş teklif değiştirilemez{ed.siparisId ? ' (siparişe bağlı)' : ''}. Değişiklik için “Kopyala” ile yeni teklif açın.</span>}</div>
           <Tabs value={sekme} onChange={setSekme} style={{ marginBottom: 12 }} tabs={[{ v: 'duzenle', l: 'Düzenle' }, { v: 'onizleme', l: 'Önizleme' }]} />
-          {sekme === 'onizleme' ? <div style={{ overflow: 'auto', background: '#888', padding: 12 }}><TeklifGoruntu no={ed.no} dil={ed.f.dil} firma={firma} musteri={[ed.f.musteri_adi, ed.f.musteri_email, ed.f.musteri_tel].filter(Boolean).join('\n')} tarihi={ed.f.tarih} gecerlilik={ed.f.gecerlilik} paraBirimi={ed.f.para_birimi} kdvOrani={ed.f.kdv_orani} kalemler={ed.kalemler} kosullar={ed.f.kosullar} /></div> : (
+          {sekme === 'onizleme' ? <div style={{ overflow: 'auto', background: '#888', padding: 12 }}><TeklifGoruntu no={ed.no} dil={ed.f.dil} firma={firma} musteri={[ed.f.musteri_adi, ed.f.musteri_email, ed.f.musteri_tel].filter(Boolean).join('\n')} tarihi={ed.f.tarih} gecerlilik={ed.f.gecerlilik} paraBirimi={ed.f.para_birimi} kdvOrani={ed.f.kdv_orani} kalemler={ed.kalemler} kosullar={ed.f.kosullar} gorseller={gorseller} /></div> : (
             <fieldset disabled={kilitli} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 12 }}>
               <FormGrid cols={4}>
                 <Field label="Kayıtlı cari (isteğe bağlı)" span={2}><select className="adm-inp" value={ed.f.cari_id} onChange={e => cariSec(e.target.value)}><option value="">— Yeni müşteri / potansiyel —</option>{d.cariTam.filter((c: any) => c.tip !== 'tedarikci').map((c: any) => <option key={c.id} value={c.id}>{c.ad}</option>)}</select></Field>
