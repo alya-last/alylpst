@@ -51,30 +51,30 @@ export default function ChatAsistan({ dil = "tr" }: { dil?: Dil }) {
     <>
       {acik && (
         <div role="dialog" aria-label={t.aria}
-          style={{ position: "fixed", zIndex: 95, right: "clamp(12px,3vw,40px)", bottom: 68, width: "min(360px, calc(100vw - 24px))", height: "min(480px, calc(100vh - 120px))", display: "flex", flexDirection: "column", background: "#0b0e0b", color: "#eae6dd", border: "1px solid rgba(234,230,221,.15)", boxShadow: "0 20px 60px rgba(0,0,0,.45)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderBottom: "1px solid rgba(234,230,221,.12)" }}>
+          style={{ position: "fixed", zIndex: 96, right: "clamp(12px,3vw,40px)", bottom: 84, width: "min(380px, calc(100vw - 24px))", height: "min(520px, calc(100vh - 120px))", display: "flex", flexDirection: "column", background: "#fff", color: "#1b1b1b", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.28)", border: "1px solid rgba(0,0,0,.08)", fontFamily: "inherit" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", background: "#262626", color: "#fff" }}>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".04em" }}>{t.baslik}</div>
-              <div style={{ fontSize: 10.5, color: "#9aa294" }}>{t.alt}</div>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>{t.baslik}</div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,.65)" }}>{t.alt}</div>
             </div>
-            <button onClick={() => setAcik(false)} aria-label={t.kapat} style={{ background: "none", border: "none", color: "#eae6dd", fontSize: 20, cursor: "pointer", lineHeight: 1 }}>×</button>
+            <button onClick={() => setAcik(false)} aria-label={t.kapat} style={{ background: "none", border: "none", color: "#fff", fontSize: 24, cursor: "pointer", lineHeight: 1 }}>×</button>
           </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 10, background: "#f7f7f5" }}>
             {msgs.map((m, i) => (
-              <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "86%", padding: "9px 12px", fontSize: 13.5, lineHeight: 1.5, whiteSpace: "pre-wrap", background: m.role === "user" ? "#e55f28" : "rgba(234,230,221,.08)", color: m.role === "user" ? "#fff" : "#eae6dd" }}>{m.content}</div>
+              <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "86%", padding: "10px 14px", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap", borderRadius: m.role === "user" ? "16px 16px 4px 16px" : "16px 16px 16px 4px", background: m.role === "user" ? "#e55f28" : "#fff", color: m.role === "user" ? "#fff" : "#1b1b1b", border: m.role === "user" ? "none" : "1px solid rgba(0,0,0,.07)" }}>{m.content}</div>
             ))}
-            {yukleniyor && <div style={{ alignSelf: "flex-start", fontSize: 12, color: "#9aa294" }}>{t.yaziyor}</div>}
+            {yukleniyor && <div style={{ alignSelf: "flex-start", fontSize: 13, color: "#777" }}>{t.yaziyor}</div>}
             <div ref={alt} />
           </div>
-          <form onSubmit={gonder} style={{ display: "flex", gap: 8, padding: 10, borderTop: "1px solid rgba(234,230,221,.12)" }}>
+          <form onSubmit={gonder} style={{ display: "flex", gap: 8, padding: 12, borderTop: "1px solid rgba(0,0,0,.08)", background: "#fff" }}>
             <input value={girdi} onChange={e => setGirdi(e.target.value)} maxLength={500} placeholder={t.yer} aria-label={t.mesajAria}
-              style={{ flex: 1, minWidth: 0, background: "rgba(234,230,221,.06)", border: "1px solid rgba(234,230,221,.15)", color: "#eae6dd", padding: "9px 11px", fontSize: 13.5, outline: "none" }} />
-            <button type="submit" disabled={yukleniyor || !girdi.trim()} style={{ background: "#e55f28", color: "#fff", border: "none", padding: "0 14px", fontSize: 12, fontWeight: 700, letterSpacing: ".08em", cursor: "pointer", opacity: yukleniyor || !girdi.trim() ? 0.5 : 1 }}>{t.gonder}</button>
+              style={{ flex: 1, minWidth: 0, background: "#f2f2f0", border: "1px solid transparent", color: "#1b1b1b", padding: "11px 14px", fontSize: 15, outline: "none", borderRadius: 12 }} />
+            <button type="submit" disabled={yukleniyor || !girdi.trim()} style={{ background: "#e55f28", color: "#fff", border: "none", padding: "0 18px", fontSize: 14, fontWeight: 600, cursor: "pointer", borderRadius: 12, opacity: yukleniyor || !girdi.trim() ? 0.5 : 1 }}>{t.gonder}</button>
           </form>
         </div>
       )}
       <button onClick={() => setAcik(o => !o)} aria-label={acik ? t.kapat : t.ac}
-        style={{ position: "fixed", zIndex: 95, right: "clamp(12px,3vw,40px)", bottom: 16, background: "#0b0e0b", color: "#eae6dd", border: "1px solid #e55f28", padding: "10px 14px", fontSize: 10, fontWeight: 700, letterSpacing: ".14em", textTransform: "uppercase", cursor: "pointer", boxShadow: "0 10px 30px rgba(0,0,0,.35)" }}>
+        style={{ position: "fixed", zIndex: 96, right: "clamp(12px,3vw,40px)", bottom: 20, background: "#262626", color: "#fff", border: "none", padding: "13px 20px", fontSize: 14, fontWeight: 600, borderRadius: 999, cursor: "pointer", boxShadow: "0 10px 30px rgba(0,0,0,.3)", fontFamily: "inherit" }}>
         {acik ? t.kapat : t.ac}
       </button>
     </>
