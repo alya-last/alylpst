@@ -6,7 +6,6 @@ import HtmlLang         from "@/components/layout/HtmlLang";
 import HashDuzelt       from "@/components/layout/HashDuzelt";
 import SchemaOrg        from "@/components/layout/SchemaOrg";
 import WhatsAppFab      from "@/components/ui/WhatsAppFab";
-import ChatAsistan      from "@/components/ui/ChatAsistan";
 import YHeader from "@/components/yeni/YHeader";
 import YHero from "@/components/yeni/YHero";
 import YSerit from "@/components/yeni/YSerit";
@@ -71,7 +70,6 @@ export default async function Anasayfa({ dil }: { dil: Dil }) {
       </main>
       <YFooter settings={settings} dil={dil} kategoriler={kat} />
       <WhatsAppFab settings={settings} dil={dil} />
-      <ChatAsistan dil={dil} />
     </div>
   );
 }
