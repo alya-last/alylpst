@@ -671,7 +671,8 @@ Kurallar:
 - KESİNLİK: Bir araç boş/eksik sonuç döndürürse "veri yok" deme; önce başka uygun aracı dene (cari borç/alacak için cari_ozet veya cari_ara — TL, USD ve EUR'yu ayrı ayrı bildir; stok için stok_durumu; kasa/banka için kasa_banka_bakiye; ürün reçetesi/kg için recete_ara). Para birimini her zaman belirt (₺, USD, EUR) ve farklı para birimlerini toplama. Araç sonucu 'kısaltıldı' ise bunu söyle.
 - DÖVİZ KURU: bugünün resmi USD/EUR kuru için "guncel_kur" aracını kullan (yalnızca bugünün kuru, gelecek tahmini değildir).
 - ${YONETICI_AKIL}
-- GENEL EKONOMİ (kur beklentisi, enflasyon, faiz gibi ileriye dönük veya makro sorular): bunlar için canlı/kesin veri aracın yok. Böyle bir soru gelirse genel ekonomi bilgin ve akıl yürütmenle bir GÖRÜŞ/DEĞERLENDİRME sun, ama bunun kişisel bir yorum olduğunu, gerçek zamanlı veya kesin veri olmadığını ve güncel resmi rakamlar için TCMB/TÜİK'e bakılması gerektiğini açıkça belirt. Eğitim verinin bir kesim tarihi var, çok yakın tarihli gelişmeleri bilemeyebilirsin — bunu sakla söyleme değil, gerektiğinde belirt.
+- KUR / ENFLASYON ÖNGÖRÜSÜ (yönetici senaryo uzmanı gibi): "dolar ne olur / yıl sonu kur / enflasyona göre" gibi sorularda "bilemem" deme. (1) guncel_kur ile bugünkü kuru al. (2) Varsayımı açıkça yaz: TL'nin değer kaybı yaklaşık olarak Türkiye enflasyonu ile ABD/Avro enflasyonu farkını izler (alım gücü paritesi); aylık/yıllık TÜFE varsayımını (kendi bilginle, güncel resmi rakam değildir) belirt. (3) Bugün kuru × (1 + TR enflasyonu) ÷ (1 + ABD enflasyonu) mantığıyla vade vade (3, 6, 12 ay) üç senaryo ver: iyimser / baz / kötümser, hesabı hesapla aracıyla yap. (4) Şirkete etkisini rakamla göster: dövizli alacak ve borç (cari_ozet), ihracat gelirleri, çek/senet, ürün maliyeti (maliyet_hesapla ile kur_usd senaryosu), hammadde. Net etkiyi ve alınabilecek önlemi (vade, fiyat güncelleme, döviz tutma) söyle. Cevabın sonunda tek satır: "Bu bir öngörü/senaryodur, kesin değildir; resmi veri için TCMB/TÜİK." Eğitim verinin kesim tarihi olduğunu, çok yakın gelişmeleri bilemeyeceğini gerektiğinde belirt.
+- NETLİK VE DOĞRULUK (kesin kural): Soruyu tam anlamadıysan veya kritik bir bilgi eksikse (hangi dönem? hangi para birimi? hangi ürün/müşteri? iç mi dış mekan mı?) tahmin edip rakam üretme; TEK, kısa bir netleştirme sorusu sor (mümkünse seçenekleri say). Soru anlaşılırsa sormadan cevapla. Rakamı yalnızca araç çıktısından ver; araç hata veya boş dönerse başka aracı dene, hâlâ olmuyorsa neyin eksik olduğunu söyle, uydurma. Birbirini tutmayan iki kaynak varsa ikisini de yaz ve farkı belirt. Cevabın başında "kesin" mi "varsayımlı" mı olduğunu hissettir.
 - Tarih aralığı gerektiğinde "bu ay" = ${bugun.slice(0, 7)}-01 ile ${bugun} arası; "geçen ay", "bu yıl" vb. için tarihleri kendin hesapla.
 - GEÇMİŞ YILLARLA / DÖNEMLERLE KARŞILAŞTIRMA: kullanıcı "geçen seneye göre", "son 3 yıl", "yıllara göre nasıl gitmiş" gibi bir karşılaştırma isterse, ilgili aracı (finans_ozet, satis_analiz, fatura_ozet, kdv_ozet, kasa_akis vb.) HER dönem/yıl için AYRI AYRI, farklı tarih aralıklarıyla çağır (finans_ozet zaten bas/bit ile onceki_bas/onceki_bit'i tek çağrıda karşılaştırır); üç veya daha fazla yıl isteniyorsa aracı gereken kadar tekrar çağır. Sonra sayısal farkı ve yüzde değişimi KENDİN hesapla (araçtan gelen ham sayılarla), tabloya benzer düzenli bir özet ve kısa bir yorum sun.
 - Sana tanımlı araçlar şirketin hemen hemen tüm iş verisini (muhasebe, satış, faturalar, KDV, kasa, cari, vadesi geçen alacak/borç, açık siparişler, üretim emirleri, kritik stok, site ziyaretleri, ve yetkin varsa hesap/fatura/işlem arama + mevzuat bilgi tabanı) kapsar — "elimde böyle bir veri yok" demeden önce gerçekten uygun bir araç olup olmadığını düşün, gerekiyorsa birden fazla aracı birlikte kullan.
@@ -683,11 +684,11 @@ Kurallar:
   const kullanilan: string[] = []
   let sonVeriAraci: { ad: string; args: Record<string, any> } | null = null
   const excelYollari: string[] = []   // araç çıktısında üretilen Excel adresleri (cevapta yazılmasa da indirme düğmesi çıksın)
-  for (let tur = 0; tur < 8; tur++) {
+  for (let tur = 0; tur < 12; tur++) {
     const m = await aiCagir({ messages: msgs, tools: araclar, maxTokens: 4000 })
     if (m.tool_calls?.length) {
       msgs.push({ role: 'assistant', content: m.content, tool_calls: m.tool_calls })
-      for (const c of m.tool_calls.slice(0, 6)) {
+      for (const c of m.tool_calls.slice(0, 8)) {
         let args: Record<string, any> = {}
         try { args = JSON.parse(c.function.arguments || '{}') } catch { /* boş */ }
         // Model excel_olustur'u veri belirtmeden çağırırsa (arac yok, dolu sayfalar yok) bir önceki veri aracının sonucunu kullan
