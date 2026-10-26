@@ -12,9 +12,11 @@ export const IMAGE_MODEL = () => {
 export const GORSEL_STIL = { studyo: 'Stüdyo', yasam: 'Yaşam alanı' } as const
 export type GorselStil = keyof typeof GORSEL_STIL
 
+// Ortak kural: ürün piksel piksel aynı kalmalı; yalnızca çevresi değişir. Ürün kadrajın ana öznesi olmalı (küçük/uzak kalmasın).
+const KORU = 'CRITICAL: The product in the photo must stay exactly the same object — identical silhouette, proportions, color, surface texture, rim, base, drainage holes, saucer and every molded detail. Do not redraw, restyle, recolor, resize, tilt, crop or duplicate it, and do not add or remove any part of it. Keep the whole product fully visible, centered, filling about 65–75% of the frame height, with its base resting naturally on a surface. No text, logos, watermarks, people or hands.'
 const PROMPT: Record<GorselStil, string> = {
-  studyo: 'Replace only the background of this product photo with a clean, professional e-commerce studio backdrop: soft neutral gradient, subtle ground shadow, high-end product photography lighting. Do NOT alter the product itself in any way — keep its exact shape, color, proportions, angle, texture, and every detail identical to the source image.',
-  yasam: 'Replace only the background of this product photo by placing the product into a realistic, tasteful lifestyle setting appropriate for its everyday use (e.g. a home, garden, patio or workspace), with soft natural lighting, shot like a professional product photograph. Do NOT alter the product itself in any way — keep its exact shape, color, proportions, angle, texture, and every detail identical to the source image.',
+  studyo: `Keep this product photo exactly as is and replace ONLY the background with a clean, professional e-commerce studio backdrop: seamless soft light-grey to white gradient, a soft natural contact shadow under the product, even high-end product photography lighting. ${KORU}`,
+  yasam: `Keep this product exactly as is and place it into a tasteful, realistic lifestyle scene suited to its use (bright home interior, patio or garden), with a softly blurred background, natural window light and a believable contact shadow. Only one simple, uncluttered setting; props must stay small, behind or beside the product and never overlap it. Photorealistic professional product photography, the product is the clear hero. ${KORU}`,
 }
 
 /** Kaynak görseli (https URL) indirir, OpenAI'ye gönderir, sonucu base64 PNG olarak döner (henüz kaydetmez). */
@@ -47,6 +49,7 @@ export async function gorselTasarla(imageUrl: string, stil: GorselStil): Promise
   form.append('image', new Blob([kaynak], { type: kaynakTip }), 'kaynak.png')
   form.append('prompt', PROMPT[stil])
   form.append('size', '1024x1024')
+  form.append('quality', 'high')
   form.append('n', '1')
 
   let res: Response
