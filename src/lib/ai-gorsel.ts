@@ -37,8 +37,9 @@ export async function gorselTasarla(imageUrl: string, stil: GorselStil): Promise
     if (Number(r.headers.get('content-length') || 0) > 15 * 1024 * 1024) throw new Error('çok büyük')
     kaynakTip = r.headers.get('content-type')?.split(';')[0] || kaynakTip
     kaynak = await r.arrayBuffer()
-  } catch {
-    throw new AiHata('Kaynak görsel indirilemedi.', 400)
+  } catch (e: any) {
+    console.error('[ai-gorsel] kaynak indirilemedi', imageUrl.slice(0, 120), e?.message)
+    throw new AiHata(`Kaynak görsel indirilemedi (${String(e?.message || 'bilinmeyen').slice(0, 80)}).`, 400)
   }
   if (kaynak.byteLength > 15 * 1024 * 1024) throw new AiHata('Kaynak görsel çok büyük (15MB üstü).', 400)
   if (!/^image\//.test(kaynakTip)) throw new AiHata('Kaynak dosya bir görsel değil.', 400)
@@ -46,7 +47,7 @@ export async function gorselTasarla(imageUrl: string, stil: GorselStil): Promise
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
   const form = new FormData()
   form.append('model', IMAGE_MODEL())
-  form.append('image', new Blob([kaynak], { type: kaynakTip }), 'kaynak.png')
+  form.append('image', new Blob([kaynak], { type: kaynakTip }), `kaynak.${kaynakTip === 'image/jpeg' ? 'jpg' : kaynakTip === 'image/webp' ? 'webp' : 'png'}`)
   form.append('prompt', PROMPT[stil])
   form.append('size', '1024x1024')
   form.append('quality', 'medium')
@@ -61,9 +62,12 @@ export async function gorselTasarla(imageUrl: string, stil: GorselStil): Promise
   if (!res.ok) {
     const t = await res.text().catch(() => '')
     console.error('[ai-gorsel] OpenAI hata', res.status, t.slice(0, 500))
+    let ayrinti = ''
+    try { ayrinti = String(JSON.parse(t)?.error?.message || '').slice(0, 220) } catch { ayrinti = t.slice(0, 120) }
     if (res.status === 401) throw new AiHata('OpenAI API anahtarı geçersiz.', 502)
     if (res.status === 429) throw new AiHata('OpenAI kotası/istek limiti doldu, biraz sonra tekrar deneyin.', 429)
-    throw new AiHata('Görsel üretimi başarısız oldu.', 502)
+    // Yalnızca yönetici panelinde görünür; sorunun gerçek nedenini (model/organizasyon doğrulaması vb.) gösterir
+    throw new AiHata(`Görsel üretimi başarısız (${res.status}${ayrinti ? ': ' + ayrinti : ''})`, 502)
   }
   const j = await res.json().catch(() => null)
   const b64 = j?.data?.[0]?.b64_json
