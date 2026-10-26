@@ -1,10 +1,10 @@
 import YCerceve from "./YCerceve";
-import YUrunListe from "./YUrunListe";
+import YMekanBolumleri from "./YMekanBolumleri";
 import { getAllProducts, getSettings } from "@/lib/supabase";
 import { DILLER, kurumsalYolu, type Dil } from "@/lib/diller";
 import { UM } from "./urunler-metin";
 
-// Ayrı "Ürünler" sayfası (tüm diller): mekan + kategori + arama süzgeçli ürün ızgarası.
+// Ayrı "Ürünler" sayfası (tüm diller): iç mekan ve dış mekan ayrı bölümler halinde ürün mozaiği.
 export default async function UrunlerSayfasi({ dil }: { dil: Dil }) {
   let settings: Awaited<ReturnType<typeof getSettings>> = null;
   let urunler: Awaited<ReturnType<typeof getAllProducts>> = [];
@@ -23,7 +23,7 @@ export default async function UrunlerSayfasi({ dil }: { dil: Dil }) {
           </div>
         </section>
         <section className="bg-white" style={{ paddingBlock: "clamp(32px,5vw,64px)" }}>
-          <div className="yt-wrap"><YUrunListe products={urunler} dil={dil} /></div>
+          <div className="yt-wrap"><YMekanBolumleri products={urunler} dil={dil} /></div>
         </section>
       </main>
     </YCerceve>
