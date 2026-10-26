@@ -1,6 +1,7 @@
 'use client'
 import { usePathname } from 'next/navigation'
 import QuickActions from './QuickActions'
+import NotifBell from './NotifBell'
 import MuhasebeRehberi from './MuhasebeRehberi'
 import MuhasebeUyarilar from './MuhasebeUyarilar'
 import GrupUyarilar from './GrupUyarilar'
@@ -19,6 +20,7 @@ export default function AdminTopBar({ title }: { title: string }) {
         {muhasebe && <MuhasebeRehberi/>}
         {grup && <GrupUyarilar key={grup} grup={grup}/>}
         {grup && <GrupRehberi key={grup} grup={grup}/>}
+        <NotifBell/>
         <QuickActions/>
       </div>
     </div>
