@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import AdminTopBar from '@/components/admin/TopBar'
 import { Copy, Package, ExternalLink, Wand2, RotateCcw, ImagePlus } from 'lucide-react'
@@ -8,6 +8,8 @@ import { aiIstek } from '@/lib/ai-client'
 
 const GORSEL_STIL = { studyo: 'Stüdyo', yasam: 'Yaşam alanı' } as const
 type GorselStil = keyof typeof GORSEL_STIL
+type TopluOge = { key: string; tur: 'urun' | 'varyant'; id: string; ad: string; url: string; durum: 'bekliyor' | 'isleniyor' | 'tamam' | 'hata'; b64: string | null; secili: boolean }
+type Toplu = { urunAd: string; stil: GorselStil; ogeler: TopluOge[]; calisiyor: boolean; kaydediyor: boolean; hata: string }
 type AiHedef = { tur: 'urun' | 'varyant'; id: string; ad: string; url: string; stil: GorselStil; b64: string | null; busy: boolean; kayit: boolean }
 
 const sb = createClient()
@@ -18,6 +20,8 @@ export default function GorsellerPage() {
   const [variants, setVariants] = useState<any[]>([])
   const [toast, setToast] = useState('')
   const [ai, setAi] = useState<AiHedef | null>(null)
+  const [toplu, setToplu] = useState<Toplu | null>(null)
+  const iptal = useRef(false)
 
   useEffect(() => { yukle() }, [])
   function yukle() {
@@ -32,6 +36,47 @@ export default function GorsellerPage() {
       setAi({ ...h, stil, b64: r.b64, busy: false })
     } catch (e: any) { setToast(e.message || 'AI hatası'); setTimeout(() => setToast(''), 3500); setAi(null) }
   }
+  // Ürüne tıklayınca: ana görsel + fotoğrafı olan tüm varyantlar sırayla AI ile yeniden tasarlanır, sonra toplu onay
+  function topluBaslat(p: any, stil: GorselStil = 'studyo', onceki?: TopluOge[]) {
+    const ogeler: TopluOge[] = onceki ? onceki.map(o => ({ ...o, durum: 'bekliyor', b64: null, secili: false })) : [
+      ...(p.image_url ? [{ key: 'u-' + p.id, tur: 'urun' as const, id: p.id, ad: 'Ana görsel', url: p.image_url, durum: 'bekliyor' as const, b64: null, secili: false }] : []),
+      ...(varyantlar[p.id] || []).filter(v => v.gorsel).map(v => ({ key: 'v-' + v.id, tur: 'varyant' as const, id: v.id, ad: v.name + (v.color && v.color !== v.name ? ' · ' + v.color : ''), url: v.gorsel, durum: 'bekliyor' as const, b64: null, secili: false })),
+    ]
+    if (ogeler.length === 0) { setToast('Bu üründe görsel yok'); setTimeout(() => setToast(''), 2500); return }
+    iptal.current = false
+    setToplu({ urunAd: p.name, stil, ogeler, calisiyor: true, kaydediyor: false, hata: '' })
+    topluCalistir(ogeler, stil)
+  }
+  async function topluCalistir(ogeler: TopluOge[], stil: GorselStil) {
+    for (const o of ogeler) {
+      if (iptal.current) return
+      setToplu(t => t && { ...t, ogeler: t.ogeler.map(x => x.key === o.key ? { ...x, durum: 'isleniyor' } : x) })
+      try {
+        const r: any = await aiIstek('urun_gorsel_tasarim', { url: o.url, stil })
+        if (iptal.current) return
+        setToplu(t => t && { ...t, ogeler: t.ogeler.map(x => x.key === o.key ? { ...x, durum: 'tamam', b64: r.b64, secili: true } : x) })
+      } catch (e: any) {
+        if (iptal.current) return
+        const limit = /saatlik sınır/i.test(e.message || '')
+        setToplu(t => t && { ...t, hata: limit ? 'Saatlik AI görsel sınırına ulaşıldı; kalanlar işlenmedi, biraz sonra tekrar dene.' : t.hata, ogeler: t.ogeler.map(x => x.key === o.key ? { ...x, durum: 'hata' } : x) })
+        if (limit) break
+      }
+    }
+    setToplu(t => t && { ...t, calisiyor: false })
+  }
+  async function topluKaydet() {
+    if (!toplu) return
+    setToplu({ ...toplu, kaydediyor: true, hata: '' })
+    let hata = 0
+    for (const o of toplu.ogeler.filter(x => x.secili && x.b64)) {
+      try { await aiIstek(o.tur === 'urun' ? 'urun_gorsel_kaydet' : 'varyant_gorsel_kaydet', o.tur === 'urun' ? { urun_id: o.id, b64: o.b64 } : { variant_id: o.id, b64: o.b64 }) } catch { hata++ }
+    }
+    yukle()
+    if (hata) { setToplu(t => t && { ...t, kaydediyor: false, hata: `${hata} görsel kaydedilemedi.` }); return }
+    setToplu(null); setToast('Görseller güncellendi'); setTimeout(() => setToast(''), 2500)
+  }
+  function topluKapat() { iptal.current = true; setToplu(null) }
+
   async function aiKaydet() {
     if (!ai?.b64) return
     setAi({ ...ai, kayit: true })
@@ -68,7 +113,7 @@ export default function GorsellerPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
           {filtered.map(p => (
             <div key={p.code} className="adm-card" style={{ padding: 0, overflow: 'hidden' }}>
-              <div style={{ aspectRatio: '1', background: 'var(--adm-s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative' }}>
+              <div onClick={() => topluBaslat(p)} title="Tıkla: ana görsel ve tüm varyantlar AI ile yeniden tasarlansın" style={{ aspectRatio: '1', background: 'var(--adm-s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, position: 'relative', cursor: 'pointer' }}>
                 {p.image_url ? (
                   <img src={p.image_url} alt={p.name}
                     style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
@@ -162,6 +207,38 @@ export default function GorsellerPage() {
               : <div style={{ width: 220, height: 220, borderRadius: 12, background: 'var(--adm-s2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ImagePlus size={26} style={{ color: 'var(--adm-tx3)' }} /></div>}
           </div>
         </div>
+      </Modal>
+      <Modal open={!!toplu} onClose={() => { if (!toplu?.kaydediyor) topluKapat() }} width={760} title={toplu ? `AI ile Tüm Görseller — ${toplu.urunAd}` : 'AI'}
+        footer={toplu && <>
+          <button type="button" className="adm-btn-ghost" disabled={toplu.kaydediyor} onClick={topluKapat}>{toplu.calisiyor ? 'Durdur ve Kapat' : 'Vazgeç'}</button>
+          {!toplu.calisiyor && <button type="button" className="adm-btn-ghost" disabled={toplu.kaydediyor} onClick={() => topluBaslat({ name: toplu.urunAd }, toplu.stil, toplu.ogeler)}><RotateCcw size={13} />Hepsini Yeniden Üret</button>}
+          {!toplu.calisiyor && <button type="button" className="adm-btn" disabled={toplu.kaydediyor || !toplu.ogeler.some(o => o.secili && o.b64)} onClick={topluKaydet}>{toplu.kaydediyor ? 'Kaydediliyor…' : `Seçilenleri Kullan (${toplu.ogeler.filter(o => o.secili && o.b64).length})`}</button>}
+        </>}>
+        {toplu && <>
+          <p style={{ fontSize: 12, color: 'var(--adm-tx3)', margin: '0 0 10px' }}>Ürünün ana görseli ve fotoğrafı olan tüm varyantları sırayla yeniden tasarlanır. Üretim bitince her sonucu eskisiyle karşılaştır, bozulanların işaretini kaldır, kalanları kaydet.</p>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {(Object.keys(GORSEL_STIL) as GorselStil[]).map(k => (
+              <button key={k} type="button" className={toplu.stil === k ? 'adm-chip on' : 'adm-chip'} disabled={toplu.calisiyor || toplu.kaydediyor} onClick={() => topluBaslat({ name: toplu.urunAd }, k, toplu.ogeler)}>{GORSEL_STIL[k]}</button>
+            ))}
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--adm-tx3)', alignSelf: 'center' }}>{toplu.ogeler.filter(o => o.durum === 'tamam' || o.durum === 'hata').length}/{toplu.ogeler.length}</span>
+          </div>
+          {toplu.hata && <p style={{ fontSize: 12, color: 'var(--adm-red)', margin: '0 0 10px' }}>{toplu.hata}</p>}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10, maxHeight: '55vh', overflowY: 'auto' }}>
+            {toplu.ogeler.map(o => (
+              <div key={o.key} style={{ border: '1px solid var(--adm-bdr)', borderRadius: 10, padding: 8, background: 'var(--adm-s1)' }}>
+                <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{o.ad}</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <img src={o.url} alt="" style={{ width: '50%', aspectRatio: '1', objectFit: 'contain', borderRadius: 8, background: 'var(--adm-s2)' }} />
+                  {o.b64 ? <img src={`data:image/png;base64,${o.b64}`} alt="" style={{ width: '50%', aspectRatio: '1', objectFit: 'contain', borderRadius: 8, background: 'var(--adm-s2)' }} />
+                    : <div style={{ width: '50%', aspectRatio: '1', borderRadius: 8, background: 'var(--adm-s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, color: o.durum === 'hata' ? 'var(--adm-red)' : 'var(--adm-tx3)', textAlign: 'center' }}>{o.durum === 'isleniyor' ? 'Oluşturuluyor…' : o.durum === 'hata' ? 'Hata' : 'Sırada'}</div>}
+                </div>
+                {o.b64 && <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, marginTop: 6, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={o.secili} disabled={toplu.kaydediyor} onChange={e => setToplu(t => t && { ...t, ogeler: t.ogeler.map(x => x.key === o.key ? { ...x, secili: e.target.checked } : x) })} /> Kullan
+                </label>}
+              </div>
+            ))}
+          </div>
+        </>}
       </Modal>
       {toast && <div className="adm-toast">✓ {toast}</div>}
     </div>
