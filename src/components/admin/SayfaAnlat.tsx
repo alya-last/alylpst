@@ -15,10 +15,10 @@ export default function SayfaAnlat() {
   const [son, setSon] = useState('')
   const [gecmis, setGecmis] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
 
-  async function sor(s?: string) {
+  async function sor(s?: string, dogrula = false) {
     setYuk(true); setHata('')
     try {
-      const r = await aiIstek<{ yanit: string }>('sayfa_anlat', { yol, soru: s || '', gecmis })
+      const r = await aiIstek<{ yanit: string }>('sayfa_anlat', { yol, soru: s || '', gecmis, dogrula })
       setYanit(r.yanit); setSon(yol + '|' + (s || ''))
       setGecmis(g => [...g, { role: 'user' as const, content: s || 'Bu sayfayı bana anlat.' }, { role: 'assistant' as const, content: r.yanit }].slice(-6))
     } catch (e: any) { setHata(e.message || 'Anlatılamadı') }
@@ -43,11 +43,11 @@ export default function SayfaAnlat() {
             <button type="button" onClick={() => setAcik(false)} aria-label="Kapat" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--adm-tx2)' }}><X size={16} /></button>
           </div>
           <div style={{ fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '45vh', overflowY: 'auto', color: 'var(--adm-tx)' }}>
-            {yuk ? 'Yapay zekâ anlatıyor…' : hata ? <span style={{ color: 'var(--adm-red, #dc2626)' }}>{hata}</span> : yanit}
+            {yuk ? 'Yapay zekâ panelden bakıyor, bir dakika…' : hata ? <span style={{ color: 'var(--adm-red, #dc2626)' }}>{hata}</span> : yanit}
           </div>
           {!yuk && !hata && yanit && (
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-              <button type="button" className="adm-btn" onClick={() => sor('Yaptım, sıradaki adım ne?')}>✓ Yaptım, sıradaki?</button>
+              <button type="button" className="adm-btn" onClick={() => sor('Yaptım, kontrol et ve sıradaki adımı söyle.', true)}>✓ Yaptım, kontrol et</button>
               <button type="button" className="adm-btn-ghost" onClick={() => sor('Takıldım, bu adımda yardım eder misin?')}>Takıldım</button>
             </div>
           )}
