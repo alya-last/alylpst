@@ -3,7 +3,11 @@ import { guvenliUrl } from '@/lib/mevzuat-takip'
 
 // Ürün görselini AI ile yeniden tasarlar (OpenAI Images edit uçu — gpt-image-1).
 // OPENAI_MODEL metin/görsel-analiz için kullanılır; görsel ÜRETİMİ ayrı bir model gerektirir.
-export const IMAGE_MODEL = () => process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
+// gpt-image-1 OpenAI tarafından kapatıldı (23 Ekim 2026) — eski değer ortam değişkeninde kalmış olsa bile gpt-image-2 kullanılır.
+export const IMAGE_MODEL = () => {
+  const m = process.env.OPENAI_IMAGE_MODEL
+  return m && m !== 'gpt-image-1' ? m : 'gpt-image-2'
+}
 
 export const GORSEL_STIL = { studyo: 'Stüdyo', yasam: 'Yaşam alanı' } as const
 export type GorselStil = keyof typeof GORSEL_STIL
