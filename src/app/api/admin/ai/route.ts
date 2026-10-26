@@ -14,6 +14,24 @@ import { TEMA_ALAN_ANAHTARLARI } from '@/data/images'
 import { supabaseAdmin } from '@/lib/notify'
 import { gorselSikistir } from '@/lib/gorsel-sikistir'
 
+/** Depodaki (urun-gorselleri) eski görsel dosyasını siler — başka hiçbir ürün/varyant kaydı kullanmıyorsa. Katalog (public/katalog) gibi depo dışı adreslere dokunmaz. */
+async function eskiDosyaSil(admin: ReturnType<typeof supabaseAdmin>, eskiUrl: string | null | undefined, yeniUrl: string) {
+  try {
+    if (!eskiUrl || eskiUrl === yeniUrl) return
+    const m = eskiUrl.match(/\/storage\/v1\/object\/public\/urun-gorselleri\/([^?#]+)$/)
+    if (!m) return
+    const yol = decodeURIComponent(m[1])
+    const [a, b, c] = await Promise.all([
+      admin.from('products').select('id', { count: 'exact', head: true }).eq('image_url', eskiUrl),
+      admin.from('products').select('id', { count: 'exact', head: true }).contains('images', [eskiUrl]),
+      admin.from('product_variants').select('id', { count: 'exact', head: true }).eq('gorsel', eskiUrl),
+    ])
+    if ((a.count || 0) + (b.count || 0) + (c.count || 0) > 0) return
+    const r = await admin.storage.from('urun-gorselleri').remove([yol])
+    if (r.error) console.error('[eskiDosyaSil]', r.error.message)
+  } catch (e: any) { console.error('[eskiDosyaSil]', e?.message) }
+}
+
 export const maxDuration = 60 // Vercel Hobby plan üst sınırı
 
 // Yönetici paneli AI uçları. Her eylem kendi modül yetkisini ister; veriye erişen eylemler
@@ -162,10 +180,11 @@ SÖZLÜK: ${soz}` },
         const up = await admin.storage.from('urun-gorselleri').upload(yol, sik.bytes, { contentType: sik.contentType, upsert: false })
         if (up.error) { console.error('[urun_gorsel_kaydet] upload', up.error.message); return NextResponse.json({ error: 'Görsel depoya yüklenemedi.' }, { status: 502 }) }
         const { data: pub } = admin.storage.from('urun-gorselleri').getPublicUrl(yol)
+        // Eski görsel arşive alınmaz; yeni görsel yerine geçer ve depodaki eski dosya silinir
         const eskiGorsel: string | null = urun.image_url || null
-        const yeniImages = eskiGorsel && eskiGorsel !== pub.publicUrl ? Array.from(new Set([...(urun.images || []), eskiGorsel])) : (urun.images || [])
-        const { error } = await admin.from('products').update({ image_url: pub.publicUrl, images: yeniImages, updated_at: new Date().toISOString() }).eq('id', body.urun_id)
+        const { error } = await admin.from('products').update({ image_url: pub.publicUrl, updated_at: new Date().toISOString() }).eq('id', body.urun_id)
         if (error) { console.error('[urun_gorsel_kaydet] update', error.message); return NextResponse.json({ error: 'Ürün güncellenemedi.' }, { status: 500 }) }
+        await eskiDosyaSil(admin, eskiGorsel, pub.publicUrl)
         return NextResponse.json({ ok: true, url: pub.publicUrl })
       }
       case 'varyant_gorsel_kaydet': {
@@ -176,7 +195,7 @@ SÖZLÜK: ${soz}` },
         if (typeof body.variant_id !== 'string' || !/^[0-9a-f-]{36}$/.test(body.variant_id)) return NextResponse.json({ error: 'Varyant geçersiz' }, { status: 400 })
         if (typeof body.b64 !== 'string' || body.b64.length < 100) return NextResponse.json({ error: 'Görsel verisi geçersiz' }, { status: 400 })
         // Varyantın bu kullanıcıya görünür olduğunu kendi oturumuyla (RLS) doğrula, sonra service_role ile yaz
-        const { data: varyant } = await y.sb.from('product_variants').select('id,product_id').eq('id', body.variant_id).maybeSingle()
+        const { data: varyant } = await y.sb.from('product_variants').select('id,product_id,gorsel').eq('id', body.variant_id).maybeSingle()
         if (!varyant) return NextResponse.json({ error: 'Varyant bulunamadı' }, { status: 404 })
         let bytes: Buffer
         try { bytes = Buffer.from(body.b64, 'base64') } catch { return NextResponse.json({ error: 'Görsel çözümlenemedi' }, { status: 400 }) }
@@ -189,6 +208,7 @@ SÖZLÜK: ${soz}` },
         const { data: pub } = admin.storage.from('urun-gorselleri').getPublicUrl(yol)
         const { error } = await admin.from('product_variants').update({ gorsel: pub.publicUrl }).eq('id', body.variant_id)
         if (error) { console.error('[varyant_gorsel_kaydet] update', error.message); return NextResponse.json({ error: 'Varyant güncellenemedi.' }, { status: 500 }) }
+        await eskiDosyaSil(admin, (varyant as any).gorsel, pub.publicUrl)
         return NextResponse.json({ ok: true, url: pub.publicUrl })
       }
       case 'urun_360_uret': {
