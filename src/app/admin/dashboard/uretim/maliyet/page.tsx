@@ -167,7 +167,7 @@ export default function MaliyetPage() {
 
         {tab === 'rehber' && <div style={{ display: 'grid', gap: 16, maxWidth: 980 }}>
           <Card title="Bu sayfa ne işe yarar?">
-            <p style={P}>Bir ürünü <b>1 adet</b> üretip kutulayana kadar şirkete kaç liraya mal olduğunu hesaplar. Sonra bunu USD ve EUR'a çevirir ve <b>USD liste fiyatıyla</b> karşılaştırıp kârı gösterir. Excel'deki "ÜRÜN MALİYET 2027" tablosunun aynı hesabıdır; 50 ürün Excel ile kuruşu kuruşuna aynı çıkar.</p>
+            <p style={P}>Bir ürünü <b>1 adet</b> üretip kutulayana kadar şirkete kaç liraya mal olduğunu hesaplar. Sonra bunu USD ve EUR'a çevirir ve <b>USD liste fiyatıyla</b> karşılaştırıp kârı gösterir. Excel'deki "ÜRÜN MALİYET 2027" tablosunun aynı hesabıdır; 50 üründen 49'u Excel ile kuruşu kuruşuna aynı çıkar (ALY-512'de Excel'deki gram girişi 1 gr farklıdır).</p>
           </Card>
           <Card title="Maliyet 4 kalemden oluşur">
             <div style={{ display: 'grid', gap: 12 }}>
