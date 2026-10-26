@@ -181,10 +181,10 @@ export default function MaliyetPage() {
         </div>}
 
         {tab === 'kilavuz' && <div style={{ display: 'grid', gap: 16, maxWidth: 980 }}>
-          <Card title="Paneli hiç bilmiyorum, nereden başlayayım?">
+          <Card title="Paneli hiç bilmiyorum, nereden başlayayım?" pad="14px 16px">
             <p style={P}>Bu sayfa her ürünün <b>1 adetinin şirkete kaça mal olduğunu</b> ve satış fiyatına göre <b>ne kadar kâr bıraktığını</b> gösterir. Aşağıda en sık yapılan işler var. Her adımın yanındaki düğme sizi doğru yere götürür. Hiçbir şeyi bozmazsınız: değişiklikler "Kaydet"e basana kadar uygulanmaz ve tüm maliyetler otomatik yeniden hesaplanır.</p>
           </Card>
-          <Card title="1) Dolar kuru değişti">
+          <Card title="1) Dolar kuru değişti" pad="14px 16px">
             <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
               <li>"Ürün Maliyetleri" sekmesinin en üstündeki <b>Hızlı işlemler</b> çubuğunda <b>USD kuru</b> kutusuna yeni kuru yazın (örn. 54,50).</li>
               <li><b>Kuru kaydet</b> düğmesine basın.</li>
@@ -192,7 +192,7 @@ export default function MaliyetPage() {
             </ol>
             <div style={{ marginTop: 10 }}><button className="adm-btn-ghost" onClick={() => git('urunler')}>Ürünler sayfasına git</button></div>
           </Card>
-          <Card title="2) Hammadde (granür, moblen, kopolimer…) fiyatı değişti">
+          <Card title="2) Hammadde (granür, moblen, kopolimer…) fiyatı değişti" pad="14px 16px">
             <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
               <li>"Kur · Hammadde · Makine" sekmesinde <b>Hammadde fiyatları</b> tablosunu açın.</li>
               <li>Fiyat <b>dolarla</b> alınıyorsa "USD/kg" kutusuna yeni fiyatı yazın. <b>Liraysa</b> "Sabit TL/kg" kutusuna yazın (ikisinden yalnızca biri dolu olsun).</li>
@@ -200,14 +200,14 @@ export default function MaliyetPage() {
             </ol>
             <div style={{ marginTop: 10 }}><button className="adm-btn-ghost" onClick={() => git('ayarlar', 'kart-hm')}>Hammadde fiyatlarına git</button></div>
           </Card>
-          <Card title="3) Makinenin saat ücreti değişti">
+          <Card title="3) Makinenin saat ücreti değişti" pad="14px 16px">
             <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
               <li>"Kur · Hammadde · Makine" sekmesinde <b>Makine saat ücretleri</b> tablosuna gidin.</li>
               <li>İlgili makinenin (örn. 220 TON) yeni TL/saat değerini yazıp <b>Kaydet</b>'e basın.</li>
             </ol>
             <div style={{ marginTop: 10 }}><button className="adm-btn-ghost" onClick={() => git('ayarlar', 'kart-mk')}>Makine ücretlerine git</button></div>
           </Card>
-          <Card title="4) Bir ürünün gramı, çevrim süresi, koli veya satış fiyatı değişti">
+          <Card title="4) Bir ürünün gramı, çevrim süresi, koli veya satış fiyatı değişti" pad="14px 16px">
             <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
               <li>"Ürün Maliyetleri" sekmesinde ürünü arayın (kod veya ad yazın).</li>
               <li>Satırın sağındaki <b>kalem simgesine</b> basın (ya da satıra tıklayıp <b>Düzenle</b>).</li>
@@ -215,17 +215,17 @@ export default function MaliyetPage() {
               <li><b>Kaydet</b>'e basın. Sonucu ürüne tıklayarak adım adım görebilirsiniz.</li>
             </ol>
           </Card>
-          <Card title="5) Satış fiyatı girilmemiş ürünleri bulmak">
+          <Card title="5) Satış fiyatı girilmemiş ürünleri bulmak" pad="14px 16px">
             <p style={P}>Hızlı işlemler çubuğundaki <b>Liste fiyatı olmayanlar</b> düğmesine basın; yalnızca fiyatsız ürünler görünür. Her birinde kalem simgesiyle <b>Liste fiyatı (USD)</b> alanını doldurun. Fiyat girilmeyen üründe kâr yüzdesi hesaplanamaz.</p>
           </Card>
-          <Card title="6) Yeni ürün eklemek">
+          <Card title="6) Yeni ürün eklemek" pad="14px 16px">
             <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
               <li>Sağ üstteki veya Hızlı işlemler'deki <b>Ürün ekle</b>'ye basın.</li>
               <li>Kod ve adı yazın. <b>Parçalar</b> bölümüne her parçanın gramını ve hammaddesini girin.</li>
               <li><b>Baskı</b> bölümüne makineyi (ton), çevrim süresini ve göz sayısını girin; koli, etiket ve liste fiyatını ekleyip kaydedin.</li>
             </ol>
           </Card>
-          <Card title="7) Sonucu nasıl okurum?">
+          <Card title="7) Sonucu nasıl okurum?" pad="14px 16px">
             <ul style={{ ...P, paddingLeft: 20, margin: 0 }}>
               <li><b>USD Maliyet:</b> ürünün 1 adedinin dolar maliyeti. <b>USD Liste:</b> satış fiyatımız.</li>
               <li><b>Kâr %:</b> maliyetin üzerine yüzde kaç kazandığımız. <b style={{ color: 'var(--adm-red)' }}>%30 altı kırmızı</b> (fiyat gözden geçirilmeli), <b style={{ color: 'var(--adm-amber)' }}>%30–60 sarı</b>, <b style={{ color: 'var(--adm-green)' }}>%60 üstü yeşil</b>.</li>
@@ -233,7 +233,7 @@ export default function MaliyetPage() {
               <li>Formülün tamamı için <button onClick={() => setTab('rehber')} style={{ background: 'none', border: 'none', color: 'var(--adm-ac)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>Nasıl Hesaplanır?</button> sekmesine bakın.</li>
             </ul>
           </Card>
-          <Card title="Yapay zekâya sorabilirsiniz">
+          <Card title="Yapay zekâya sorabilirsiniz" pad="14px 16px">
             <p style={P}>Panelin yapay zekâ asistanına ürün adını söyleyerek maliyeti sorabilirsiniz: "ALY-512 maliyeti ne?", "Kur 55 olursa kârım ne olur?", "Granür %10 zamlanırsa hangi ürünler etkilenir?", "En az kârlı 5 ürün hangisi?". Yazarak ya da konuşarak sorabilirsiniz. Asistan değişiklik kaydetmez, yalnızca hesaplar ve önerir.</p>
           </Card>
         </div>}
