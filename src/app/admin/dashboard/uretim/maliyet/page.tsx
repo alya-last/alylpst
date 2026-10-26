@@ -23,6 +23,8 @@ export default function MaliyetPage() {
   const [modal, setModal] = useState<any>(null) // { id?: string, f: form }
   const [busy, setBusy] = useState(false)
   const [rehberKod, setRehberKod] = useState('ALY-101')
+  const [sadeceListesiz, setSadeceListesiz] = useState(false)
+  const git = (t: string, id?: string) => { setTab(t); if (id) setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80) }
 
   const yukle = useCallback(async () => {
     const [u, h, m, a] = await Promise.all([
@@ -99,6 +101,7 @@ export default function MaliyetPage() {
     { key: 'top', label: ayar.kdv_dahil ? 'Maliyet (KDV dahil)' : 'Maliyet (KDV hariç)', align: 'right', sort: u => H[u.id]?.toplam, render: u => <Money v={H[u.id]?.toplam} />, csv: u => H[u.id]?.toplam },
     { key: 'usd', label: 'USD Maliyet', align: 'right', sort: u => H[u.id]?.usd, render: u => <Money v={H[u.id]?.usd} cur="USD" bold={false} />, csv: u => H[u.id]?.usd },
     { key: 'liste', label: 'USD Liste', align: 'right', sort: u => num(u.liste_usd), render: u => num(u.liste_usd) ? <Money v={num(u.liste_usd)} cur="USD" bold={false} /> : <span style={{ color: 'var(--adm-amber)', fontSize: 11 }}>fiyat yok</span>, csv: u => u.liste_usd },
+    { key: 'duz', label: '', width: 44, align: 'right', render: u => <button className="adm-btn-ghost" title="Düzenle" onClick={e => { e.stopPropagation(); acDuzenle(u) }}><Pencil size={12} /></button> },
     { key: 'kar', label: 'Kâr %', align: 'right', sort: u => H[u.id]?.kar ?? -999, render: u => H[u.id]?.kar === null ? '—' : <b style={{ color: renkKar(H[u.id].kar) }}>%{fmtN((H[u.id].kar as number) * 100, 0)}</b>, csv: u => H[u.id]?.kar },
   ]
 
@@ -111,26 +114,37 @@ export default function MaliyetPage() {
       <AdminTopBar title="Ürün Maliyeti" />
       <Page>
         <PageHead title="Ürün Maliyet Hesabı" sub="Hammadde + baskı + ambalaj + genel gider → TL, USD ve EUR maliyet ile kâr"
-          actions={<><button className="adm-btn-ghost" onClick={() => setTab('rehber')}><Info size={14} />Nasıl hesaplanır?</button><button className="adm-btn" onClick={() => setModal({ f: bosUrun() })}><Plus size={14} />Ürün Ekle</button></>} />
+          actions={<><button className="adm-btn-ghost" onClick={() => setTab('kilavuz')}><Info size={14} />Nasıl kullanılır?</button><button className="adm-btn-ghost" onClick={() => setTab('rehber')}><Calculator size={14} />Nasıl hesaplanır?</button><button className="adm-btn" onClick={() => setModal({ f: bosUrun() })}><Plus size={14} />Ürün Ekle</button></>} />
         <KpiGrid min={190}>
           <Kpi label="Ürün" value={aktifler.length} Icon={Calculator} color="var(--adm-ac)" sub={listesiz ? `${listesiz} ürünün USD liste fiyatı yok` : 'tümünün liste fiyatı var'} />
           <Kpi label="Ortalama Kâr" value={`%${fmtN(ortKar * 100, 0)}`} Icon={TrendingUp} color="var(--adm-green)" sub="maliyet üzerine, USD liste fiyatına göre" />
           <Kpi label="En Düşük Kâr" value={enDusuk ? `%${fmtN((H[enDusuk.id].kar as number) * 100, 0)}` : '—'} Icon={AlertTriangle} color="var(--adm-amber)" sub={enDusuk ? `${enDusuk.kod} ${enDusuk.ad}` : ''} />
           <Kpi label="Kur / Genel Gider" value={`${fmtN(ayar.kur_usd)} ₺`} Icon={Coins} color="var(--adm-blue)" sub={`1 USD · genel gider %${fmtN(ayar.genel_gider_pct, 0)} · ${ayar.kdv_dahil ? 'KDV dahil' : 'KDV hariç'}`} />
         </KpiGrid>
-        <div style={{ margin: '0 0 12px' }}><Tabs value={tab} onChange={setTab} tabs={[{ v: 'urunler', l: 'Ürün Maliyetleri', n: urunler.length }, { v: 'ayarlar', l: 'Kur · Hammadde · Makine' }, { v: 'rehber', l: 'Nasıl Hesaplanır?' }]} /></div>
+        <div style={{ margin: '0 0 12px' }}><Tabs value={tab} onChange={setTab} tabs={[{ v: 'urunler', l: 'Ürün Maliyetleri', n: urunler.length }, { v: 'ayarlar', l: 'Kur · Hammadde · Makine' }, { v: 'kilavuz', l: 'Adım Adım Kullanım' }, { v: 'rehber', l: 'Nasıl Hesaplanır?' }]} /></div>
 
         {tab === 'urunler' && <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', padding: '10px 14px', borderRadius: 10, border: '1px solid var(--adm-bd)', marginBottom: 12 }}>
+            <b style={{ fontSize: 12.5, marginRight: 4 }}>Hızlı işlemler</b>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>USD kuru ₺
+              <input className="adm-inp" style={{ width: 90 }} type="number" step="0.01" value={ayar.kur_usd} onChange={e => setAyar({ ...ayar, kur_usd: +e.target.value })} /></label>
+            <button className="adm-btn" onClick={ayarKaydet} disabled={busy}><Save size={13} />Kuru kaydet</button>
+            <button className="adm-btn-ghost" onClick={() => git('ayarlar', 'kart-hm')}>Hammadde fiyatı</button>
+            <button className="adm-btn-ghost" onClick={() => git('ayarlar', 'kart-mk')}>Makine saat ücreti</button>
+            <button className="adm-btn-ghost" onClick={() => git('ayarlar', 'kart-genel')}>Genel gider / KDV</button>
+            <button className={sadeceListesiz ? 'adm-btn' : 'adm-btn-ghost'} onClick={() => setSadeceListesiz(v => !v)}><AlertTriangle size={13} />Liste fiyatı olmayanlar ({listesiz})</button>
+            <button className="adm-btn-ghost" onClick={() => setModal({ f: bosUrun() })}><Plus size={13} />Ürün ekle</button>
+          </div>
           <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--adm-s2)', fontSize: 12.5, color: 'var(--adm-tx2)', marginBottom: 12, lineHeight: 1.6 }}>
             Tüm tutarlar <b>1 adet ürün</b> içindir. Bir satıra tıklayınca hesap adım adım görünür. Kur, hammadde fiyatı veya makine saat ücreti değişince <b>tüm ürünler otomatik yeniden hesaplanır</b> (Kur · Hammadde · Makine sekmesi).
             <button onClick={() => setTab('rehber')} style={{ background: 'none', border: 'none', color: 'var(--adm-ac)', fontWeight: 600, cursor: 'pointer', marginLeft: 6 }}>Hesap mantığını oku →</button>
           </div>
-          <DataGrid rows={urunler} cols={cols} rowKey={u => u.id} loading={loading} onRowClick={u => setDetay(u)} activeKey={detay?.id} csvName="urun-maliyet" storageKey="maliyet-urunler"
+          <DataGrid rows={sadeceListesiz ? urunler.filter(u => !num(u.liste_usd)) : urunler} cols={cols} rowKey={u => u.id} loading={loading} onRowClick={u => setDetay(u)} activeKey={detay?.id} csvName="urun-maliyet" storageKey="maliyet-urunler"
             searchText={u => `${u.kod} ${u.ad} ${u.seri || ''}`} searchPlaceholder="Kod veya ürün ara..." emptyTitle="Maliyet kaydı yok" emptySub="Ürün Ekle ile gramaj, kalıp ve çevrim bilgilerini gir." />
         </>}
 
         {tab === 'ayarlar' && <div style={{ display: 'grid', gap: 16 }}>
-          <Card title="Genel ayarlar" right={<button className="adm-btn" onClick={ayarKaydet} disabled={busy}><Save size={13} />Kaydet</button>}>
+          <div id="kart-genel"></div><Card title="Genel ayarlar" right={<button className="adm-btn" onClick={ayarKaydet} disabled={busy}><Save size={13} />Kaydet</button>}>
             <FormGrid cols={3}>
               <Field label="USD kuru (₺)" hint="Hammadde USD fiyatını TL'ye ve ürün maliyetini USD'ye çevirirken kullanılır. İstediğin zaman elle değiştir.">
                 <input className="adm-inp" type="number" step="0.01" value={ayar.kur_usd} onChange={e => setAyar({ ...ayar, kur_usd: +e.target.value })} /></Field>
@@ -144,7 +158,7 @@ export default function MaliyetPage() {
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, paddingTop: 6 }}><input type="checkbox" checked={ayar.kdv_dahil} onChange={e => setAyar({ ...ayar, kdv_dahil: e.target.checked })} />KDV dahil hesapla</label></Field>
             </FormGrid>
           </Card>
-          <Card title="Hammadde fiyatları" right={<span style={{ fontSize: 12, color: 'var(--adm-tx3)' }}>TL/kg = USD/kg × kur + ek</span>}>
+          <div id="kart-hm"></div><Card title="Hammadde fiyatları" right={<span style={{ fontSize: 12, color: 'var(--adm-tx3)' }}>TL/kg = USD/kg × kur + ek</span>}>
             <table className="adm-tbl" style={{ width: '100%' }}><thead><tr><th>Hammadde</th><th style={{ textAlign: 'right' }}>USD / kg</th><th style={{ textAlign: 'right' }}>Ek TL/kg</th><th style={{ textAlign: 'right' }}>Sabit TL/kg</th><th style={{ textAlign: 'right' }}>Güncel TL/kg</th><th /></tr></thead><tbody>
               {hms.map((h, i) => <tr key={h.kod}><td><b>{h.ad}</b></td>
                 <td style={{ textAlign: 'right' }}><input className="adm-inp" style={{ width: 90, textAlign: 'right' }} type="number" step="0.01" value={h.usd_kg ?? ''} placeholder="—" onChange={e => setHms(hms.map((x, j) => j === i ? { ...x, usd_kg: e.target.value === '' ? null : +e.target.value } : x))} /></td>
@@ -155,13 +169,71 @@ export default function MaliyetPage() {
             </tbody></table>
             <p style={{ fontSize: 11.5, color: 'var(--adm-tx3)', margin: '10px 0 0' }}>USD/kg doluysa TL fiyat kurdan hesaplanır, boşsa "Sabit TL/kg" kullanılır (ör. geri dönüşüm granür). Fiyatı değiştirip Kaydet'e basınca tüm ürünler güncellenir.</p>
           </Card>
-          <Card title="Makine saat ücretleri">
+          <div id="kart-mk"></div><Card title="Makine saat ücretleri">
             <table className="adm-tbl" style={{ width: '100%' }}><thead><tr><th>Makine</th><th style={{ textAlign: 'right' }}>Saat ücreti (₺/saat)</th><th /></tr></thead><tbody>
               {mks.map((m, i) => <tr key={m.ton}><td><b>{m.ton}</b></td>
                 <td style={{ textAlign: 'right' }}><input className="adm-inp" style={{ width: 110, textAlign: 'right' }} type="number" step="50" value={m.saat_ucreti} onChange={e => setMks(mks.map((x, j) => j === i ? { ...x, saat_ucreti: +e.target.value } : x))} /></td>
                 <td style={{ textAlign: 'right' }}><button className="adm-btn-ghost" onClick={() => mkKaydet(m)}><Save size={12} />Kaydet</button></td></tr>)}
             </tbody></table>
             <p style={{ fontSize: 11.5, color: 'var(--adm-tx3)', margin: '10px 0 0' }}>Saat ücreti; elektrik, işçilik, makine amortismanı gibi enjeksiyon makinesinin bir saatlik toplam maliyetidir.</p>
+          </Card>
+        </div>}
+
+        {tab === 'kilavuz' && <div style={{ display: 'grid', gap: 16, maxWidth: 980 }}>
+          <Card title="Paneli hiç bilmiyorum, nereden başlayayım?">
+            <p style={P}>Bu sayfa her ürünün <b>1 adetinin şirkete kaça mal olduğunu</b> ve satış fiyatına göre <b>ne kadar kâr bıraktığını</b> gösterir. Aşağıda en sık yapılan işler var. Her adımın yanındaki düğme sizi doğru yere götürür. Hiçbir şeyi bozmazsınız: değişiklikler "Kaydet"e basana kadar uygulanmaz ve tüm maliyetler otomatik yeniden hesaplanır.</p>
+          </Card>
+          <Card title="1) Dolar kuru değişti">
+            <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
+              <li>"Ürün Maliyetleri" sekmesinin en üstündeki <b>Hızlı işlemler</b> çubuğunda <b>USD kuru</b> kutusuna yeni kuru yazın (örn. 54,50).</li>
+              <li><b>Kuru kaydet</b> düğmesine basın.</li>
+              <li>Tüm ürünlerin USD maliyeti ve kâr yüzdesi hemen güncellenir. Yukarıdaki "Kur / Genel Gider" kartından da kontrol edebilirsiniz.</li>
+            </ol>
+            <div style={{ marginTop: 10 }}><button className="adm-btn-ghost" onClick={() => git('urunler')}>Ürünler sayfasına git</button></div>
+          </Card>
+          <Card title="2) Hammadde (granür, moblen, kopolimer…) fiyatı değişti">
+            <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
+              <li>"Kur · Hammadde · Makine" sekmesinde <b>Hammadde fiyatları</b> tablosunu açın.</li>
+              <li>Fiyat <b>dolarla</b> alınıyorsa "USD/kg" kutusuna yeni fiyatı yazın. <b>Liraysa</b> "Sabit TL/kg" kutusuna yazın (ikisinden yalnızca biri dolu olsun).</li>
+              <li>O satırın yanındaki <b>Kaydet</b>'e basın. O hammaddeyi kullanan tüm ürünler güncellenir.</li>
+            </ol>
+            <div style={{ marginTop: 10 }}><button className="adm-btn-ghost" onClick={() => git('ayarlar', 'kart-hm')}>Hammadde fiyatlarına git</button></div>
+          </Card>
+          <Card title="3) Makinenin saat ücreti değişti">
+            <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
+              <li>"Kur · Hammadde · Makine" sekmesinde <b>Makine saat ücretleri</b> tablosuna gidin.</li>
+              <li>İlgili makinenin (örn. 220 TON) yeni TL/saat değerini yazıp <b>Kaydet</b>'e basın.</li>
+            </ol>
+            <div style={{ marginTop: 10 }}><button className="adm-btn-ghost" onClick={() => git('ayarlar', 'kart-mk')}>Makine ücretlerine git</button></div>
+          </Card>
+          <Card title="4) Bir ürünün gramı, çevrim süresi, koli veya satış fiyatı değişti">
+            <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
+              <li>"Ürün Maliyetleri" sekmesinde ürünü arayın (kod veya ad yazın).</li>
+              <li>Satırın sağındaki <b>kalem simgesine</b> basın (ya da satıra tıklayıp <b>Düzenle</b>).</li>
+              <li><b>Gram:</b> her parçanın (gövde, kapak, tabak…) gramı. <b>Çevrim (sn):</b> makinenin bir baskıyı kaç saniyede yaptığı. <b>Göz:</b> kalıptan bir baskıda kaç parça çıktığı. <b>Koli / etiket:</b> ürün başına TL. <b>Liste fiyatı:</b> USD satış fiyatı.</li>
+              <li><b>Kaydet</b>'e basın. Sonucu ürüne tıklayarak adım adım görebilirsiniz.</li>
+            </ol>
+          </Card>
+          <Card title="5) Satış fiyatı girilmemiş ürünleri bulmak">
+            <p style={P}>Hızlı işlemler çubuğundaki <b>Liste fiyatı olmayanlar</b> düğmesine basın; yalnızca fiyatsız ürünler görünür. Her birinde kalem simgesiyle <b>Liste fiyatı (USD)</b> alanını doldurun. Fiyat girilmeyen üründe kâr yüzdesi hesaplanamaz.</p>
+          </Card>
+          <Card title="6) Yeni ürün eklemek">
+            <ol style={{ ...P, paddingLeft: 20, margin: 0 }}>
+              <li>Sağ üstteki veya Hızlı işlemler'deki <b>Ürün ekle</b>'ye basın.</li>
+              <li>Kod ve adı yazın. <b>Parçalar</b> bölümüne her parçanın gramını ve hammaddesini girin.</li>
+              <li><b>Baskı</b> bölümüne makineyi (ton), çevrim süresini ve göz sayısını girin; koli, etiket ve liste fiyatını ekleyip kaydedin.</li>
+            </ol>
+          </Card>
+          <Card title="7) Sonucu nasıl okurum?">
+            <ul style={{ ...P, paddingLeft: 20, margin: 0 }}>
+              <li><b>USD Maliyet:</b> ürünün 1 adedinin dolar maliyeti. <b>USD Liste:</b> satış fiyatımız.</li>
+              <li><b>Kâr %:</b> maliyetin üzerine yüzde kaç kazandığımız. <b style={{ color: 'var(--adm-red)' }}>%30 altı kırmızı</b> (fiyat gözden geçirilmeli), <b style={{ color: 'var(--adm-amber)' }}>%30–60 sarı</b>, <b style={{ color: 'var(--adm-green)' }}>%60 üstü yeşil</b>.</li>
+              <li>Bir satıra tıklayınca maliyetin hangi kalemlerden (hammadde, baskı, ambalaj, genel gider) oluştuğu adım adım görünür.</li>
+              <li>Formülün tamamı için <button onClick={() => setTab('rehber')} style={{ background: 'none', border: 'none', color: 'var(--adm-ac)', fontWeight: 600, cursor: 'pointer', padding: 0 }}>Nasıl Hesaplanır?</button> sekmesine bakın.</li>
+            </ul>
+          </Card>
+          <Card title="Yapay zekâya sorabilirsiniz">
+            <p style={P}>Panelin yapay zekâ asistanına ürün adını söyleyerek maliyeti sorabilirsiniz: "ALY-512 maliyeti ne?", "Kur 55 olursa kârım ne olur?", "Granür %10 zamlanırsa hangi ürünler etkilenir?", "En az kârlı 5 ürün hangisi?". Yazarak ya da konuşarak sorabilirsiniz. Asistan değişiklik kaydetmez, yalnızca hesaplar ve önerir.</p>
           </Card>
         </div>}
 
