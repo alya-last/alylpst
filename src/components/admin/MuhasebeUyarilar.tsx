@@ -34,7 +34,7 @@ export default function MuhasebeUyarilar() {
   const renk = hata ? RENK.hata : uyari ? RENK.uyari : 'var(--adm-green)'
   return (
     <>
-      <button className="adm-btn-ghost" onClick={() => setAcik(true)} title="Muhasebe kontrolleri" style={{ marginRight: 8, color: renk }}>
+      <button data-ust-uyari className="adm-btn-ghost" onClick={() => setAcik(true)} title="Muhasebe kontrolleri" style={{ marginRight: 8, color: renk, whiteSpace: 'nowrap', flexShrink: 0 }}>
         {onemli ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
         {onemli ? `${onemli} uyarı` : 'Kontroller temiz'}
       </button>
