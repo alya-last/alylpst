@@ -19,7 +19,7 @@ const girisBos = { uretilen: '', fire: '0', cevrim: '', neden: '', variant: '' }
 
 export default function UretimEmirleriPage() {
   const toast = useToast()
-  const { d, loading, reload } = useUretim(['emirler', 'products', 'variants', 'hammaddeler', 'makineler', 'kaliplar', 'receteler', 'receteKalemleri', 'siparisler', 'siparisKalemleri', 'hareketler', 'kalite', 'cariler'])
+  const { d, loading, reload } = useUretim(['emirler', 'products', 'variants', 'hammaddeler', 'makineler', 'kaliplar', 'receteler', 'receteKalemleri', 'siparisler', 'siparisKalemleri', 'hareketler', 'cariler'])
   const [tab, setTab] = useState('acik')
   const [detay, setDetay] = useState<any>(null)
   const [dTab, setDTab] = useState('ozet')
@@ -212,7 +212,6 @@ export default function UretimEmirleriPage() {
   // Detay
   const dE = canliDetay
   const dHar = dE ? d.hareketler.filter((h: any) => h.uretim_emri_id === dE.id) : []
-  const dKal = dE ? d.kalite.filter((k: any) => k.uretim_emri_id === dE.id) : []
   const dRec = dE?.recete_id ? recete[dE.recete_id] : null
   const dMal = dRec ? receteMaliyet(dRec, d.receteKalemleri, d.hammaddeler) : null
   const sure = dE?.baslangic ? ((dE.bitis ? +new Date(dE.bitis) : Date.now()) - +new Date(dE.baslangic)) / 3600000 : 0
@@ -266,7 +265,6 @@ export default function UretimEmirleriPage() {
           {dE.durum === 'uretimde' && <><button className="adm-btn-ghost" disabled={busy} onClick={() => durumDegis(dE, 'durduruldu')}><Pause size={13} />Duraklat</button><button className="adm-btn" style={{ background: 'var(--adm-green)' }} disabled={busy} onClick={() => durumDegis(dE, 'tamamlandi')}><CheckCircle2 size={14} />Tamamla</button></>}
           {dE.durum === 'durduruldu' && <button className="adm-btn-ghost" disabled={busy} onClick={() => durumDegis(dE, 'planlandi')}><Undo2 size={13} />Plana al</button>}
           {!['tamamlandi', 'iptal'].includes(dE.durum) && <button className="adm-btn-danger" disabled={busy} onClick={() => durumDegis(dE, 'iptal')}><Ban size={13} />İptal</button>}
-          {dE.durum === 'tamamlandi' && <Link href="/admin/dashboard/kalite/kontrol" className="adm-btn-ghost" style={{ textDecoration: 'none' }}><ShieldCheck size={13} />Kalite kontrol gir</Link>}
         </>}>
         {dE && (
           <div>
@@ -278,7 +276,7 @@ export default function UretimEmirleriPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 14 }}>
                 {[['Fire', `%${fmtN(fireOrani(+dE.uretilen_miktar, +dE.fire_miktar), 1)}`, +dE.fire_miktar ? 'var(--adm-red)' : undefined], ['Hız', hiz ? `${fmtN(hiz, 0)}/sa` : '—'], ['Süre', sure ? `${fmtN(sure, 1)} sa` : '—'], [dE.durum === 'uretimde' ? 'Kalan' : 'Çevrim', dE.durum === 'uretimde' ? (kalanSaat != null ? `${fmtN(kalanSaat, 1)} sa` : '—') : dE.gercek_cevrim ? `${dE.gercek_cevrim} sn` : '—']].map(([k, v, c]: any) => <div key={k} style={{ padding: 10, borderRadius: 10, background: 'var(--adm-s2)' }}><div className="adm-kpi-label" style={{ marginBottom: 3 }}>{k}</div><b style={{ fontSize: 14.5, fontFamily: 'JetBrains Mono,monospace', color: c }}>{v}</b></div>)}
               </div>
-              <Tabs value={dTab} onChange={setDTab} tabs={[{ v: 'ozet', l: 'Özet' }, { v: 'giris', l: 'Üretim Girişi' }, { v: 'malzeme', l: 'Malzeme' }, { v: 'hareket', l: 'Hareketler', n: dHar.length }, { v: 'kalite', l: 'Kalite', n: dKal.length }]} />
+              <Tabs value={dTab} onChange={setDTab} tabs={[{ v: 'ozet', l: 'Özet' }, { v: 'giris', l: 'Üretim Girişi' }, { v: 'malzeme', l: 'Malzeme' }, { v: 'hareket', l: 'Hareketler', n: dHar.length }]} />
             </div>
 
             {dTab === 'ozet' && <div style={{ padding: 20 }}>
@@ -320,8 +318,6 @@ export default function UretimEmirleriPage() {
               <div key={h.id} className="adm-row"><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 600 }}>{fmtDateTime(h.tarih)}</div><div style={{ fontSize: 11.5, color: 'var(--adm-tx3)' }}>{h.vardiya || ''}{h.cevrim_suresi ? ` · ${h.cevrim_suresi} sn` : ''}{h.fire_nedeni ? ` · ${h.fire_nedeni}` : ''}</div></div>
                 <b style={{ color: 'var(--adm-green)', fontFamily: 'JetBrains Mono,monospace' }}>+{fmtInt(h.uretilen_adet)}</b>{+h.fire_adet > 0 && <b style={{ color: 'var(--adm-red)', fontFamily: 'JetBrains Mono,monospace', fontSize: 12 }}>fire {fmtInt(h.fire_adet)}</b>}</div>)))}
 
-            {dTab === 'kalite' && (dKal.length === 0 ? <Empty icon={<ShieldCheck size={28} />} title="Kalite kaydı yok" sub="Kalite → Kalite Kontrol’dan bu emre kayıt gir" /> : dKal.map((k: any) => (
-              <div key={k.id} className="adm-row"><div style={{ flex: 1 }}><div style={{ fontSize: 12.5, fontWeight: 600 }}>{k.kontrol_tipi.replace('_', ' ')}</div><div style={{ fontSize: 11.5, color: 'var(--adm-tx3)' }}>{fmtDateTime(k.tarih)} · {fmtInt(k.uygun_adet)}/{fmtInt(k.kontrol_edilen_adet)} uygun</div></div><Badge tone={k.sonuc === 'uygun' ? 'green' : k.sonuc === 'red' ? 'red' : 'amber'}>{k.sonuc.replace('_', ' ')}</Badge></div>)))}
           </div>
         )}
       </Drawer>
