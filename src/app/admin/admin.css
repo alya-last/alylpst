@@ -74,6 +74,9 @@ select.adm-inp { cursor: pointer; }
 .adm-sb-av { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--adm-ac), #c94f1e); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
 
 .adm-topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; background: var(--adm-s1); border-bottom: 1px solid var(--adm-bdr); flex-shrink: 0; }
+/* Üst çubukta kontrol/uyarı düğmesi tek olmalı: aynı düğmenin kopyaları (tarayıcı çevirisi, eklenti, çift render) gizlenir */
+.adm-topbar [data-ust-uyari] ~ [data-ust-uyari] { display: none !important; }
+.adm-topbar h1 { white-space: nowrap; }
 .adm-topbar h1 { font-size: 15px; font-weight: 700; color: var(--adm-tx); letter-spacing: -.3px; margin: 0; }
 
 .adm-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); backdrop-filter: blur(4px); z-index: 500; display: flex; align-items: center; justify-content: center; padding: 16px; }
