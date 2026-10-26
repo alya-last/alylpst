@@ -32,7 +32,7 @@ const YETKI: Record<string, string[]> = {
   gorsel_toplu_sikistir: ['yonetim'],
   basvuru_analiz: ['dashboard'],
   asistan: [],                      // her personel; veri erişimi zaten RLS ile sınırlı
-  sayfa_anlat: [],                  // her personel; yalnızca rehber metnine dayanır, şirket verisi okumaz
+  sayfa_anlat: [],                  // her personel; anlatım rehber metnine dayanır. "Yaptım" doğrulaması kullanıcının KENDİ modül yetkisiyle okur (araclariSuz)
   ozet: [],                         // yalnızca yetkili olduğu modüllerin verisi kullanılır
   ekstre_oner: ['muhasebe'],
   belge_oku: ['muhasebe', 'satinalma', 'stok'],
@@ -67,6 +67,12 @@ export async function POST(req: NextRequest) {
         const gecmis = (Array.isArray(body.gecmis) ? body.gecmis : []).slice(-6)
           .filter((x: any) => x && (x.role === 'user' || x.role === 'assistant') && typeof x.content === 'string')
           .map((x: any) => ({ role: x.role as 'user' | 'assistant', content: String(x.content).slice(0, 1500) }))
+        // "Yaptım" doğrulaması: panel verisini okuma araçlarıyla (kullanıcının kendi yetkisiyle) kontrol edip sıradaki adımı söyler.
+        if (body.dogrula === true) {
+          const d: Konusma[] = [...gecmis, { role: 'user', content: `[Bulunduğum sayfa: ${yol}] Az önce anlatılan adımı yaptığımı söylüyorum. Gerçekten yapıldığını yalnızca okuma araçlarıyla panelden doğrula: ilgili son kayıtlara (bugünün/son birkaç günün işlemleri, faturaları, hareketleri, stok vb.) bak. Bulursan "Kayıtta görünüyor:" diye kısaca neyi gördüğünü yaz (tutar, tarih, firma). Bulamazsan "Kayıtta göremedim" de ve olası nedenini söyle; yaptım dediğim için körü körüne onaylama. Sonra SIRADAKİ tek adımı sade Türkçeyle yaz. En fazla 120 kelime. Hiçbir kaydı değiştirme.` }]
+          const r: any = await genelAsistanYanit(y.sb, d, y.moduller)
+          return NextResponse.json({ ok: true, yanit: String(r.yanit || '').trim() + (r.soru?.metin ? `\n\n${r.soru.metin}` : ''), dogrulandi: true })
+        }
         const rehber = MODULLER.map(m => `[${m.baslik}] Menü: ${m.menu}. ${m.ne} Adımlar: ${m.adimlar.map(a => `${a.t}: ${a.a}`).join(' | ')}${m.dikkat ? ' Dikkat: ' + m.dikkat.join(' ') : ''}`).join('\n')
         const soz = SOZLUK.map(x => `${x.t}: ${x.a}`).join('; ')
         const m = await aiCagir({
