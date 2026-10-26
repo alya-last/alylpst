@@ -42,7 +42,18 @@ export default function TekliflerPage() {
   const urun = useMemo(() => byId(d.products), [d.products])
   const vList = useMemo(() => d.variants.map((v: any) => ({ id: v.id, label: [urun[v.product_id]?.name, v.name, v.color, v.size].filter(Boolean).filter((a: any, i: number, arr: any[]) => arr.indexOf(a) === i).join(' · ') || v.name })), [d.variants, urun])
   // Katalogdan seçilen kalemlerin resmi: önce renk/varyant görseli, yoksa ürün ana görseli
-  const gorseller = useMemo(() => Object.fromEntries(d.variants.map((v: any) => [v.id, v.gorsel || urun[v.product_id]?.image_url]).filter(([, g]: any) => g)), [d.variants, urun]) as Record<string, string>
+  const gorseller = useMemo(() => {
+    const m: Record<string, string> = {}
+    const ad = (x: string) => 'ad:' + String(x || '').toLocaleLowerCase('tr').replace(/\s+/g, ' ').trim()
+    for (const p of d.products as any[]) if (p.image_url) m[ad(p.name)] = p.image_url
+    for (const v of d.variants as any[]) {
+      const g = v.gorsel || urun[v.product_id]?.image_url; if (!g) continue
+      m[v.id] = g
+      // Kalem katalogdan seçilmeyip adı yazıldıysa (variant_id boş) ad üzerinden de bulunabilsin
+      const e = vList.find((x: any) => x.id === v.id)?.label; if (e) m[ad(e)] = g
+    }
+    return m
+  }, [d.variants, d.products, urun, vList]) as Record<string, string>
   const varsayilanListe = d.fiyatListeleri.find((l: any) => l.varsayilan)?.id
   function fiyatBul(variantId: string, cariId: string, miktar: number) {
     const lid = cari[cariId]?.fiyat_listesi_id || varsayilanListe
