@@ -3,11 +3,11 @@
 //
 // Ortam değişkenleri:
 //   OPENAI_API_KEY   (zorunlu)
-//   OPENAI_MODEL     (opsiyonel, varsayılan gpt-4.1-mini) — metin/görsel/araç çağrısı için
+//   OPENAI_MODEL     (opsiyonel, varsayılan gpt-4.1) — metin/görsel/araç çağrısı için
 //   OPENAI_BASE_URL  (opsiyonel, varsayılan https://api.openai.com/v1)
 
 export const aiAktif = () => !!process.env.OPENAI_API_KEY
-export const AI_MODEL = () => process.env.OPENAI_MODEL || 'gpt-4.1-mini'
+export const AI_MODEL = () => process.env.OPENAI_MODEL || 'gpt-4.1'
 
 export class AiHata extends Error {
   constructor(message: string, public durum = 502) { super(message) }

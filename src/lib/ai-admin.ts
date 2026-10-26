@@ -693,8 +693,8 @@ Kurallar:
   const kullanilan: string[] = []
   let sonVeriAraci: { ad: string; args: Record<string, any> } | null = null
   const excelYollari: string[] = []   // araç çıktısında üretilen Excel adresleri (cevapta yazılmasa da indirme düğmesi çıksın)
-  for (let tur = 0; tur < 12; tur++) {
-    const m = await aiCagir({ messages: msgs, tools: araclar, maxTokens: 4000 })
+  for (let tur = 0; tur < 16; tur++) {
+    const m = await aiCagir({ messages: msgs, tools: araclar, maxTokens: 6000, timeoutMs: 55000 })
     const sc = m.tool_calls?.find(c => c.function.name === 'soru_sor' && izinli.has('soru_sor'))
     if (sc) {
       let sa: any = {}; try { sa = JSON.parse(sc.function.arguments || '{}') } catch { /* boş */ }
