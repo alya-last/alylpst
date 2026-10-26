@@ -89,25 +89,6 @@ const REHBERLER: Record<GrupId, Bolum[]> = {
     ] },
     UYARI_BOLUMU,
   ],
-  kalite: [
-    { v: 'genel', l: 'Genel mantık', icerik: [
-      'Kalite iki kayıt türüyle izlenir: KONTROL kayıtları (giriş, proses, son kontrol) ve FİRE kayıtları.',
-      'Her kayıt mümkünse bir üretim emrine bağlanmalıdır; böylece emir bazında red ve fire oranı hesaplanır.',
-    ] },
-    { v: 'kontrol', l: 'Kalite kontrol', icerik: [
-      { b: 'Kurallar', t: ['Uygun adet + red adet = kontrol edilen adet olmalıdır.', '"Uygun" sonuçta red adet olmamalı; "Red" sonuçta red adet sıfır olmamalıdır.', 'Red adedi varsa red nedeni yazılmalıdır (iyileştirme ve tedarikçi değerlendirmesi için).', 'Red oranı %10\'u aşan kontroller sarı uyarı olarak çıkar.', 'Kontrolü yapan kişi seçilirse izlenebilirlik sağlanır.'] },
-    ] },
-    { v: 'fire', l: 'Fire', icerik: [
-      'Fire kaydı girilince ilgili hammadde/ürün stoğundan otomatik ÇIKIŞ hareketi yazılır; fire silinirse geri giriş yazılır.',
-      'Fire nedeni, hammadde/ürün ve maliyet etkisi doldurulursa fire analizi ve maliyet raporları doğru çalışır.',
-      'Miktarı 0 ya da negatif fire kaydı hata olarak listelenir.',
-    ] },
-    { v: 'bakim', l: 'Bakım', icerik: [
-      'Kalıp bakım tarihi geçince ve makine arızalı/bakımda bekleyince bu gruptan da uyarı çıkar (Üretim > Kalıp / Makine sayfalarından düzeltilir).',
-      'Bakım yapıldığında kalıp kartından bakım kaydı ekleyin; "son bakım" ve "sonraki bakım" tarihleri güncellenir.',
-    ] },
-    UYARI_BOLUMU,
-  ],
 }
 
 export default function GrupRehberi({ grup }: { grup: GrupId }) {
