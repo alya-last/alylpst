@@ -54,7 +54,7 @@ export async function gorselTasarla(imageUrl: string, stil: GorselStil): Promise
 
   let res: Response
   try {
-    res = await fetch(`${base}/images/edits`, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(50000) })
+    res = await fetch(`${base}/images/edits`, { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(55000) })
   } catch (e: any) {
     throw new AiHata(e?.name === 'TimeoutError' ? 'AI görsel üretimi zaman aşımına uğradı.' : 'AI servisine ulaşılamadı.', 504)
   }
