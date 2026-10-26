@@ -50,10 +50,11 @@ export default function MaliyetPage() {
   const formdan = (f: any) => ({
     kod: f.kod.trim(), ad: f.ad.trim(), litre: f.litre || null, seri: f.seri || null,
     parcalar: f.parcalar.filter((p: any) => p.ad && num(p.gram) > 0).map((p: any) => ({ ad: p.ad, gram: num(p.gram), hm: p.hm })),
-    baski: f.baski.filter((b: any) => b.ad && num(b.cevrim) > 0).map((b: any) => ({ ad: b.ad, goz: num(b.goz) || 1, cevrim: num(b.cevrim), ton: b.ton, coef: num(b.coef) || 1, ...(num(b.saat) > 0 ? { saat: num(b.saat) } : {}) })),
+    baski: f.baski.filter((b: any) => b.ad && (num(b.cevrim) > 0 || num(b.sabit_tl) > 0)).map((b: any) => ({ ad: b.ad, goz: num(b.goz) || 1, cevrim: num(b.cevrim), ton: b.ton, coef: num(b.coef) || 1, ...(num(b.saat) > 0 ? { saat: num(b.saat) } : {}), ...(num(b.sabit_tl) > 0 ? { sabit_tl: num(b.sabit_tl) } : {}) })),
     ek_tl: num(f.ek_tl), koli_tl: num(f.koli_tl), etiket_tl: num(f.etiket_tl), liste_usd: num(f.liste_usd),
+    genel_gider_pct: f.gg === '' || f.gg === undefined || f.gg === null ? null : num(f.gg),
   })
-  const acDuzenle = (u: MUrun) => setModal({ id: u.id, f: { kod: u.kod, ad: u.ad, litre: u.litre || '', seri: u.seri || '', parcalar: u.parcalar.map(p => ({ ...p, gram: String(p.gram) })), baski: u.baski.map(b => ({ ...b, goz: String(b.goz), cevrim: String(b.cevrim), coef: String(b.coef), saat: b.saat ? String(b.saat) : '' })), ek_tl: String(u.ek_tl), koli_tl: String(u.koli_tl), etiket_tl: String(u.etiket_tl), liste_usd: String(u.liste_usd) } })
+  const acDuzenle = (u: MUrun) => setModal({ id: u.id, f: { kod: u.kod, ad: u.ad, litre: u.litre || '', seri: u.seri || '', parcalar: u.parcalar.map(p => ({ ...p, gram: String(p.gram) })), baski: u.baski.map(b => ({ ...b, goz: String(b.goz), cevrim: String(b.cevrim), coef: String(b.coef), saat: b.saat ? String(b.saat) : '', sabit_tl: b.sabit_tl ? String(b.sabit_tl) : '' })), ek_tl: String(u.ek_tl), koli_tl: String(u.koli_tl), etiket_tl: String(u.etiket_tl), liste_usd: String(u.liste_usd), gg: u.genel_gider_pct === null || u.genel_gider_pct === undefined ? '' : String(u.genel_gider_pct) } })
   async function kaydet(e: React.FormEvent) {
     e.preventDefault(); if (busy || !modal) return
     const p = formdan(modal.f)
@@ -345,6 +346,7 @@ function MForm({ f, set, hms, mks }: { f: any; set: (f: any) => void; hms: MHamm
       <Field label="Hacim (lt)"><input className="adm-inp" value={f.litre} onChange={e => up('litre', e.target.value)} /></Field>
       <Field label="Seri"><input className="adm-inp" value={f.seri} onChange={e => up('seri', e.target.value)} /></Field>
       <Field label="USD liste fiyatı"><input className="adm-inp" type="number" step="0.01" value={f.liste_usd} onChange={e => up('liste_usd', e.target.value)} /></Field>
+      <Field label="Genel gider % (özel)" hint="Boşsa genel ayardaki oran kullanılır. Örn. Efes gövdesi için 20."><input className="adm-inp" type="number" step="0.1" value={f.gg ?? ''} placeholder="genel" onChange={e => up('gg', e.target.value)} /></Field>
     </FormGrid>
     <Divider label="Parçalar ve hammadde (gram)" />
     {f.parcalar.map((p: any, i: number) => <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 100px 1fr 28px', gap: 8, marginBottom: 6 }}>
@@ -354,14 +356,15 @@ function MForm({ f, set, hms, mks }: { f: any; set: (f: any) => void; hms: MHamm
       <button type="button" onClick={() => up('parcalar', f.parcalar.filter((_: any, j: number) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--adm-tx3)' }}><X size={15} /></button></div>)}
     <button type="button" className="adm-btn-ghost" style={{ fontSize: 12 }} onClick={() => up('parcalar', [...f.parcalar, { ad: '', gram: '', hm: 'moblen' }])}><Plus size={12} />Parça ekle</button>
     <Divider label="Baskı (kalıp ve makine)" />
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 80px 110px 70px 90px 28px', gap: 8, fontSize: 10.5, color: 'var(--adm-tx3)', marginBottom: 4 }}><span>Kalıp / parça</span><span>Göz</span><span>Çevrim sn</span><span>Makine</span><span>Katsayı</span><span>Özel ₺/saat</span><span /></div>
-    {f.baski.map((b: any, i: number) => <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 80px 110px 70px 90px 28px', gap: 8, marginBottom: 6 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 80px 110px 70px 90px 90px 28px', gap: 8, fontSize: 10.5, color: 'var(--adm-tx3)', marginBottom: 4 }}><span>Kalıp / parça</span><span>Göz</span><span>Çevrim sn</span><span>Makine</span><span>Katsayı</span><span>Özel ₺/saat</span><span>Sabit ₺</span><span /></div>
+    {f.baski.map((b: any, i: number) => <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 80px 110px 70px 90px 90px 28px', gap: 8, marginBottom: 6 }}>
       <input className="adm-inp" style={mini} value={b.ad} onChange={e => arr('baski', i, { ad: e.target.value })} />
       <input className="adm-inp" style={mini} type="number" value={b.goz} onChange={e => arr('baski', i, { goz: e.target.value })} />
       <input className="adm-inp" style={mini} type="number" step="0.5" value={b.cevrim} onChange={e => arr('baski', i, { cevrim: e.target.value })} />
       <select className="adm-inp" style={mini} value={b.ton} onChange={e => arr('baski', i, { ton: e.target.value })}>{mks.map(m => <option key={m.ton} value={m.ton}>{m.ton}</option>)}</select>
       <input className="adm-inp" style={mini} type="number" step="0.25" value={b.coef} onChange={e => arr('baski', i, { coef: e.target.value })} />
       <input className="adm-inp" style={mini} type="number" step="50" value={b.saat ?? ''} placeholder="genel" title="Boş bırakırsan makinenin genel saat ücreti kullanılır" onChange={e => arr('baski', i, { saat: e.target.value })} />
+      <input className="adm-inp" style={mini} type="number" step="0.01" value={b.sabit_tl ?? ''} placeholder="yok" title="Baskı maliyeti elle belliyse TL olarak yaz; makine hesabı yapılmaz" onChange={e => arr('baski', i, { sabit_tl: e.target.value })} />
       <button type="button" onClick={() => up('baski', f.baski.filter((_: any, j: number) => j !== i))} style={{ background: 'none', border: 'none', color: 'var(--adm-tx3)' }}><X size={15} /></button></div>)}
     <button type="button" className="adm-btn-ghost" style={{ fontSize: 12 }} onClick={() => up('baski', [...f.baski, { ad: '', goz: '1', cevrim: '', ton: mks[0]?.ton || '180 TON', coef: '1' }])}><Plus size={12} />Kalıp ekle</button>
     <p style={{ fontSize: 11, color: 'var(--adm-tx3)', margin: '6px 0 0' }}>Göz: kalıpta bir baskıda çıkan parça sayısı. Katsayı: parçanın ürüne kaç kez girdiği (4 ayak = 4; normal parça = 1). Özel ₺/saat: yalnız bu ürüne farklı saat ücreti uygulanacaksa doldurun (örn. 3D set); boşsa makinenin genel ücreti geçerli.</p>
