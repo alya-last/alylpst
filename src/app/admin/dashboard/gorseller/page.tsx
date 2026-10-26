@@ -2,7 +2,13 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import AdminTopBar from '@/components/admin/TopBar'
-import { Copy, Package, ExternalLink } from 'lucide-react'
+import { Copy, Package, ExternalLink, Wand2, RotateCcw, ImagePlus } from 'lucide-react'
+import { Modal } from '@/components/admin/erp/ui'
+import { aiIstek } from '@/lib/ai-client'
+
+const GORSEL_STIL = { studyo: 'Stüdyo', yasam: 'Yaşam alanı' } as const
+type GorselStil = keyof typeof GORSEL_STIL
+type AiHedef = { tur: 'urun' | 'varyant'; id: string; ad: string; url: string; stil: GorselStil; b64: string | null; busy: boolean; kayit: boolean }
 
 const sb = createClient()
 
@@ -11,11 +17,29 @@ export default function GorsellerPage() {
   const [search, setSearch] = useState('')
   const [variants, setVariants] = useState<any[]>([])
   const [toast, setToast] = useState('')
+  const [ai, setAi] = useState<AiHedef | null>(null)
 
-  useEffect(() => {
+  useEffect(() => { yukle() }, [])
+  function yukle() {
     sb.from('products').select('id,code,name,image_url,category,is_new').order('sort_order').then(({ data }) => setProducts(data || []))
     sb.from('product_variants').select('id,product_id,name,color,hex,gorsel,sort_order').order('sort_order').then(({ data }) => setVariants(data || []))
-  }, [])
+  }
+
+  async function aiUret(h: AiHedef, stil: GorselStil) {
+    setAi({ ...h, stil, b64: null, busy: true })
+    try {
+      const r: any = await aiIstek('urun_gorsel_tasarim', { url: h.url, stil })
+      setAi({ ...h, stil, b64: r.b64, busy: false })
+    } catch (e: any) { setToast(e.message || 'AI hatası'); setTimeout(() => setToast(''), 3500); setAi(null) }
+  }
+  async function aiKaydet() {
+    if (!ai?.b64) return
+    setAi({ ...ai, kayit: true })
+    try {
+      await aiIstek(ai.tur === 'urun' ? 'urun_gorsel_kaydet' : 'varyant_gorsel_kaydet', ai.tur === 'urun' ? { urun_id: ai.id, b64: ai.b64 } : { variant_id: ai.id, b64: ai.b64 })
+      setAi(null); setToast('Görsel güncellendi'); setTimeout(() => setToast(''), 2500); yukle()
+    } catch (e: any) { setToast(e.message || 'Kaydedilemedi'); setTimeout(() => setToast(''), 3500); setAi({ ...ai, kayit: false }) }
+  }
 
   const varyantlar: Record<string, any[]> = {}
   for (const v of variants) (varyantlar[v.product_id] ||= []).push(v)
@@ -67,10 +91,16 @@ export default function GorsellerPage() {
                     </p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       {(varyantlar[p.id] || []).map(v => v.gorsel ? (
-                        <button key={v.id} onClick={() => copy(v.gorsel)} title={`${v.name}${v.color ? ' · ' + v.color : ''} — URL'yi kopyala`}
-                          style={{ width: 38, height: 38, padding: 2, border: '1px solid var(--adm-bdr)', borderRadius: 6, background: 'var(--adm-s2)', cursor: 'pointer' }}>
-                          <img src={v.gorsel} alt={v.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-                        </button>
+                        <span key={v.id} style={{ position: 'relative', display: 'inline-block' }}>
+                          <button onClick={() => copy(v.gorsel)} title={`${v.name}${v.color ? ' · ' + v.color : ''} — URL'yi kopyala`}
+                            style={{ width: 38, height: 38, padding: 2, border: '1px solid var(--adm-bdr)', borderRadius: 6, background: 'var(--adm-s2)', cursor: 'pointer' }}>
+                            <img src={v.gorsel} alt={v.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                          </button>
+                          <button onClick={() => aiUret({ tur: 'varyant', id: v.id, ad: `${p.name} — ${v.name}`, url: v.gorsel, stil: 'studyo', b64: null, busy: true, kayit: false }, 'studyo')} title="AI ile yeniden tasarla" aria-label="AI ile yeniden tasarla"
+                            style={{ position: 'absolute', right: -3, bottom: -3, width: 16, height: 16, padding: 0, borderRadius: 8, border: '1px solid var(--adm-bdr2)', background: 'var(--adm-s1)', color: 'var(--adm-ac)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Wand2 size={9} />
+                          </button>
+                        </span>
                       ) : (
                         <span key={v.id} title={`${v.name}${v.color ? ' · ' + v.color : ''} — görsel yok`}
                           style={{ width: 38, height: 38, border: '1px dashed var(--adm-bdr2)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: v.hex || 'transparent', color: 'var(--adm-tx3)', fontSize: 9 }}>
@@ -85,6 +115,10 @@ export default function GorsellerPage() {
                     <button className="adm-btn-ghost" style={{ flex: 1, justifyContent: 'center', fontSize: 11, padding: '5px 0' }}
                       onClick={() => copy(p.image_url)}>
                       <Copy size={11} /> Kopyala
+                    </button>
+                    <button className="adm-btn-ghost" style={{ padding: '5px 8px' }} title="AI ile yeniden tasarla" aria-label="AI ile yeniden tasarla"
+                      onClick={() => aiUret({ tur: 'urun', id: p.id, ad: p.name, url: p.image_url, stil: 'studyo', b64: null, busy: true, kayit: false }, 'studyo')}>
+                      <Wand2 size={11} />
                     </button>
                     <a href={p.image_url} target="_blank" rel="noopener noreferrer nofollow"
                       className="adm-btn-ghost" style={{ padding: '5px 8px' }}>
@@ -103,6 +137,32 @@ export default function GorsellerPage() {
           <p style={{ textAlign: 'center', color: 'var(--adm-tx3)', padding: 60 }}>Ürün bulunamadı</p>
         )}
       </div>
+      <Modal open={!!ai} onClose={() => { if (!ai?.busy && !ai?.kayit) setAi(null) }} width={640} title={ai ? `AI ile Yeniden Tasarla — ${ai.ad}` : 'AI'}
+        footer={<>
+          <button type="button" className="adm-btn-ghost" disabled={ai?.kayit} onClick={() => setAi(null)}>{ai?.b64 ? 'Vazgeç' : 'İptal'}</button>
+          {ai?.b64 && <button type="button" className="adm-btn-ghost" disabled={ai.busy || ai.kayit} onClick={() => ai && aiUret(ai, ai.stil)}><RotateCcw size={13} />Tekrar Dene</button>}
+          {ai?.b64 && <button type="button" className="adm-btn" disabled={ai.kayit} onClick={aiKaydet}>{ai.kayit ? 'Kaydediliyor…' : 'Bu Görseli Kullan'}</button>}
+        </>}>
+        <p style={{ fontSize: 12, color: 'var(--adm-tx3)', margin: '0 0 12px' }}>Ürünün şekli ve rengi korunmaya çalışılır, çevresi AI ile yeniden oluşturulur. Sonucu mutlaka mevcut görselle karşılaştır; ürün değişmişse "Vazgeç" de.</p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          {(Object.keys(GORSEL_STIL) as GorselStil[]).map(k => (
+            <button key={k} type="button" className={ai?.stil === k ? 'adm-chip on' : 'adm-chip'} disabled={ai?.busy || ai?.kayit} onClick={() => ai && aiUret(ai, k)}>{GORSEL_STIL[k]}</button>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', justifyContent: 'center', minHeight: 260 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--adm-tx3)', marginBottom: 6 }}>Mevcut</div>
+            {ai && <img src={ai.url} alt="" style={{ width: 220, height: 220, objectFit: 'contain', borderRadius: 12, background: 'var(--adm-s2)', padding: 8 }} />}
+          </div>
+          <div style={{ fontSize: 20, color: 'var(--adm-tx3)' }}>→</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 11, color: 'var(--adm-tx3)', marginBottom: 6 }}>AI önerisi</div>
+            {ai?.busy ? <div style={{ width: 220, height: 220, borderRadius: 12, background: 'var(--adm-s2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--adm-tx3)' }}>Oluşturuluyor…</div>
+              : ai?.b64 ? <img src={`data:image/png;base64,${ai.b64}`} alt="" style={{ width: 220, height: 220, objectFit: 'contain', borderRadius: 12, background: 'var(--adm-s2)', padding: 8 }} />
+              : <div style={{ width: 220, height: 220, borderRadius: 12, background: 'var(--adm-s2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ImagePlus size={26} style={{ color: 'var(--adm-tx3)' }} /></div>}
+          </div>
+        </div>
+      </Modal>
       {toast && <div className="adm-toast">✓ {toast}</div>}
     </div>
   )
