@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { ARACLAR, araciCalistir, asistanYanit, bugunISO, SIRKET_KURALLARI, type Konusma } from '@/lib/ai-admin'
+import { ARACLAR, araciCalistir, asistanYanit, bugunISO, SIRKET_KURALLARI, SORU_ARACI, type Konusma } from '@/lib/ai-admin'
 import { MUH_ARACLAR, muhAraci, mevzuatBaglami } from '@/lib/ai-muhasebe'
 import type { AiArac } from '@/lib/ai'
 
@@ -34,7 +34,7 @@ export const araclariSuz = (moduller: string[]): AiArac[] => [...ARACLAR, ...MUH
  * "her şeyi bilen" bir asistan gibi davranabilir, ayrı Muhasebe AI sohbetiyle aynı veri tabanını kullanır.
  */
 export async function genelAsistanYanit(sb: SupabaseClient, gecmis: Konusma[], moduller: string[]) {
-  const araclar = araclariSuz(moduller)
+  const araclar = [...araclariSuz(moduller), SORU_ARACI]
   const calistir = (sb: SupabaseClient, ad: string, a: Record<string, any>) =>
     (ad === 'hesapla' || ad === 'fatura_ara' || ad === 'islem_ara') ? muhAraci(sb, ad, a) : araciCalistir(sb, ad, a)
   let ekSistem = ''
