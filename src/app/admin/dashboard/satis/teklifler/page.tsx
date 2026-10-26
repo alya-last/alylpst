@@ -230,7 +230,7 @@ export default function TekliflerPage() {
                 <Field label="KDV %"><input type="number" min="0" max="100" step="any" className="adm-inp" value={ed.f.kdv_orani} onChange={e => setF({ kdv_orani: +e.target.value })} /></Field>
               </FormGrid>
 
-              {!kilitli && <Card title={<span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Sparkles size={14} />AI ile kalem öner</span>}>
+              {!kilitli && <Card title={<span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Sparkles size={14} />AI ile kalem öner</span>} pad={12}>
                 <textarea className="adm-inp" rows={3} style={{ width: '100%' }} placeholder="Müşterinin talep mesajını yapıştırın (başvurudan geldiyse hazır)" value={ai.metin} onChange={e => setAi(a => ({ ...a, metin: e.target.value }))} />
                 <button type="button" className="adm-btn-ghost" style={{ marginTop: 6 }} disabled={ai.busy || ai.kapali || (!ai.metin.trim() && !ed.f.basvuru_id)} onClick={aiOner}><Sparkles size={13} />{ai.busy ? 'Analiz ediliyor…' : 'Öner'}</button>
                 {ai.kapali && <span style={{ fontSize: 12, color: 'var(--adm-amber)', marginLeft: 8 }}>AI yapılandırılmamış</span>}
