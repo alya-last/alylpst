@@ -46,7 +46,6 @@ export default function AdminDashboardPage() {
       if (A.uretim || A.satis || A.kalite) { add('emirler', erp.from('uretim_emirleri').select('*').in('durum', ['planlandi', 'uretimde', 'durduruldu']).limit(1000)); add('emirlerBitmis', erp.from('uretim_emirleri').select('id,no,urun_id,durum,uretilen_miktar,bitis').eq('durum', 'tamamlandi').gte('bitis', gunOnce(90)).limit(1000)) }
       if (A.satis || A.sevk) { add('siparisler', erp.from('satis_siparisleri').select('*').in('durum', SIPARIS_ACIK).limit(1000)) }
       if (A.satin) add('satinalma', erp.from('satinalma_siparisleri').select('*').in('durum', ['beklemede', 'onaylandi', 'yolda']).limit(1000))
-      if (A.kalite) add('kalite', erp.from('kalite_kontrol_kayitlari').select('uretim_emri_id,kontrol_tipi').gte('tarih', gunOnce(120)).limit(1000))
       if (A.fin) add('fiyatListeleri', erp.from('fiyat_listeleri').select('id').limit(50))
       if (A.sevk) add('sevkiyatlar', erp.from('sevkiyatlar').select('id,no,tarih,durum,cari_id').in('durum', ['hazirlaniyor', 'yola_cikti']).limit(500))
       const res = await Promise.all(ops)
@@ -118,7 +117,6 @@ export default function AdminDashboardPage() {
   const arizaMakine = g('makineler').filter((m: any) => m.durum === 'arizali')
   const gecEmir = g('emirler').filter((e: any) => ['planlandi', 'uretimde', 'durduruldu'].includes(e.durum) && g('siparisler').find((s: any) => s.id === e.siparis_id)?.teslim_tarihi < bugun)
   const gecSatin = g('satinalma').filter((s: any) => ['beklemede', 'onaylandi', 'yolda'].includes(s.durum) && s.beklenen_teslim && s.beklenen_teslim < bugun)
-  const kontrolBekleyen = g('emirlerBitmis').filter((e: any) => +e.uretilen_miktar > 0 && !g('kalite').some((k: any) => k.uretim_emri_id === e.id && k.kontrol_tipi === 'son_kontrol'))
   const satinP = useMemo(() => {
     const ks = g('satinalmaKalemleri'); return g('satinalma').reduce((s: number, o: any) => {
       const kalemler = ks.filter((k: any) => k.siparis_id === o.id)
@@ -150,7 +148,6 @@ export default function AdminDashboardPage() {
   if (A.uretim && bakimKalip.length) alerts.push({ tone: 'amber', text: `${bakimKalip.length} kalıbın bakımı yaklaşıyor/geçmiş`, href: '/admin/dashboard/uretim/kalip', mod: 'uretim' })
   if (A.uretim && gecEmir.length) alerts.push({ tone: 'amber', text: `${gecEmir.length} üretim emri sipariş terminini aşmış durumda`, href: '/admin/dashboard/uretim/emirler', mod: 'uretim' })
   if (A.satin && gecSatin.length) alerts.push({ tone: 'amber', text: `${gecSatin.length} satınalma siparişinin teslimi gecikti`, href: '/admin/dashboard/satinalma/siparisler', mod: 'satinalma' })
-  if (A.kalite && kontrolBekleyen.length) alerts.push({ tone: 'amber', text: `${kontrolBekleyen.length} tamamlanan emrin son kalite kontrolü girilmemiş`, href: '/admin/dashboard/kalite/kontrol', mod: 'kalite' })
   if (A.web && yeniSayi) alerts.push({ tone: 'blue', text: `${yeniSayi} yeni başvuru yanıt bekliyor`, href: '/admin/dashboard/basvurular', mod: 'dashboard' })
   if (bordroUyari) alerts.push({ tone: 'amber', text: `${bordroAyAdi} ayı bordrosu henüz onaylanıp muhasebeye işlenmedi`, href: '/admin/dashboard/personel', mod: 'bordro' })
   alerts.sort((a, b) => ({ red: 0, amber: 1, blue: 2 }[a.tone] - { red: 0, amber: 1, blue: 2 }[b.tone]))

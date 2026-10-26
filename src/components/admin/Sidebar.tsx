@@ -72,8 +72,7 @@ const NAV = [
     { href:'/admin/dashboard/satinalma/tedarikciler',  label:'Tedarikçiler',        Icon:Building2, mod:['satinalma'] },
     { href:'/admin/dashboard/sevkiyat',               label:'Sevkiyat / İhracat',   Icon:Truck,         mod:['sevkiyat','stok'] },
   ]},
-  { g:'Kalite & Bakım', mod:['kalite'], items:[
-    { href:'/admin/dashboard/kalite/kontrol', label:'Kalite Kontrol', Icon:ShieldCheck,  mod:['kalite'] },
+  { g:'Fire', mod:['kalite'], items:[
     { href:'/admin/dashboard/kalite/fire',    label:'Fire Yönetimi',  Icon:FlameKindling,mod:['kalite'] },
   ]},
   { g:'Site Yönetimi', mod:['yonetim'], items:[
