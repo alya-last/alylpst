@@ -14,6 +14,7 @@ const NAV = [
     { href:'/admin/dashboard/istatistik',   label:'İstatistikler',   Icon:BarChart2,       mod:['dashboard'] },
     { href:'/admin/dashboard/asistan',      label:'AI Asistan',      Icon:Sparkles,        mod:['dashboard','muhasebe','stok','uretim','satis','satinalma','sevkiyat','kalite','yonetim','sosyal'] },
     { href:'/admin/dashboard/gunluk-ozet',   label:'Günlük Özet',     Icon:Bell,            mod:['dashboard','muhasebe','stok','uretim','satis','satinalma','sevkiyat','kalite','yonetim','sosyal'] },
+    { href:'/admin/dashboard/yardim',       label:'Başlangıç Rehberi', Icon:GraduationCap, mod:['dashboard','muhasebe','muhasebe_cari','stok','uretim','satis','satinalma','sevkiyat','kalite','yonetim','sosyal','personel'] },
     { href:'/admin/dashboard/aktivite',     label:'Aktivite Logu',   Icon:Activity,        mod:['yonetim'] },
   ]},
   { g:'Ürün Yönetimi', mod:['yonetim','sosyal'], items:[
