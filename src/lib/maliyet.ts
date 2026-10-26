@@ -10,7 +10,7 @@ export type MAyar = { kur_usd: number; eur_parite: number; genel_gider_pct: numb
 export type MHammadde = { id?: string; kod: string; ad: string; usd_kg: number | null; ek_tl: number; sabit_tl_kg: number | null }
 export type MMakine = { id?: string; ton: string; saat_ucreti: number }
 export type MParca = { ad: string; gram: number; hm: string }
-export type MBaski = { ad: string; goz: number; cevrim: number; ton: string; coef: number }
+export type MBaski = { ad: string; goz: number; cevrim: number; ton: string; coef: number; saat?: number | null } // saat: bu ürüne özel saat ücreti (boşsa makinenin genel ücreti)
 export type MUrun = {
   id: string; kod: string; ad: string; litre: string | null; seri: string | null
   parcalar: MParca[]; baski: MBaski[]
@@ -43,11 +43,11 @@ export function hesapla(u: MUrun, ay: MAyar, hms: MHammadde[], mks: MMakine[]) {
   if (num(u.ek_tl)) { hammadde += num(u.ek_tl); satirlar.push({ grup: 'Hammadde', ad: 'Ek hammadde / sabit', formul: 'elle girilen sabit tutar', tl: num(u.ek_tl) }) }
   let baski = 0
   for (const b of u.baski || []) {
-    const saat = num(mkMap[b.ton]?.saat_ucreti)
+    const saat = num(b.saat) > 0 ? num(b.saat) : num(mkMap[b.ton]?.saat_ucreti)
     const sureAdet = num(b.cevrim) > 0 ? num(b.cevrim) / 3600 : 0 // saat / baskı
     const tl = num(b.goz) > 0 ? num(b.coef) * saat * sureAdet / num(b.goz) : 0
     baski += tl
-    satirlar.push({ grup: 'Baskı', ad: `${b.ad} · ${b.ton}`, formul: `${num(b.coef) !== 1 ? num(b.coef) + ' × ' : ''}${saat} TL/saat × ${b.cevrim} sn ÷ 3600 ÷ ${b.goz} göz`, tl })
+    satirlar.push({ grup: 'Baskı', ad: `${b.ad} · ${b.ton}`, formul: `${num(b.coef) !== 1 ? num(b.coef) + ' × ' : ''}${saat} TL/saat${num(b.saat) > 0 ? ' (ürüne özel)' : ''} × ${b.cevrim} sn ÷ 3600 ÷ ${b.goz} göz`, tl })
   }
   const koli = num(u.koli_tl), etiket = num(u.etiket_tl)
   satirlar.push({ grup: 'Ambalaj', ad: 'Koli', formul: 'ürün başına', tl: koli }, { grup: 'Ambalaj', ad: 'Etiket', formul: 'ürün başına', tl: etiket })
