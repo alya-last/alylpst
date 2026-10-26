@@ -3,11 +3,11 @@
 //
 // Ortam değişkenleri:
 //   OPENAI_API_KEY   (zorunlu)
-//   OPENAI_MODEL     (opsiyonel, varsayılan gpt-4.1) — metin/görsel/araç çağrısı için
+//   OPENAI_MODEL     (opsiyonel, varsayılan gpt-6-astra (model reddedilirse otomatik gpt-4.1'e düşer)) — metin/görsel/araç çağrısı için
 //   OPENAI_BASE_URL  (opsiyonel, varsayılan https://api.openai.com/v1)
 
 export const aiAktif = () => !!process.env.OPENAI_API_KEY
-export const AI_MODEL = () => process.env.OPENAI_MODEL || 'gpt-4.1'
+export const AI_MODEL = () => process.env.OPENAI_MODEL || 'gpt-6-astra'
 
 export class AiHata extends Error {
   constructor(message: string, public durum = 502) { super(message) }
@@ -33,7 +33,22 @@ type CagriSecenek = {
   model?: string
 }
 
-export async function aiCagir(o: CagriSecenek) {
+const YEDEK_MODEL = 'gpt-4.1'
+export async function aiCagir(o: CagriSecenek): Promise<{ content: string | null; tool_calls?: AiAracCagrisi[]; refusal?: string | null }> {
+  try {
+    return await aiCagirTek(o)
+  } catch (e) {
+    // Yeni model bu API biçimini/parametreyi kabul etmezse (400/404) yedek modelle bir kez daha dene.
+    const model = o.model || AI_MODEL()
+    if (e instanceof AiHata && e.durum === 502 && e.message.includes('reddedildi') && model !== YEDEK_MODEL) {
+      console.error('[ai] model reddedildi, yedek modele geçildi:', model)
+      return await aiCagirTek({ ...o, model: YEDEK_MODEL })
+    }
+    throw e
+  }
+}
+
+async function aiCagirTek(o: CagriSecenek) {
   const key = process.env.OPENAI_API_KEY
   if (!key) throw new AiHata('AI özelliği yapılandırılmamış (OPENAI_API_KEY tanımlı değil).', 503)
   const base = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '')
@@ -62,6 +77,7 @@ export async function aiCagir(o: CagriSecenek) {
     const t = await res.text().catch(() => '')
     console.error('[ai] OpenAI hata', res.status, t.slice(0, 500))
     if (res.status === 401) throw new AiHata('OpenAI API anahtarı geçersiz.', 502)
+    if (res.status === 400 || res.status === 404) throw new AiHata('AI modeli isteği reddedildi.', 502)
     if (res.status === 429) throw new AiHata('OpenAI kotası/istek limiti doldu, biraz sonra tekrar deneyin.', 429)
     throw new AiHata('AI isteği başarısız oldu.', 502)
   }
