@@ -6,7 +6,7 @@ import { guvenliUrl } from '@/lib/mevzuat-takip'
 // karelerin AI ile türetilmesidir (üretici görüntü modeli gerçek arka yüzü "görmez", makul biçimde tahmin eder).
 // Tek fotoğraftan gerçek 3D model üretimi çok daha yavaş/pahalı ve güvenilirliği düşüktür; bu yüzden
 // müşteri tarafında "sürükle-döndür" izlenimi veren bu pratik yaklaşım tercih edilmiştir.
-export const IMAGE_MODEL_360 = () => process.env.OPENAI_IMAGE_MODEL || 'gpt-image-1'
+export const IMAGE_MODEL_360 = () => { const m = process.env.OPENAI_IMAGE_MODEL; return m && m !== 'gpt-image-1' ? m : 'gpt-image-2' }
 
 // Kare sayısı: çok fazlası hem maliyeti hem de tek istekte toplam süreyi arttırır (Vercel Hobby: 60sn fonksiyon sınırı).
 // Kareler yine de PARALEL üretildiği için (bkz. Promise.allSettled altta) toplam süre kare sayısıyla değil,
