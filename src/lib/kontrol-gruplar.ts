@@ -6,7 +6,7 @@ const SAYFA_KURALLARI: Record<GrupId, [RegExp, string][]> = {
   stok: [[/^hareket_/, 'stok/hareketler'], [/^varyant_/, 'stok/barkod'], [/./, 'stok/hammadde']],
   uretim: [[/^emir_/, 'uretim/emirler'], [/^makine_/, 'uretim/makine'], [/^kalip_/, 'uretim/kalip'], [/^recete_/, 'uretim/recete']],
   satis: [[/^siparis_/, 'satis/siparisler'], [/^teklif_/, 'satis/teklifler'], [/^sevk_/, 'sevkiyat'], [/^sa_/, 'satinalma/siparisler'], [/^talep_/, 'satinalma/talepler'], [/^ret_/, 'satinalma/iade-ret'], [/^ihracat_/, 'satis/ihracat-evraklari']],
-  kalite: [[/^fire_/, 'kalite/fire'], [/^kalip_/, 'uretim/kalip'], [/^makine_/, 'uretim/makine']],
+  kalite: [[/^kalip_/, 'uretim/kalip'], [/^makine_/, 'uretim/makine']],
 }
 
 export const GRUPLAR: Record<GrupId, { ad: string; rpc: string; yollar: string[] }> = {
