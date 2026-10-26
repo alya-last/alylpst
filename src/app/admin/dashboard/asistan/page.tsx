@@ -8,6 +8,7 @@ import { Send, Sparkles, Trash2 } from 'lucide-react'
 import SesliAsistan from '@/components/admin/SesliAsistan'
 
 type Msg = { role: 'user' | 'assistant'; content: string; araclar?: string[] }
+type Soru = { metin: string; secenekler: string[] }
 
 const ONERILER = [
   'Bu ay gelir ve gider durumu nasıl, geçen aya göre?',
@@ -24,16 +25,21 @@ export default function AsistanPage() {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [girdi, setGirdi] = useState('')
   const [loading, setLoading] = useState(false)
+  const [soru, setSoru] = useState<Soru | null>(null)   // yapay zekânın takıldığı yerde sorduğu popup
+  const [serbest, setSerbest] = useState('')
   const alt = useRef<HTMLDivElement>(null)
   useEffect(() => { alt.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, loading])
+
+  function cevapla(c: string) { setSoru(null); sor(c) }
 
   async function sor(metin: string) {
     const q = metin.trim(); if (!q || loading) return
     const yeni: Msg[] = [...msgs, { role: 'user', content: q }]
     setMsgs(yeni); setGirdi(''); setLoading(true)
     try {
-      const r = await aiIstek<{ yanit: string; araclar: string[] }>('asistan', { mesajlar: yeni.map(m => ({ role: m.role, content: m.content })) })
+      const r = await aiIstek<{ yanit: string; araclar: string[]; soru?: Soru }>('asistan', { mesajlar: yeni.map(m => ({ role: m.role, content: m.content })) })
       setMsgs(m => [...m, { role: 'assistant', content: r.yanit, araclar: r.araclar }])
+      if (r.soru) { setSerbest(''); setSoru(r.soru) }
     } catch (e: any) { toast.show(e.message, true); setMsgs(yeni.slice(0, -1)); setGirdi(q) }
     setLoading(false)
   }
@@ -70,6 +76,20 @@ export default function AsistanPage() {
         </Card>
       </Page>
       {toast.node}
+      {soru && <div role="dialog" aria-modal="true" onClick={() => setSoru(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80, padding: 16 }}>
+        <div onClick={e => e.stopPropagation()} style={{ background: 'var(--adm-s1, var(--adm-bg))', border: '1px solid var(--adm-bdr)', borderRadius: 16, padding: 20, width: 'min(480px, 100%)', boxShadow: '0 20px 60px rgba(0,0,0,.35)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--adm-ac)', fontWeight: 700, marginBottom: 8 }}><Sparkles size={14} />Asistan bir şey soruyor</div>
+          <p style={{ fontSize: 15, fontWeight: 600, margin: '0 0 14px', lineHeight: 1.5 }}>{soru.metin}</p>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {soru.secenekler.map(o => <button key={o} className="adm-btn-ghost" style={{ justifyContent: 'flex-start', textAlign: 'left', whiteSpace: 'normal' }} onClick={() => cevapla(o)}>{o}</button>)}
+          </div>
+          <form onSubmit={e => { e.preventDefault(); if (serbest.trim()) cevapla(serbest) }} style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <input className="adm-inp" value={serbest} onChange={e => setSerbest(e.target.value)} maxLength={300} placeholder="Başka bir cevap yaz…" />
+            <button className="adm-btn" type="submit" disabled={!serbest.trim()}><Send size={14} /></button>
+          </form>
+          <div style={{ textAlign: 'right', marginTop: 10 }}><button className="adm-btn-ghost" style={{ fontSize: 12 }} onClick={() => setSoru(null)}>Vazgeç</button></div>
+        </div>
+      </div>}
     </div>
   )
 }
