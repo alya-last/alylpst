@@ -87,7 +87,7 @@ export default function AyarTab({ toast }: { toast: Toast }) {
   const set = (k: string, v: any) => setAyar((a: any) => ({ ...a, [k]: v }))
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <Card title="Çalışma kuralları">
+      <Card title="Çalışma kuralları" pad={16}>
         <form onSubmit={ayarKaydet}>
           <FormGrid cols={3}>
             <Field label="Haftalık normal süre (saat)" hint="İş Kanunu md. 63: en çok 45 saat"><input type="number" step="0.5" className="adm-inp" value={ayar.haftalik_normal_saat} onChange={e => set('haftalik_normal_saat', e.target.value)} /></Field>
@@ -114,7 +114,7 @@ export default function AyarTab({ toast }: { toast: Toast }) {
         {!vard.length && <p style={{ padding: '12px 18px', margin: 0, fontSize: 12.5, color: 'var(--adm-tx3)' }}>Vardiya yok.</p>}
       </Card>
 
-      <Card title={`Resmî tatiller (${new Date().getFullYear()}→)`}>
+      <Card title={`Resmî tatiller (${new Date().getFullYear()}→)`} pad={16}>
         <form onSubmit={tEkle} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
           <input type="date" className="adm-inp" required style={{ width: 150 }} value={tForm.tarih} onChange={e => setTForm((f: any) => ({ ...f, tarih: e.target.value }))} />
           <input className="adm-inp" required placeholder="Tatil adı" style={{ flex: 1, minWidth: 160 }} value={tForm.ad} onChange={e => setTForm((f: any) => ({ ...f, ad: e.target.value }))} />
@@ -125,7 +125,7 @@ export default function AyarTab({ toast }: { toast: Toast }) {
         {!tatil.length && <p style={{ fontSize: 12.5, color: 'var(--adm-tx3)', margin: 0 }}>Kayıtlı tatil yok. Dini bayramların tarihleri her yıl değiştiği için her yıl güncellemeyi unutmayın.</p>}
       </Card>
 
-      <Card title="Kiosk cihazları (kapıdaki tablet)">
+      <Card title="Kiosk cihazları (kapıdaki tablet)" pad={16}>
         <form onSubmit={kioskOlustur} style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <input className="adm-inp" placeholder="Cihaz adı (örn. Ana kapı)" maxLength={60} style={{ flex: 1 }} value={kAd} onChange={e => setKAd(e.target.value)} />
           <button className="adm-btn" disabled={busy || !kAd.trim()}>Kurulum bağlantısı oluştur</button>

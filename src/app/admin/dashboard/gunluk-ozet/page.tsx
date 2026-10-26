@@ -44,7 +44,7 @@ export default function GunlukOzetPage() {
         ) : (
           <div style={{ display: 'grid', gap: 14 }}>
             {o.bolumler.map((b: any) => (
-              <Card key={b.anahtar} title={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Badge tone={TON[b.ton].tone}>{b.sayi}</Badge>{b.baslik}</span>}>
+              <Card key={b.anahtar} title={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Badge tone={TON[b.ton].tone}>{b.sayi}</Badge>{b.baslik}</span>} pad={16}>
                 <div style={{ fontSize: 13, color: TON[b.ton].renk, fontWeight: 600 }}>{b.ozet}</div>
                 {b.satirlar.length > 0 && <ul style={{ margin: '8px 0 0', paddingLeft: 18, fontSize: 13, lineHeight: 1.7 }}>{b.satirlar.map((s: string, i: number) => <li key={i}>{s}</li>)}</ul>}
               </Card>))}

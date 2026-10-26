@@ -35,20 +35,20 @@ export default function YardimPage() {
         </div>
 
         {gor('ilk') && bul('ilk gün giriş şifre menü özet asistan', ...ILK_GUN.map(i => i.t + i.a)) && (
-          <Card title="İlk gün: bu 6 adımı sırayla yap"><ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>{ILK_GUN.map((a, i) => <Adim key={a.t} n={i + 1} t={a.t} a={a.a} />)}</ol></Card>
+          <Card title="İlk gün: bu 6 adımı sırayla yap" pad={16}><ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>{ILK_GUN.map((a, i) => <Adim key={a.t} n={i + 1} t={a.t} a={a.a} />)}</ol></Card>
         )}
 
         {gor('rutin') && (!n || RUTIN.some(r => bul(r.zaman, ...r.isler))) && (
           <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', marginTop: n ? 12 : 0 }}>
             {RUTIN.filter(r => bul(r.zaman, ...r.isler)).map(r => (
-              <Card key={r.zaman} title={r.zaman}><ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, lineHeight: 1.6, color: 'var(--adm-tx2)' }}>{r.isler.map(i => <li key={i}>{i}</li>)}</ul></Card>
+              <Card key={r.zaman} title={r.zaman} pad={16}><ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, lineHeight: 1.6, color: 'var(--adm-tx2)' }}>{r.isler.map(i => <li key={i}>{i}</li>)}</ul></Card>
             ))}
           </div>
         )}
 
         {gor('modul') && moduller.map(m => (
           <div key={m.id} style={{ marginTop: 12 }}>
-            <Card title={m.baslik} right={<Badge tone="muted">{m.menu}</Badge>}>
+            <Card title={m.baslik} right={<Badge tone="muted">{m.menu}</Badge>} pad={16}>
               <p style={{ margin: '0 0 6px', fontSize: 14, lineHeight: 1.55 }}>{m.ne}</p>
               <ol style={{ listStyle: 'none', margin: 0, padding: 0 }}>{m.adimlar.map((a, i) => <Adim key={a.t} n={i + 1} t={a.t} a={a.a} />)}</ol>
               {m.dikkat && <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 8, background: 'var(--adm-amber-bg, rgba(245,158,11,.1))', fontSize: 13, lineHeight: 1.55 }}><b>Dikkat:</b><ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{m.dikkat.map(d => <li key={d}>{d}</li>)}</ul></div>}
@@ -58,7 +58,7 @@ export default function YardimPage() {
 
         {gor('ai') && bul('ai asistan yapay zeka soru ses', ...AI_ORNEK.flatMap(a => a.sorular), ...AI_IPUCU) && (
           <div style={{ marginTop: n ? 12 : 0 }}>
-            <Card title={<span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Sparkles size={16} /> {"AI Asistan'a ne sorulur?"}</span>}>
+            <Card title={<span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}><Sparkles size={16} /> {"AI Asistan'a ne sorulur?"}</span>} pad={16}>
               <ul style={{ margin: '0 0 12px', paddingLeft: 18, fontSize: 13.5, lineHeight: 1.6, color: 'var(--adm-tx2)' }}>{AI_IPUCU.map(i => <li key={i}>{i}</li>)}</ul>
               <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(260px,1fr))' }}>
                 {AI_ORNEK.map(g => <div key={g.k}><div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{g.k}</div>{g.sorular.map(s => <div key={s} style={{ fontSize: 13, padding: '5px 9px', margin: '3px 0', borderRadius: 8, background: 'var(--adm-bg2, rgba(0,0,0,.04))' }}>“{s}”</div>)}</div>)}
@@ -68,19 +68,19 @@ export default function YardimPage() {
         )}
 
         {gor('sozluk') && (
-          <div style={{ marginTop: n ? 12 : 0 }}><Card title="Sözlük: sık geçen kelimeler">
+          <div style={{ marginTop: n ? 12 : 0 }}><Card title="Sözlük: sık geçen kelimeler" pad={16}>
             {SOZLUK.filter(s => bul(s.t, s.a)).map(s => <div key={s.t} style={{ padding: '7px 0', borderBottom: '1px solid var(--adm-bd, rgba(0,0,0,.07))', fontSize: 13.5 }}><b>{s.t}:</b> <span style={{ color: 'var(--adm-tx2)' }}>{s.a}</span></div>)}
           </Card></div>
         )}
 
         {gor('sorun') && (
-          <div style={{ marginTop: n ? 12 : 0 }}><Card title="Takılırsan: sık sorunlar">
+          <div style={{ marginTop: n ? 12 : 0 }}><Card title="Takılırsan: sık sorunlar" pad={16}>
             {SORUN.filter(s => bul(s.s, s.c)).map(s => <div key={s.s} style={{ padding: '9px 0', borderBottom: '1px solid var(--adm-bd, rgba(0,0,0,.07))' }}><div style={{ fontWeight: 700, fontSize: 13.5 }}>{s.s}</div><div style={{ fontSize: 13.5, color: 'var(--adm-tx2)', marginTop: 2, lineHeight: 1.55 }}>{s.c}</div></div>)}
           </Card></div>
         )}
 
         {gor('kural') && (
-          <div style={{ marginTop: n ? 12 : 0 }}><Card title="Altın kurallar">
+          <div style={{ marginTop: n ? 12 : 0 }}><Card title="Altın kurallar" pad={16}>
             {ALTIN.map(k => <div key={k.m} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '7px 0', fontSize: 14 }}>{k.y ? <CheckCircle2 size={18} color="var(--adm-green, #16a34a)" /> : <XCircle size={18} color="var(--adm-red, #dc2626)" />}{k.m}</div>)}
           </Card></div>
         )}

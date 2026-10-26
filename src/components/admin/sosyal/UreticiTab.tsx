@@ -45,7 +45,7 @@ export default function UreticiTab({ toast, onGorsel, onKaydedildi }: { toast: T
   const lim = PLATFORM[f.platform as Platform]
   return (
     <>
-      <Card title="Paylaşım metni üret (B2B — toptan / ihracat alıcıları)">
+      <Card title="Paylaşım metni üret (B2B — toptan / ihracat alıcıları)" pad={16}>
         <form onSubmit={uret}>
           <FormGrid cols={3}>
             <Field label="Platform"><select className="adm-inp" value={f.platform} onChange={e => setF((x: any) => ({ ...x, platform: e.target.value }))}>{Object.entries(PLATFORM).map(([k, v]) => <option key={k} value={k}>{v.l}</option>)}</select></Field>
@@ -64,7 +64,7 @@ export default function UreticiTab({ toast, onGorsel, onKaydedildi }: { toast: T
         {liste.map((g, i) => {
           const et = etiketAyikla(g.hashtagler), boy = tamMetin(g.metin, et).length
           return (
-            <Card key={i} title={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Badge tone="blue">{lim.l}</Badge><input className="adm-inp" style={{ flex: 1, fontWeight: 600 }} maxLength={160} value={g.baslik} onChange={e => guncelle(i, { baslik: e.target.value })} /></span>}>
+            <Card key={i} title={<span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><Badge tone="blue">{lim.l}</Badge><input className="adm-inp" style={{ flex: 1, fontWeight: 600 }} maxLength={160} value={g.baslik} onChange={e => guncelle(i, { baslik: e.target.value })} /></span>} pad={16}>
               <textarea className="adm-inp" rows={9} value={g.metin} onChange={e => guncelle(i, { metin: e.target.value })} style={{ width: '100%', lineHeight: 1.55 }} />
               <input className="adm-inp" style={{ width: '100%', marginTop: 8 }} value={g.hashtagler} onChange={e => guncelle(i, { hashtagler: e.target.value })} placeholder="#hashtag #hashtag" />
               {g.gorsel_fikri && <p style={{ fontSize: 12, color: 'var(--adm-tx3)', margin: '8px 0 0' }}>Görsel fikri: {g.gorsel_fikri}</p>}

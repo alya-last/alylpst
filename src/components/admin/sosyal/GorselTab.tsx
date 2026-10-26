@@ -135,7 +135,7 @@ export default function GorselTab({ toast, urunId, setUrunId }: { toast: Toast; 
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,380px) 1fr', gap: 18, alignItems: 'start' }}>
-      <Card title="Görsel ayarları">
+      <Card title="Görsel ayarları" pad={16}>
         <FormGrid cols={1}>
           <Field label="Ürün"><select className="adm-inp" value={urunId} onChange={e => setUrunId(e.target.value)}><option value="">— Seçin —</option>{urunler.map(u => <option key={u.id} value={u.id}>{u.name}{u.code ? ` (${u.code})` : ''}</option>)}</select></Field>
           {gorseller.length > 1 && <Field label="Ürün fotoğrafı"><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{gorseller.map((g, i) => <img key={g} src={g} alt="" onClick={() => setImgUrl(g)} style={{ width: 54, height: 54, objectFit: 'cover', cursor: 'pointer', border: g === imgUrl ? '2px solid var(--adm-ac)' : '1px solid var(--adm-bd)' }} />)}</div></Field>}
