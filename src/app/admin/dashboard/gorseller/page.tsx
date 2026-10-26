@@ -9,11 +9,16 @@ const sb = createClient()
 export default function GorsellerPage() {
   const [products, setProducts] = useState<any[]>([])
   const [search, setSearch] = useState('')
+  const [variants, setVariants] = useState<any[]>([])
   const [toast, setToast] = useState('')
 
   useEffect(() => {
-    sb.from('products').select('code,name,image_url,category,is_new').order('sort_order').then(({ data }) => setProducts(data || []))
+    sb.from('products').select('id,code,name,image_url,category,is_new').order('sort_order').then(({ data }) => setProducts(data || []))
+    sb.from('product_variants').select('id,product_id,name,color,hex,gorsel,sort_order').order('sort_order').then(({ data }) => setVariants(data || []))
   }, [])
+
+  const varyantlar: Record<string, any[]> = {}
+  for (const v of variants) (varyantlar[v.product_id] ||= []).push(v)
 
   function copy(url: string) {
     navigator.clipboard.writeText(url)
@@ -21,8 +26,10 @@ export default function GorsellerPage() {
     setTimeout(() => setToast(''), 2000)
   }
 
+  const q = search.toLowerCase()
   const filtered = products.filter(p =>
-    !search || p.name?.toLowerCase().includes(search.toLowerCase()) || p.code?.toLowerCase().includes(search.toLowerCase())
+    !search || p.name?.toLowerCase().includes(q) || p.code?.toLowerCase().includes(q) ||
+    (varyantlar[p.id] || []).some(v => (v.name || '').toLowerCase().includes(q) || (v.color || '').toLowerCase().includes(q))
   )
 
   return (
@@ -53,6 +60,26 @@ export default function GorsellerPage() {
                 <p style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginBottom: 8 }}>
                   <code style={{ color: 'var(--adm-ac)' }}>{p.code}</code> · {p.category}
                 </p>
+                {(varyantlar[p.id] || []).length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <p style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginBottom: 4 }}>
+                      Varyantlar ({(varyantlar[p.id] || []).filter(v => v.gorsel).length}/{(varyantlar[p.id] || []).length} görselli)
+                    </p>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {(varyantlar[p.id] || []).map(v => v.gorsel ? (
+                        <button key={v.id} onClick={() => copy(v.gorsel)} title={`${v.name}${v.color ? ' · ' + v.color : ''} — URL'yi kopyala`}
+                          style={{ width: 38, height: 38, padding: 2, border: '1px solid var(--adm-bdr)', borderRadius: 6, background: 'var(--adm-s2)', cursor: 'pointer' }}>
+                          <img src={v.gorsel} alt={v.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+                        </button>
+                      ) : (
+                        <span key={v.id} title={`${v.name}${v.color ? ' · ' + v.color : ''} — görsel yok`}
+                          style={{ width: 38, height: 38, border: '1px dashed var(--adm-bdr2)', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', background: v.hex || 'transparent', color: 'var(--adm-tx3)', fontSize: 9 }}>
+                          {v.hex ? '' : '—'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {p.image_url ? (
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button className="adm-btn-ghost" style={{ flex: 1, justifyContent: 'center', fontSize: 11, padding: '5px 0' }}
