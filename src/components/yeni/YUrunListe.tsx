@@ -1,12 +1,11 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { Search } from "lucide-react";
 import type { Product } from "@/lib/supabase";
-import { type Dil, urunLinki, ad } from "@/lib/diller";
-import { M, kategoriGoster } from "@/lib/site-metin";
-import { Y } from "./metin";
+import { type Dil, ad } from "@/lib/diller";
+import { M } from "@/lib/site-metin";
 import { UM } from "./urunler-metin";
+import YUrunIzgara from "./YUrunIzgara";
 
 const norm = (s: string) => s.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9çğıöşü]+/g, " ").trim();
 const CHIP = "px-4 py-2.5 rounded-full text-[15px] font-medium border transition-colors";
@@ -67,21 +66,7 @@ export default function YUrunListe({ products, dil = "tr" }: { products: Product
       </div>
 
       {liste.length === 0 ? <p className="py-16 text-center text-black/55 text-[17px]">{u.bulunamadi}</p> : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-          {liste.map(p => (
-            <Link key={p.id} href={urunLinki(p, dil)} className="group bg-white rounded-2xl overflow-hidden border border-black/6 hover:shadow-lg transition-shadow">
-              <div className="relative aspect-square bg-[#f6f6f4] flex items-center justify-center">
-                {p.is_new && <span className="absolute top-3 left-3 z-10 bg-[var(--yt-accent)] text-white text-[12px] font-bold tracking-wider px-3 py-1.5 rounded-md">{Y[dil].yeni.yeni}</span>}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image_url} alt={ad(p, dil)} loading="lazy" className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-[1.05]" />
-              </div>
-              <div className="p-4">
-                <h3 className="text-[17px] font-semibold leading-snug">{ad(p, dil)}</h3>
-                <p className="text-[14px] text-black/50 mt-1">{kategoriGoster(dil, p.category)} · {p.code}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
+        <YUrunIzgara liste={liste} dil={dil} />
       )}
     </div>
   );
