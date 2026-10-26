@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { HelpCircle, X, Send } from 'lucide-react'
 import { aiIstek } from '@/lib/ai-client'
@@ -13,20 +13,24 @@ export default function SayfaAnlat() {
   const [hata, setHata] = useState('')
   const [soru, setSoru] = useState('')
   const [son, setSon] = useState('')
+  const [gecmis, setGecmis] = useState<{ role: 'user' | 'assistant'; content: string }[]>([])
 
   async function sor(s?: string) {
     setYuk(true); setHata('')
     try {
-      const r = await aiIstek<{ yanit: string }>('sayfa_anlat', { yol, soru: s || '' })
+      const r = await aiIstek<{ yanit: string }>('sayfa_anlat', { yol, soru: s || '', gecmis })
       setYanit(r.yanit); setSon(yol + '|' + (s || ''))
+      setGecmis(g => [...g, { role: 'user' as const, content: s || 'Bu sayfayı bana anlat.' }, { role: 'assistant' as const, content: r.yanit }].slice(-6))
     } catch (e: any) { setHata(e.message || 'Anlatılamadı') }
     setYuk(false)
   }
+  useEffect(() => { setGecmis([]); setYanit(''); setSon(''); setHata('') }, [yol])
   function ac() {
     const yeni = !acik; setAcik(yeni)
     if (yeni && !yuk && son !== yol + '|') sor()
   }
 
+  if (yol === '/admin/dashboard/asistan' || yol.endsWith('/muhasebe/ai')) return null   // bu sayfalar zaten AI sohbetidir; düğme gönder tuşunun üstüne binmesin
   return (
     <>
       <button type="button" onClick={ac} aria-label="Bu sayfayı anlat" className="adm-sa-btn no-print">
@@ -41,6 +45,12 @@ export default function SayfaAnlat() {
           <div style={{ fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', maxHeight: '45vh', overflowY: 'auto', color: 'var(--adm-tx)' }}>
             {yuk ? 'Yapay zekâ anlatıyor…' : hata ? <span style={{ color: 'var(--adm-red, #dc2626)' }}>{hata}</span> : yanit}
           </div>
+          {!yuk && !hata && yanit && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              <button type="button" className="adm-btn" onClick={() => sor('Yaptım, sıradaki adım ne?')}>✓ Yaptım, sıradaki?</button>
+              <button type="button" className="adm-btn-ghost" onClick={() => sor('Takıldım, bu adımda yardım eder misin?')}>Takıldım</button>
+            </div>
+          )}
           <form onSubmit={e => { e.preventDefault(); const s = soru.trim(); if (s && !yuk) { sor(s); setSoru('') } }} style={{ display: 'flex', gap: 6, marginTop: 10 }}>
             <input value={soru} onChange={e => setSoru(e.target.value)} placeholder="Bu sayfayla ilgili sorun var mı?" aria-label="Soru" style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--adm-bdr)', background: 'var(--adm-s1)', color: 'var(--adm-tx)', fontSize: 13 }} />
             <button type="submit" disabled={yuk} className="adm-btn" aria-label="Sor"><Send size={14} /></button>
