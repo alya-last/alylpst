@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import AdminSidebar from '@/components/admin/Sidebar'
 import { Menu } from 'lucide-react'
+import SayfaAnlat from '@/components/admin/SayfaAnlat'
 
 export default function AdminDashboardLayout({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false)
@@ -45,6 +46,7 @@ export default function AdminDashboardLayout({ children }: { children: React.Rea
           <div style={{ width:38 }}/>
         </div>
         {children}
+        <SayfaAnlat />
       </main>
 
       <style>{`
