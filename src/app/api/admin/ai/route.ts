@@ -143,7 +143,7 @@ SÖZLÜK: ${soz}` },
         const stil: GorselStil = body.stil === 'yasam' ? 'yasam' : 'studyo'
         // Görsel üretimi metin isteklerinden çok daha maliyetli — ayrı, daha dar bir saatlik sınır
         // (toplu tasarım akışı da bu eylemi kullanır, bu yüzden makul bir toplu iş payı bırakılmıştır)
-        if (!(await oranSiniri(`ai_gorsel:${y.user.id}`, 30, 3600, false))) return NextResponse.json({ error: 'Görsel üretimi için saatlik sınıra ulaştın, biraz sonra tekrar dene.' }, { status: 429 })
+        if (!(await oranSiniri(`ai_gorsel:${y.user.id}`, 100, 3600, false))) return NextResponse.json({ error: 'Görsel üretimi için saatlik sınıra ulaştın, biraz sonra tekrar dene.' }, { status: 429 })
         const b64 = await gorselTasarla(body.url, stil)
         return NextResponse.json({ ok: true, b64, stil })
       }
