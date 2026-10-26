@@ -49,7 +49,7 @@ export async function gorselTasarla(imageUrl: string, stil: GorselStil): Promise
   form.append('image', new Blob([kaynak], { type: kaynakTip }), 'kaynak.png')
   form.append('prompt', PROMPT[stil])
   form.append('size', '1024x1024')
-  form.append('quality', 'high')
+  form.append('quality', 'medium')
   form.append('n', '1')
 
   let res: Response
