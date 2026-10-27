@@ -470,13 +470,14 @@ async function ekstreRapor(sb: SupabaseClient, arama: string, kod: string): Prom
   const hr = (await sayfala(sb, 'cari_eski_hareketler', 'grup,tarih,sira,evrak_no,evrak_cinsi,vade,aciklama,tl_borc,tl_alacak,usd_borc,usd_alacak,eur_borc,eur_alacak,nakil', q => q.in('cari_id', aday.map((x: any) => x.id)))).sort((a: any, b: any) => String(a.tarih).localeCompare(String(b.tarih)) || (+a.sira || 0) - (+b.sira || 0))
   const tl = hr.filter((x: any) => !x.grup || x.grup === 'TL')
   let run = 0, tb = 0, ta = 0
-  const sat: Hucre[][] = tl.map((x: any) => { const b = +x.tl_borc || 0, a = +x.tl_alacak || 0; run = r2(run + b - a); tb += b; ta += a; return [String(x.tarih).slice(0, 10), x.evrak_no || '', x.nakil ? 'Devir' : (x.evrak_cinsi || ''), x.vade || '', x.aciklama || '', r2(b), r2(a), run > 0 ? run : 0, run < 0 ? -run : 0] })
-  sat.push(['TOPLAM', '', '', '', '', r2(tb), r2(ta), run > 0 ? run : 0, run < 0 ? -run : 0])
-  const sut = ['Tarih', 'Evrak no', 'Evrak cinsi', 'Vade', 'Açıklama', 'Borç', 'Alacak', 'Borç bakiye', 'Alacak bakiye']
+  const vadeGun = (v: any, t: any) => { const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(String(v || '').trim()); if (!m) return ''; return Math.round((Date.UTC(+m[3], +m[2] - 1, +m[1]) - Date.parse(String(t).slice(0, 10))) / 86400000) }
+  const sat: Hucre[][] = tl.map((x: any) => { const b = +x.tl_borc || 0, a = +x.tl_alacak || 0; run = r2(run + b - a); tb += b; ta += a; return [String(x.tarih).slice(0, 10), x.evrak_no || '', x.nakil ? 'DEVİR' : (x.evrak_cinsi || ''), x.vade || '', vadeGun(x.vade, x.tarih), x.aciklama || '', x.nakil ? '' : (b > 0 ? 'Borç' : a > 0 ? 'Alacak' : ''), r2(b), r2(a), run > 0 ? run : 0, run < 0 ? -run : 0] })
+  sat.push(['TOPLAM', '', '', '', '', '', '', r2(tb), r2(ta), run > 0 ? run : 0, run < 0 ? -run : 0])
+  const sut = ['Tarih', 'Evrak no', 'Evrak cinsi', 'Vade', 'Vade gün', 'Açıklama', 'B/A', 'Borç', 'Alacak', 'Borç bakiye', 'Alacak bakiye']
   const guncel = r2(aday.reduce((t: number, x: any) => t + (+x.bakiye || 0), 0))
   const sayfalar: Sayfa[] = [
     { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Cari', c.ad], ['Cari kodu', c.muhasebe_kodu || ''], ['Vergi no', c.vergi_no || ''], ['Toplam borç (TL)', r2(tb)], ['Toplam alacak (TL)', r2(ta)], ['Hareket sayısı', tl.length], [guncel >= 0 ? 'Bakiye (müşteri bize borçlu, TL)' : 'Bakiye (biz borçluyuz, TL)', r2(Math.abs(guncel))], ['Ekstre ile sistem bakiyesi', Math.abs(run - guncel) < 0.02 ? 'Tutuyor' : `FARK VAR (ekstre ${TL(run)} / sistem ${TL(guncel)})`]] },
-    { ad: 'Ekstre', sutunlar: sut, satirlar: sat, sari: 5 },
+    { ad: 'Ekstre', sutunlar: sut, satirlar: sat, sari: 7 },
   ]
   if (!dis) for (const [g, ad, bk, ak] of [['USD', 'USD hareketleri', 'usd_borc', 'usd_alacak'], ['EUR', 'EUR hareketleri', 'eur_borc', 'eur_alacak']] as const) {
     const d = hr.filter((x: any) => x.grup === g); if (!d.length) continue
