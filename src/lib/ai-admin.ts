@@ -135,6 +135,8 @@ const nrm = (v: unknown) => String(v ?? '').toLocaleLowerCase('tr').normalize('N
 const esles = (metin: unknown, ara: string) => { const m = nrm(metin), k = nrm(ara).split(/\s+/).filter(Boolean); return k.length > 0 && k.every(t => m.includes(t)) }
 const HAM = new AsyncLocalStorage<boolean>() // Excel için araç çıktısı kısaltılmadan alınır
 export const hamMi = () => !!HAM.getStore()
+/** Araç çıktısını kısaltmadan (Excel/rapor için) almak üzere çalıştırır. */
+export const hamCalistir = <T,>(f: () => Promise<T>): Promise<T> => HAM.run(true, f)
 const kes = (n: number) => (HAM.getStore() ? 100000 : n) // Excel'de liste sınırı yok
 const kisalt = (x: unknown, n = 7000) => { const s = JSON.stringify(x ?? null); return !HAM.getStore() && s.length > n ? s.slice(0, n) + '…(kısaltıldı)' : s }
 
@@ -642,6 +644,12 @@ export async function asistanYanit(
     const son = [...gecmis].reverse().find(m => m.role === 'user')?.content || ''
     const hz = await (await import('@/lib/ai-hazir')).hazirCevap(sb, son)
     if (hz) return hz
+  }
+  // Satış / stok / tahsilat / ihracat gibi sık sorulan veri sorularında tek satırlık cevap yerine detaylı çok sayfalı Excel + özet üretilir
+  {
+    const son = [...gecmis].reverse().find(m => m.role === 'user')?.content || ''
+    const rp = await (await import('@/lib/ai-rapor')).detayliRapor(sb, son, izinli)
+    if (rp) return rp
   }
   const bugun = bugunISO()
   const msgs: AiMesaj[] = [
