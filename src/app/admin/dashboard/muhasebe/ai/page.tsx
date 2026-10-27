@@ -29,6 +29,28 @@ const ORNEKLER = [
   'Vadesi geçen alacaklarımızı yaşlandırmayla göster.',
   'Kurumlar vergisi oranı nedir, imalat/ihracat indirimi bize uygulanır mı?',
 ]
+// Sık sorulan raporlar: yapay zeka bunları sabit, çok sayfalı Excel olarak üretir (src/lib/ai-rapor.ts).
+const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
+  { baslik: 'Dış mekan', sorular: [
+    'dış mekan tahsilat listesi bakiyesi olanlar excel',
+    'dış mekan ne kadar elimde stok var excel',
+    'dış mekan 2026 sene başından beri ne kadar satmışım excel',
+    'ALYG-01 ÇEŞME(YUVARLAK) SAKSI 28 LT ne kadar satmışım',
+    '2026 döneminde dış mekan satışlarımda ne kadar hammadde kullanmışım',
+  ] },
+  { baslik: 'İç mekan', sorular: [
+    'iç mekan tahsilat listesi bakiyesi olanlar excel',
+    'iç mekan depo stok excel',
+    'iç mekan 2026 sene başından beri satış excel',
+    'ayl-101, aly-102, aly-132 ne kadar satmışım excel',
+    '2026 dönemi ne kadar iç mekan satmışım',
+  ] },
+  { baslik: 'İhracat', sorular: [
+    'ihracatta tahsil etmediğim müşterilerin listesi',
+    '2026 ihracat rakamları usd, euro ve TL',
+  ] },
+  { baslik: 'K. kartı', sorular: ['k.kartı tahsilatlarım'] },
+]
 const BELGE_ISTEKLERI = [
   { l: 'Standart alanlar', t: '' },
   { l: 'KDV oranına göre matrah + KDV', t: 'Satıcı unvanı, vergi no, fatura no, tarih, her KDV oranı için matrah ve KDV tutarı, genel toplam, para birimi' },
@@ -283,6 +305,13 @@ export default function MuhasebeAiPage() {
                   <Sparkles size={28} style={{ color: 'var(--adm-ac)' }} />
                   <p style={{ fontSize: 13.5, color: 'var(--adm-tx3)', margin: '10px 0 6px' }}>Birden fazla soruyu tek mesajda sorabilirsin; her biri ayrı ayrı yanıtlanır.</p>
                   <p style={{ fontSize: 12, color: 'var(--adm-tx3)', margin: '0 0 14px' }}>Oran, limit ve ceza gibi değerler yalnızca <b>Güncel mevzuat</b> sekmesindeki kaynaklı kayıtlardan alınır; hesaplar hesap aracıyla yapılır.</p>
+                  {RAPOR_GRUPLARI.map(g => (
+                    <div key={g.baslik} style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--adm-tx3)', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>{g.baslik} — Excel raporları</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>{g.sorular.map(o => <button key={o} className="adm-chip" style={{ textAlign: 'left' }} onClick={() => sor(o)}>{o}</button>)}</div>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--adm-tx3)', margin: '14px 0 6px', textTransform: 'uppercase', letterSpacing: '.04em' }}>Mevzuat ve hesap</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>{ORNEKLER.map(o => <button key={o} className="adm-chip" style={{ textAlign: 'left' }} onClick={() => sor(o)}>{o}</button>)}</div>
                 </div>
               )}
