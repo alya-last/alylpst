@@ -494,8 +494,8 @@ async function ekstreRapor(sb: SupabaseClient, arama: string, kod: string): Prom
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   const n = raporNiyeti(soru)
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: ['cari_ara'] }
-  if (!gerek[n.tur].every(a => izinli.has(a))) return null
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [] }
+  if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
       case 'tahsilat': return await tahsilat(sb, n.mekan)
@@ -512,6 +512,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
     }
   } catch (e: any) {
     console.error('[ai-rapor]', n.tur, e?.message)
+    if (n.tur === 'ekstre') return { yanit: `Cari ekstresi hazırlanırken hata oluştu (${String(e?.message || e).slice(0, 160)}). Eski/yanlış rakam vermemek için dosya üretmedim.`, araclar: ['rapor_ekstre'] }
     return null
   }
 }
