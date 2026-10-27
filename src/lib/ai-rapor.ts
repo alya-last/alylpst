@@ -58,7 +58,7 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
     return null
   }
   if (/tedarikci|satici|borclarimiz|odeyecegimiz|odenecek(ler)?\b|ne kadar borcumuz|borcumuz (var|ne)/.test(t) && /borc|odeme|odenecek|liste|bakiye|ekstre/.test(t) && !/kdv|fatura|cek|senet|maas|personel/.test(t)) return { tur: 'odeme' }
-  if (/ekstre|hesap (dokum|hareket|ozet)|hareketleri|carisi|cari hesabi/.test(t) && !/banka|kasa|\bk ?karti|kredi kart|\bpos\b|tahsilat listesi|stok|kdv/.test(t)) {
+  if (/ekstre|hesap (dokum|hareket|ozet)|hareketleri|carisi|cari hesabi|\bcari\b.{0,12}\b(excel|dokum|detay|hareket)|\b(excel|dokum)\b.{0,12}\bcari\b/.test(t) && !/banka|kasa|\bk ?karti|kredi kart|\bpos\b|tahsilat|stok|kdv/.test(t)) {
     const kod = /\b(120|320)\.\d{2}\.\d{3}[a-z]?\b/.exec(String(soru))?.[0] || ''
     const arama = t.replace(/\b(120|320) \d{2} \d{3}[a-z]?\b/g, ' ').replace(/\b(ekstre(si)?|ekstreyi|cari(si|nin|yi)?|hesap(i|in)?|dokumu|dokum|hareket(leri|lerini)?|ozet(i)?|excel|ver|al|cikar|goster|lazim|listesi|liste|detayli|detay|tum|icin|ile|ve|bir|bana|olarak|dis mekan|ic mekan|tl|nin|nın)\b/g, ' ').replace(/\s+/g, ' ').trim()
     if (kod || arama.length >= 2) return { tur: 'ekstre', arama, kod }
