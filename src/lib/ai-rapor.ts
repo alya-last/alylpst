@@ -143,6 +143,8 @@ async function satis(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
     hamCalistir(() => araciCalistir(sb, 'musteri_satis', { mekan })).then(json).catch(() => null),
   ])
   let ciro: any = null
+  let stokU: any[] = []
+  try { stokU = (json(await hamCalistir(() => araciCalistir(sb, 'stok_durumu', { tur: 'mamul', ...(mekan !== 'hepsi' ? { mekan } : {}) }))).mamul?.urunler) || [] } catch { /* stok sütunu boş kalır */ }
   try { ciro = json(await araciCalistir(sb, 'mekan_satis', { bas: `${bugunISO().slice(0, 4)}-01-01`, bit: bugunISO() })) } catch { /* muhasebe ciro eklenemez */ }
   if (!rows.length) return { yanit: 'Satış dosyasında bu kapsam için kayıt bulunamadı.', araclar: ['rapor_satis'] }
   const sonAy = Math.max(...rows.map(x => +x.ay || 0))
@@ -173,7 +175,22 @@ async function satis(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   const kodSat: Hucre[][] = kodL.map(g => [g.kod, g.ad, renkAdi(g.ad), mekanAd(g.mekan), r2(g.adet), g.adet ? r2(g.tutar / g.adet) : 0, r2(g.tutar)])
   const matris = (alan: 'ay' | 'tay'): Hucre[][] => { const s: Hucre[][] = anaL.map(g => [g.kod, g.ad, mekanAd(g.mekan), ...g[alan].map(r2), r2(g[alan].reduce((t, x) => t + x, 0))]); if (s.length) s.push(topSat(s, ayList.map((_, i) => i + 3).concat([ayList.length + 3]), [1, 'TOPLAM'])); return s }
   const aySut = ayList.map(n => AYLAR[n - 1])
+  // Muhasebe programı çıktısıyla aynı düzen: Stok kodu | Stok ismi | Satış miktarı | Birimi | Stok adedi | her ay (adet + satış belge) | TÜM AYLAR
+  const rnk = (v: string) => nrm(v).replace(/antarasit|antasit|antrasit/g, 'antrasit').replace(/kapucino|kapicino|kapucino/g, 'kapicino')
+  const stokBul = (kod: string, ad: string): number | null => {
+    const u = stokU.find(x => String(x.kod).toUpperCase() === anaKod(kod))
+    if (!u) return null
+    const r = rnk(renkAdi(ad))
+    const vs: any[] = u.varyantlar || []
+    const e = r ? vs.filter(v => rnk(String(v.ad)).includes(r)) : vs
+    return e.length ? r2(e.reduce((t, v) => t + (+v.adet || 0), 0)) : 0
+  }
+  const liste = Object.values(kodlu).sort((a, b) => a.kod.localeCompare(b.kod, 'tr', { numeric: true }))
+  const listeSut = ['Stok kodu', 'Stok ismi', 'Satış miktarı', 'Birimi', 'Stok adedi', ...ayList.flatMap(n => [AYLAR[n - 1], `${AYLAR[n - 1]} satış belge`]), 'TÜM AYLAR TOP.SAT.BELG.DEĞ']
+  const listeSat: Hucre[][] = liste.map(g => [g.kod, g.ad, r2(g.adet), 'ADET', stokBul(g.kod, g.ad), ...ayList.flatMap((_, i) => [r2(g.ay[i] || 0), r2(g.tay[i] || 0)]), r2(g.tutar)])
+  if (listeSat.length) listeSat.push(topSat(listeSat, [2, 4, ...ayList.flatMap((_, i) => [5 + i * 2, 6 + i * 2]), 5 + ayList.length * 2], [0, 'TOPLAM']))
   const sayfalar: Sayfa[] = [
+    { ad: 'Satış Listesi', sutunlar: listeSut, satirlar: listeSat },
     { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [
       ['Kapsam', mekan === 'hepsi' ? 'İç + dış mekan' : mekanAd(mekan)], ['Dönem', `${bugunISO().slice(0, 4)} Ocak – ${AYLAR[sonAy - 1]} (satış dosyası ${AYLAR[sonAy - 1]} ayına kadar)`],
       ['Satılan adet', r2(toplamAdet)], ['Satış tutarı (TL, KDV hariç)', r2(toplamTutar)], ['Ortalama birim fiyat (TL)', toplamAdet ? r2(toplamTutar / toplamAdet) : 0], ['Ürün sayısı', anaL.length],

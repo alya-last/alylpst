@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import ExcelJS from 'exceljs'
 
 export type Sayfa = { ad: string; sutunlar: string[]; satirlar: (string | number | null)[][] }
-const SINIR = { sayfa: 12, satir: 5000, sutun: 24, hucre: 150000 }
+const SINIR = { sayfa: 12, satir: 5000, sutun: 32, hucre: 150000 }
 
 // Araç çıktısındaki ASCII alan adlarını okunur Türkçeye çevirir ("odeme_kaydi_olmayan" → "Ödeme kaydı olmayan")
 const TR_KELIME: Record<string, string> = { plani: 'planı', her: 'her', ayin: 'ayın', odeme: 'ödeme', odemeler: 'ödemeler', kaydi: 'kaydı', katilim: 'katılım', gore: 'göre', musteri: 'müşteri', satirlar: 'satırlar', satir: 'satır', aciklama: 'açıklama', siparis: 'sipariş', urun: 'ürün', urunler: 'ürünler', uretim: 'üretim', yil: 'yıl', yillar: 'yıllar', gelis: 'geliş', yatis: 'yatış', gunu: 'günü', gun: 'gün', edis: 'ediş', ozet: 'özet', cek: 'çek', portfoy: 'portföy', fuar: 'fuar', alinan: 'alınan', alindi: 'alındı', bekleyen: 'bekleyen', bekleyenler: 'bekleyenler', yatanlar: 'yatanlar', dagilimi: 'dağılımı', dagilim: 'dağılım', kisaltildi: 'kısaltıldı', birimi: 'birimi', birimine: 'birimine', tutari: 'tutarı', kayitli: 'kayıtlı', bilgisi: 'bilgisi', olmayan: 'olmayan', sayisi: 'sayısı', adedi: 'adedi', kalan: 'kalan', odenen: 'ödenen', borc: 'borç', ihracat: 'ihracat', hesap: 'hesap', hesaplar: 'hesaplar', sirket: 'şirket', ay: 'ay', hafta: 'hafta', normalden: 'normalden', uzun: 'uzun', son: 'son', satirlari: 'satırları', elden: 'elden', ev: 'ev', sahibi: 'sahibi', odeme_gunu: 'ödeme günü', tarihi: 'tarihi', gecikme: 'gecikme', gecikmis: 'gecikmiş', acik: 'açık', degisim: 'değişim', degeri: 'değeri', miktar: 'miktar', min: 'min', stok: 'stok', birim: 'birim', toplam: 'toplam', genel: 'genel', adet: 'adet' }
