@@ -60,7 +60,7 @@ export async function excelBuffer(baslik: string, sayfalar: Sayfa[]) {
   for (const s of sayfalar) {
     const ws = wb.addWorksheet(s.ad, { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] })
     const h = ws.addRow(s.sutunlar); h.height = 24
-    h.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2B2F2B' } }; c.alignment = { vertical: 'middle', wrapText: true } })
+    h.eachCell(c => { c.font = { bold: true, color: { argb: 'FF000000' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; c.border = { bottom: { style: 'thin', color: { argb: 'FF808080' } } }; c.alignment = { vertical: 'middle', wrapText: true } })
     const sari = typeof s.sari === 'number' ? s.sari : -1
     if (sari >= 0) h.eachCell((c, n) => { if (n - 1 >= sari) { c.font = { bold: true, color: { argb: 'FF000000' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } } } })
     for (const r of s.satirlar) {
