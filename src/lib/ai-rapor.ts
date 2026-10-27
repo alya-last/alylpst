@@ -206,8 +206,8 @@ async function urunSatis(sb: SupabaseClient, kodlar: string[]): Promise<Sonuc> {
   ])
   const sonAy = Math.max(1, ...rows.map(x => +x.ay || 0)), ayList = Array.from({ length: sonAy }, (_, i) => i + 1), aySut = ayList.map(n => AYLAR[n - 1])
   const ozet: Hucre[][] = [], aAdet: Hucre[][] = [], aTutar: Hucre[][] = [], renk: Hucre[][] = [], mus: Hucre[][] = [], govde: string[] = [], bulunamayan: string[] = []
-  const stokRows: any[] = await sb.from('products').select('id,code').then((r: any) => r.data || []).catch(() => [])
-  const varRows: any[] = await sb.from('product_variants').select('product_id,stock').limit(6000).then((r: any) => r.data || []).catch(() => [])
+  const stokRows: any[] = await Promise.resolve(sb.from('products').select('id,code').then((r: any) => r.data || [])).catch(() => [])
+  const varRows: any[] = await Promise.resolve(sb.from('product_variants').select('product_id,stock').limit(6000).then((r: any) => r.data || [])).catch(() => [])
   let gAdet = 0, gTutar = 0
   kodlar.forEach((kod, i) => {
     const u = rows.filter(x => kodEslesir(x.kod, kod))
