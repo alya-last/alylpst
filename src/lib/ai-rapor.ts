@@ -15,6 +15,7 @@ export type RaporNiyet =
   | { tur: 'ihr_tahsilat' }
   | { tur: 'ihr_rakam'; yil: number }
   | { tur: 'pos' }
+  | { tur: 'kdv'; yil: number; ay: number }
 type Hucre = string | number | null
 type Sonuc = { yanit: string; araclar: string[] }
 
@@ -53,6 +54,12 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
     if (/tahsil|alacak|bakiye|borc|odeme/.test(t)) return { tur: 'ihr_tahsilat' }
     if (/rakam|ne kadar|usd|dolar|euro|\btl\b|satis|ciro|toplam|donem|kac/.test(t)) return { tur: 'ihr_rakam', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bugunISO().slice(0, 4) }
     return null
+  }
+  if (/yuklen|indirilecek kdv|kdv (listesi|detay|dokum|raporu)|kdv.{0,12}liste|liste.{0,12}kdv/.test(t) && !/hesaplanan kdv (orani|nedir)/.test(t)) {
+    const AY = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik']
+    const ayI = AY.findIndex(a => t.includes(a))
+    const bg = bugunISO()
+    return { tur: 'kdv', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: ayI >= 0 ? ayI + 1 : +bg.slice(5, 7) }
   }
   if (/\bk ?karti|kredi kart|\bpos\b/.test(t) && /tahsilat|liste|yat|bekle|ne kadar|rakam|excel/.test(t)) return { tur: 'pos' }
   const kodlar = kodlariBul(soru)
@@ -382,10 +389,42 @@ async function posRapor(sb: SupabaseClient): Promise<Sonuc> {
   return bitir(sb, 'K.kartı tahsilatları', sayfalar, govde, ['rapor_pos'])
 }
 
+/* ─────────────── KDV listesi (yüklenilen / indirilecek + hesaplanan) ─────────────── */
+async function kdvRapor(sb: SupabaseClient, yil: number, ay: number): Promise<Sonuc> {
+  const bas = `${yil}-${String(ay).padStart(2, '0')}-01`, bit = new Date(Date.UTC(yil, ay, 0)).toISOString().slice(0, 10)
+  const rows = await sayfala(sb, 'v_faturalar_liste', 'id,no,tip,durum,tarih,cari_ad,ara_toplam,kdv_orani,kdv_tutari,toplam,para_birimi,notlar', q => q.gte('tarih', bas).lte('tarih', bit))
+  const gecerli = (x: any) => x.durum === 'onaylandi' || x.durum === 'odendi'
+  const alis = rows.filter(x => x.tip === 'alis' && gecerli(x)).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)))
+  const taslakAlis = rows.filter(x => x.tip === 'alis' && x.durum === 'taslak')
+  const satis = rows.filter(x => x.tip === 'satis' && gecerli(x)).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)))
+  const iade = rows.filter(x => x.tip === 'iade' && gecerli(x)).sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)))
+  const t = (l: any[], k: string) => r2(l.reduce((a, x) => a + (+x[k] || 0), 0))
+  const ayAd = AYLAR[ay - 1]
+  const satir = (x: any): Hucre[] => [String(x.tarih).slice(0, 10), x.no, x.cari_ad || '', r2(+x.ara_toplam || 0), +x.kdv_orani || 0, r2(+x.kdv_tutari || 0), r2(+x.toplam || 0), x.durum === 'odendi' ? 'Ödendi' : x.durum === 'onaylandi' ? 'Onaylı' : x.durum, x.para_birimi && x.para_birimi !== 'TRY' ? x.para_birimi : '']
+  const sut = ['Fatura tarihi', 'Fatura no', 'Cari / Satıcı', 'Matrah (KDV hariç)', 'KDV oranı %', 'KDV tutarı', 'Toplam', 'Durum', 'Döviz']
+  const tab = (l: any[]): Hucre[][] => { const r = l.map(satir); if (r.length) r.push(['TOPLAM', '', '', t(l, 'ara_toplam'), null, t(l, 'kdv_tutari'), t(l, 'toplam'), '', '']); return r }
+  const oranlar = (l: any[]) => { const m: Record<string, { n: number; a: number; k: number }> = {}; for (const x of l) { const o = String(+x.kdv_orani || 0); const g = m[o] = m[o] || { n: 0, a: 0, k: 0 }; g.n++; g.a += +x.ara_toplam || 0; g.k += +x.kdv_tutari || 0 } return Object.keys(m).sort((a, b) => +a - +b).map(o => [+o, m[o].n, r2(m[o].a), r2(m[o].k)] as Hucre[]) }
+  const ind = t(alis, 'kdv_tutari'), hes = r2(t(satis, 'kdv_tutari') - t(iade, 'kdv_tutari'))
+  const sayfalar: Sayfa[] = [
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Dönem', `${ayAd} ${yil}`], ['İndirilecek (yüklenilen) KDV — alış faturaları (TL)', ind], ['Alış fatura adedi', alis.length], ['Alış matrahı (TL)', t(alis, 'ara_toplam')], ['Hesaplanan KDV — satış (TL)', t(satis, 'kdv_tutari')], ['İade KDV (TL)', t(iade, 'kdv_tutari')], ['Net hesaplanan KDV (satış − iade) (TL)', hes], ['Ödenecek (+) / Devreden (−) KDV (TL)', r2(hes - ind)], ['Taslak alış faturası (KDV\'ye dahil değil)', taslakAlis.length]] },
+    { ad: 'İndirilecek KDV (Alış)', sutunlar: sut, satirlar: tab(alis) },
+    { ad: 'KDV Oranına Göre (Alış)', sutunlar: ['KDV oranı %', 'Fatura adedi', 'Matrah', 'KDV tutarı'], satirlar: oranlar(alis) },
+    { ad: 'Hesaplanan KDV (Satış)', sutunlar: sut, satirlar: tab(satis) },
+    { ad: 'İade Faturaları', sutunlar: sut, satirlar: tab(iade) },
+  ]
+  if (taslakAlis.length) sayfalar.push({ ad: 'Taslak Alış (dahil değil)', sutunlar: sut, satirlar: tab(taslakAlis) })
+  if (!alis.length && !satis.length) return { yanit: `${ayAd} ${yil} döneminde onaylı fatura kaydı bulunamadı.`, araclar: ['rapor_kdv'] }
+  const top = [...alis].sort((a, b) => (+b.kdv_tutari || 0) - (+a.kdv_tutari || 0)).slice(0, 10)
+  const govde = [`${ayAd.toUpperCase()} ${yil} KDV — indirilecek (yüklenilen) KDV: ${TL(ind)} TL (${alis.length} alış faturası, matrah ${TL(t(alis, 'ara_toplam'))} TL)`, `Hesaplanan KDV (satış − iade): ${TL(hes)} TL`, `${hes - ind >= 0 ? 'Ödenecek KDV' : 'Devreden KDV'}: ${TL(Math.abs(hes - ind))} TL`, '', 'EN YÜKSEK KDV\'Lİ 10 ALIŞ FATURASI:', ...top.map((x, i) => `${i + 1}. ${String(x.tarih).slice(0, 10)} ${x.no} ${x.cari_ad || ''}: ${TL(+x.kdv_tutari || 0)} TL`)]
+  if (taslakAlis.length) govde.push('', `Not: ${taslakAlis.length} taslak alış faturası KDV'ye dahil edilmedi (ayrı sayfada).`)
+  govde.push('Not: Faturalar fatura tarihine göre; döviz faturaları ayrı işaretlidir.')
+  return bitir(sb, `${ayAd} ${yil} KDV listesi`, sayfalar, govde, ['rapor_kdv'])
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   const n = raporNiyeti(soru)
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'] }
   if (!gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -397,6 +436,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       case 'ihr_tahsilat': return await ihracatTahsilat(sb)
       case 'ihr_rakam': return await ihracatRakam(sb, n.yil)
       case 'pos': return await posRapor(sb)
+      case 'kdv': return await kdvRapor(sb, n.yil, n.ay)
     }
   } catch (e: any) {
     console.error('[ai-rapor]', n.tur, e?.message)

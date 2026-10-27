@@ -50,6 +50,7 @@ const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
     '2026 ihracat rakamları usd, euro ve TL',
   ] },
   { baslik: 'K. kartı', sorular: ['k.kartı tahsilatlarım'] },
+  { baslik: 'KDV', sorular: ['eylül ayı yüklenilen (indirilecek) KDV listesi', 'ekim ayı KDV listesi'] },
 ]
 const BELGE_ISTEKLERI = [
   { l: 'Standart alanlar', t: '' },
