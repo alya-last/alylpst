@@ -295,7 +295,7 @@ SÖZLÜK: ${soz}` },
           .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
           .map((m: any) => ({ role: m.role, content: m.content.slice(0, 1500) }))
         if (!g.length || g[g.length - 1].role !== 'user') return NextResponse.json({ error: 'Soru gerekli' }, { status: 400 })
-        return NextResponse.json({ ok: true, ...(await genelAsistanYanit(y.sb, g, y.moduller)) })
+        { const r: any = await genelAsistanYanit(y.sb, g, y.moduller); if (typeof r.yanit === 'string') r.yanit = await (await import('@/lib/ai-excel')).sahteLinkTemizle(y.sb, r.yanit); return NextResponse.json({ ok: true, ...r }) }
       }
       case 'ozet':
         return NextResponse.json({ ok: true, ...(await haftalikOzet(y.sb, y.moduller)) })

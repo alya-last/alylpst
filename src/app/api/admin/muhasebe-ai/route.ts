@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         .map((m: any) => ({ role: m.role, content: m.content.slice(0, 3000) }))
       if (!g.length || g[g.length - 1].role !== 'user') return NextResponse.json({ error: 'Soru gerekli' }, { status: 400 })
       const belge = typeof body.belge === 'string' && body.belge.trim() ? body.belge.slice(0, 9000) : undefined
-      return NextResponse.json({ ok: true, ...(await muhasebeAsistan(y.sb, g, belge)) })
+      { const r: any = await muhasebeAsistan(y.sb, g, belge); if (typeof r.yanit === 'string') r.yanit = await (await import('@/lib/ai-excel')).sahteLinkTemizle(y.sb, r.yanit); return NextResponse.json({ ok: true, ...r }) }
     }
     if (action === 'rapor_yorum') return NextResponse.json({ ok: true, yorum: await raporYorumla(await raporUret(y.sb, String(body.tip), String(body.donem))) })
     if (action === 'kayit_oner') {

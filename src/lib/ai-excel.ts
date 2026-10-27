@@ -80,3 +80,14 @@ export async function excelBuffer(baslik: string, sayfalar: Sayfa[]) {
   }
   return wb.xlsx.writeBuffer()
 }
+
+/** Model, tablo oluşturmadan uydurma bir indirme bağlantısı yazabilir; kayıtlı olmayan ai-excel bağlantılarını açık uyarıyla değiştirir. */
+export async function sahteLinkTemizle(sb: SupabaseClient, metin: string): Promise<string> {
+  const idler = [...new Set([...String(metin || '').matchAll(/\/api\/admin\/ai-excel\?id=([0-9a-f-]{36})/gi)].map(m => m[1]))]
+  if (!idler.length) return metin
+  const { data } = await sb.from('ai_excel').select('id').in('id', idler)
+  const var_ = new Set((data || []).map((x: any) => x.id))
+  let out = metin
+  for (const id of idler) if (!var_.has(id)) out = out.split(`/api/admin/ai-excel?id=${id}`).join('(Excel dosyası oluşturulamadı — soruyu "excel olarak ver" diyerek tekrar sor)')
+  return out
+}
