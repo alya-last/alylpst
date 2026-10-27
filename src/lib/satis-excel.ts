@@ -56,7 +56,7 @@ export async function satisExcelBuffer(sb: SupabaseClient, mekanlar: Mekan[], do
     for (const a of aylar) baslik.push(etiket(a), `${etiket(a)} satış belge`)
     baslik.push('TÜM AYLAR TOP.SAT. BELG.DEĞ')
     const h = ws.addRow(baslik); h.height = 30
-    h.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2B2F2B' } }; c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true } })
+    h.eachCell(c => { c.font = { bold: true, color: { argb: 'FF000000' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF2F2F2' } }; c.border = { bottom: { style: 'thin', color: { argb: 'FF808080' } } }; c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true } })
     const r2 = (v: number) => Math.round(v * 100) / 100
     const topA = Array(n).fill(0), topT = Array(n).fill(0); let topAdet = 0, topStok = 0, topTutar = 0
     for (const s of satirlar) {
