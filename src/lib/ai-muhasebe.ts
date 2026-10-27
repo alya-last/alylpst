@@ -132,6 +132,9 @@ export async function muhasebeAsistan(sb: SupabaseClient, gecmis: Konusma[], bel
     const son = [...gecmis].reverse().find(m => m.role === 'user')?.content || ''
     const hz = await (await import('@/lib/ai-hazir')).hazirCevap(sb, son)
     if (hz) return { ...hz, bilgiTabani: { adet: 0, enEskiDogrulama: null as string | null, uyarilar: [] as string[] } }
+    // Sık sorulan tahsilat / satış / stok / ihracat / k.kartı soruları: tek satırlık cevap yerine onaylı düzende çok sayfalı Excel
+    const rp = await (await import('@/lib/ai-rapor')).detayliRapor(sb, son, new Set(ARACLAR.map(a => a.function.name)))
+    if (rp) return { ...rp, bilgiTabani: { adet: 0, enEskiDogrulama: null as string | null, uyarilar: [] as string[] } }
   }
   const bugun = bugunISO()
   const kb = await mevzuatBaglami(sb)
