@@ -94,9 +94,12 @@ async function tahsilat(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
     const al = u.filter(x => x.tl_bakiye > 0.5).sort((a, b) => b.tl_bakiye - a.tl_bakiye)
     const toplam = al.reduce((t, x) => t + x.tl_bakiye, 0)
     let kum = 0
-    const sat: Hucre[][] = al.map((x, i) => { kum += x.tl_bakiye; return [i + 1, x.cari_kodu, x.unvan, x.tl_borc, x.tl_alacak, x.tl_bakiye, toplam ? r2(x.tl_bakiye / toplam * 100) : 0, toplam ? r2(kum / toplam * 100) : 0, x.usd_bakiye || null, x.eur_bakiye || null] })
-    if (sat.length) { const tr = topSat(sat, [3, 4, 5], [2, 'TOPLAM']); tr[0] = ''; tr[8] = null; tr[9] = null; tr[6] = null; tr[7] = null; sat.push(tr) }
-    sayfalar.push({ ad: `Tahsilat ${mekanAd(m)}`, sutunlar: ['Sıra', 'Cari Kodu', 'Ünvan', 'TL Borç (toplam hareket)', 'TL Alacak (toplam hareket)', 'Tahsil Edilecek (TL bakiye)', 'Pay %', 'Kümülatif %', 'USD Bakiye', 'EUR Bakiye'], satirlar: sat })
+    const sat: Hucre[][] = al.map(x => [x.cari_kodu, x.unvan, r2(x.tl_bakiye), r2(+x.tl_borc || 0), r2(+x.tl_alacak || 0), x.tl_bakiye > 0 ? r2(x.tl_bakiye) : 0, x.tl_bakiye < 0 ? r2(-x.tl_bakiye) : 0])
+    if (sat.length) sat.push(topSat(sat, [2, 3, 4, 5, 6], [1, 'TOPLAM']))
+    sayfalar.push({ ad: `Tahsilat ${mekanAd(m)}`, sutunlar: ['Cari kodu', 'Unvan', 'Tahsil edilecek TL', 'Borç', 'Alacak', 'Borç bakiye', 'Alacak bakiye'], satirlar: sat, sari: 3 })
+    const analiz: Hucre[][] = al.map((x, i) => { kum += x.tl_bakiye; return [i + 1, x.cari_kodu, x.unvan, r2(x.tl_bakiye), toplam ? r2(x.tl_bakiye / toplam * 100) : 0, toplam ? r2(kum / toplam * 100) : 0, x.usd_bakiye || null, x.eur_bakiye || null] })
+    if (analiz.length) { const tr = topSat(analiz, [3], [2, 'TOPLAM']); tr[0] = ''; analiz.push(tr) }
+    if (analiz.length) sayfalar.push({ ad: `Analiz ${mekanAd(m)}`, sutunlar: ['Sıra', 'Cari kodu', 'Unvan', 'Tahsil edilecek TL', 'Pay %', 'Kümülatif %', 'USD bakiye', 'EUR bakiye'], satirlar: analiz })
     const dv = u.filter(x => x.usd_bakiye > 0.5 || x.eur_bakiye > 0.5)
     if (dv.length) sayfalar.push({ ad: `Döviz alacak ${mekanAd(m)}`, sutunlar: ['Cari Kodu', 'Ünvan', 'USD Bakiye', 'EUR Bakiye'], satirlar: dv.map(x => [x.cari_kodu, x.unvan, x.usd_bakiye, x.eur_bakiye]) })
     const bz = u.filter(x => x.tl_bakiye < -0.5).sort((a, b) => a.tl_bakiye - b.tl_bakiye)

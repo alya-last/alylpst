@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import ExcelJS from 'exceljs'
 
-export type Sayfa = { ad: string; sutunlar: string[]; satirlar: (string | number | null)[][] }
+export type Sayfa = { ad: string; sutunlar: string[]; satirlar: (string | number | null)[][]; sari?: number }
 const SINIR = { sayfa: 12, satir: 5000, sutun: 32, hucre: 150000 }
 
 // Araç çıktısındaki ASCII alan adlarını okunur Türkçeye çevirir ("odeme_kaydi_olmayan" → "Ödeme kaydı olmayan")
@@ -44,7 +44,7 @@ export async function excelKaydet(sb: SupabaseClient, baslik: string, sayfalar: 
     const sut = s.sutunlar.slice(0, SINIR.sutun).map(x => String(x).slice(0, 80))
     const sat = s.satirlar.slice(0, SINIR.satir).map(r => sut.map((_, i) => { const v = duz(r[i]); return typeof v === 'string' ? v.slice(0, 1000) : v }))
     hucre += sat.length * sut.length
-    return { ad: tekil(s.ad, ad), sutunlar: sut, satirlar: sat }
+    return { ad: tekil(s.ad, ad), sutunlar: sut, satirlar: sat, ...(typeof s.sari === 'number' ? { sari: s.sari } : {}) }
   })
   if (!temiz.length) throw new Error('Excel için tablo verisi yok')
   if (hucre > SINIR.hucre) throw new Error('Tablo çok büyük; tarih aralığı ya da süzgeçle daraltın')
@@ -61,7 +61,17 @@ export async function excelBuffer(baslik: string, sayfalar: Sayfa[]) {
     const ws = wb.addWorksheet(s.ad, { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] })
     const h = ws.addRow(s.sutunlar); h.height = 24
     h.eachCell(c => { c.font = { bold: true, color: { argb: 'FFFFFFFF' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2B2F2B' } }; c.alignment = { vertical: 'middle', wrapText: true } })
-    for (const r of s.satirlar) { const x = ws.addRow(r); x.eachCell(c => { c.border = { bottom: { style: 'hair', color: { argb: 'FFD0D0D0' } } }; if (typeof c.value === 'number') c.alignment = { horizontal: 'right' } }) }
+    const sari = typeof s.sari === 'number' ? s.sari : -1
+    if (sari >= 0) h.eachCell((c, n) => { if (n - 1 >= sari) { c.font = { bold: true, color: { argb: 'FF000000' } }; c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } } } })
+    for (const r of s.satirlar) {
+      const x = ws.addRow(r), top = r.some(v => v === 'TOPLAM')
+      x.eachCell({ includeEmpty: true }, (c, n) => {
+        c.border = { bottom: { style: 'hair', color: { argb: 'FFD0D0D0' } } }
+        if (typeof c.value === 'number') c.alignment = { horizontal: 'right' }
+        if (top) { c.font = { bold: true }; c.border = { top: { style: 'thin' }, bottom: { style: 'double' } } }
+        if (sari >= 0 && n - 1 >= sari && n <= s.sutunlar.length) c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFCC' } }
+      })
+    }
     s.sutunlar.forEach((baslikAd, i) => {
       const col = ws.getColumn(i + 1), ornek = s.satirlar.slice(0, 200).map(r => r[i]), sayisal = ornek.filter(v => typeof v === 'number') as number[]
       if (sayisal.length && !SAYI_YIL.test(baslikAd)) col.numFmt = sayisal.every(Number.isInteger) ? '#,##0' : '#,##0.00'
