@@ -14,6 +14,7 @@ export type RaporNiyet =
   | { tur: 'hammadde'; mekan: Mekan }
   | { tur: 'ihr_tahsilat' }
   | { tur: 'ihr_rakam'; yil: number }
+  | { tur: 'pos' }
 type Hucre = string | number | null
 type Sonuc = { yanit: string; araclar: string[] }
 
@@ -53,6 +54,7 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
     if (/rakam|ne kadar|usd|dolar|euro|\btl\b|satis|ciro|toplam|donem|kac/.test(t)) return { tur: 'ihr_rakam', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bugunISO().slice(0, 4) }
     return null
   }
+  if (/\bk ?karti|kredi kart|\bpos\b/.test(t) && /tahsilat|liste|yat|bekle|ne kadar|rakam|excel/.test(t)) return { tur: 'pos' }
   const kodlar = kodlariBul(soru)
   if (kodlar.length && /sat|adet|ne kadar|rakam|kac|ciro/.test(t) && !/stok|recete|maliyet/.test(t)) return { tur: 'urun', kodlar }
   if (/hammadde/.test(t)) return /stok|stog|depo|kalan/.test(t) ? null : { tur: 'hammadde', mekan }
@@ -343,10 +345,44 @@ async function ihracatRakam(sb: SupabaseClient, yil: number): Promise<Sonuc> {
 }
 
 /** Soru sabit rapora uyuyorsa Excel + özet üretir; uymuyorsa ya da hata olursa null (yapay zekaya devredilir). */
+/* ─────────────── K. kartı (POS) tahsilatları ─────────────── */
+async function posRapor(sb: SupabaseClient): Promise<Sonuc> {
+  const [rows, cariler] = await Promise.all([
+    sayfala(sb, 'pos_tahsilat', 'tarih,musteri,cari_id,tutar,ekstre_vade_gun,beklenen_tarih,durum,yatis_tarihi,kaynak'),
+    sayfala(sb, 'cari_hesaplar', 'id,ad,muhasebe_kodu'),
+  ])
+  if (!rows.length) return { yanit: 'Kayıtlı k.kartı (POS) tahsilatı yok.', araclar: ['rapor_pos'] }
+  const cm = new Map(cariler.map((c: any) => [c.id, c]))
+  const bg = bugunISO()
+  const sirali = [...rows].sort((a, b) => String(a.tarih).localeCompare(String(b.tarih)))
+  const top = (l: any[]) => r2(l.reduce((t, x) => t + (+x.tutar || 0), 0))
+  const yat = sirali.filter(x => x.durum === 'yatti'), bek = sirali.filter(x => x.durum === 'bekliyor'), bagsiz = sirali.filter(x => !x.cari_id)
+  const gun = (x: string, y: string) => Math.round((Date.parse(String(x).slice(0, 10)) - Date.parse(String(y).slice(0, 10))) / 86400000)
+  const satir = (x: any): Hucre[] => { const c: any = x.cari_id ? cm.get(x.cari_id) : null; return [x.tarih, x.musteri, c?.ad || 'CARİYE BAĞLI DEĞİL', c?.muhasebe_kodu || '', r2(+x.tutar || 0), x.durum === 'yatti' ? 'Bankaya yattı' : 'Bankada bekliyor', x.yatis_tarihi || '', x.durum === 'yatti' && x.yatis_tarihi ? gun(x.yatis_tarihi, x.tarih) : x.durum === 'bekliyor' ? gun(bg, x.tarih) : null] }
+  const sut = ['Tahsilat Tarihi', 'Müşteri (ekstre)', 'Cari Hesap', 'Muhasebe Kodu', 'Tutar (TL)', 'Durum', 'Bankaya Yatış', 'Gün (yatış / bekleme)']
+  const tab = (l: any[]): Hucre[][] => { const r = l.map(satir); if (r.length) r.push(['', 'TOPLAM', '', '', top(l), '', '', null]); return r }
+  const mus: Record<string, { ad: string; n: number; t: number; b: number }> = {}
+  for (const x of sirali) { const c: any = x.cari_id ? cm.get(x.cari_id) : null, ad = c?.ad || x.musteri; const k = mus[ad] = mus[ad] || { ad, n: 0, t: 0, b: 0 }; k.n++; k.t += +x.tutar || 0; if (x.durum === 'bekliyor') k.b += +x.tutar || 0 }
+  const musL = Object.values(mus).sort((a, b) => b.t - a.t)
+  const ay: Record<string, { n: number; t: number }> = {}
+  for (const x of sirali) { const k = ay[String(x.tarih).slice(0, 7)] = ay[String(x.tarih).slice(0, 7)] || { n: 0, t: 0 }; k.n++; k.t += +x.tutar || 0 }
+  const sayfalar: Sayfa[] = [
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Toplam k.kartı tahsilatı (TL)', top(sirali)], ['Tahsilat adedi', sirali.length], ['Bankaya yatan (TL)', top(yat)], ['Yatan adet', yat.length], ['Bankada bekleyen (TL)', top(bek)], ['Bekleyen adet', bek.length], ['Cariye bağlı olmayan adet', bagsiz.length], ['Rapor tarihi', bg]] },
+    { ad: 'Tüm Tahsilatlar', sutunlar: sut, satirlar: tab(sirali) },
+    { ad: 'Bankada Bekleyen', sutunlar: sut, satirlar: tab(bek) },
+    { ad: 'Bankaya Yatan', sutunlar: sut, satirlar: tab(yat) },
+    { ad: 'Müşteri Bazlı', sutunlar: ['Müşteri / Cari', 'Adet', 'Toplam (TL)', 'Bankada Bekleyen (TL)'], satirlar: musL.map(m => [m.ad, m.n, r2(m.t), r2(m.b)]) },
+    { ad: 'Aylık', sutunlar: ['Ay', 'Adet', 'Tutar (TL)'], satirlar: Object.keys(ay).sort().map(k => [k, ay[k].n, r2(ay[k].t)]) },
+  ]
+  if (bagsiz.length) sayfalar.push({ ad: 'Cariye Bağlı Olmayan', sutunlar: sut, satirlar: tab(bagsiz) })
+  const govde = [`K.KARTI (POS) TAHSİLATLARI — toplam ${TL(top(sirali))} TL, ${sirali.length} işlem`, `• Bankaya yatan: ${TL(top(yat))} TL (${yat.length} adet)`, `• Bankada bekleyen: ${TL(top(bek))} TL (${bek.length} adet)`, bagsiz.length ? `• Cariye bağlı olmayan: ${bagsiz.length} adet` : '', '', 'BANKADA BEKLEYENLER:', ...bek.slice(0, 15).map(x => `• ${String(x.tarih).slice(0, 10)} ${x.musteri}: ${TL(+x.tutar)} TL (${gun(bg, x.tarih)} gündür)`)].filter((x, i, a) => x !== '' || a[i - 1] !== '')
+  return bitir(sb, 'K.kartı tahsilatları', sayfalar, govde, ['rapor_pos'])
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   const n = raporNiyeti(soru)
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'] }
   if (!gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -357,6 +393,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       case 'hammadde': return await hammadde(sb, n.mekan)
       case 'ihr_tahsilat': return await ihracatTahsilat(sb)
       case 'ihr_rakam': return await ihracatRakam(sb, n.yil)
+      case 'pos': return await posRapor(sb)
     }
   } catch (e: any) {
     console.error('[ai-rapor]', n.tur, e?.message)
