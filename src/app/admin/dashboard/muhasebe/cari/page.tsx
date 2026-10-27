@@ -109,22 +109,23 @@ export default function CariPage() {
 
   // Eski program hareketleri (salt okunur): ekstrede aynı listede görünür, bakiyeye dahil değildir
   type EkSatir = { tarih: string; aciklama: string; tur: string; borc: number; alacak: number; bakiye: number | null; eski?: boolean }
-  const eskiSatirlar = useCallback((): EkSatir[] => eski.filter(r => !(r.nakil && !+r.tl_borc && !+r.tl_alacak)).map(r => ({
-    tarih: r.tarih, eski: true, bakiye: null, borc: +r.tl_borc || 0, alacak: +r.tl_alacak || 0,
+  // Dış mekan (120.03) cariler yalnızca TL çalışır: USD/EUR hareketleri gösterilmez. TL hareketlerde yürüyen bakiye (borç − alacak) hesaplanır.
+  const eskiSatirlar = useCallback((dis = false): EkSatir[] => { let yb = 0; return eski.filter(r => !(r.nakil && !+r.tl_borc && !+r.tl_alacak) && !(dis && r.grup && r.grup !== 'TL')).map(r => ({
+    tarih: r.tarih, eski: true, bakiye: !r.grup || r.grup === 'TL' ? (yb = Math.round((yb + (+r.tl_borc || 0) - (+r.tl_alacak || 0)) * 100) / 100) : null, borc: +r.tl_borc || 0, alacak: +r.tl_alacak || 0,
     aciklama: r.nakil ? 'Önceki dönemden devir' : [r.evrak_cinsi, r.evrak_no].filter(Boolean).join(' · ') + (r.aciklama ? ` — ${r.aciklama}` : '') + (r.gib_fatura_no ? ` (${r.gib_fatura_no})` : ''),
-    tur: `Eski program · ${r.grup}${r.vade ? ` · vade ${r.vade}` : ''}${+r.usd_borc || +r.usd_alacak ? ` · ${fmt(+r.usd_borc || +r.usd_alacak)} $` : ''}`,
-  })), [eski])
-  const birlesik = (cariId: string): EkSatir[] => [...ekstre(cariId), ...eskiSatirlar()].sort((a, b) => a.tarih.localeCompare(b.tarih))
+    tur: `Eski program · ${r.grup}${r.vade ? ` · vade ${r.vade}` : ''}${!dis && (+r.usd_borc || +r.usd_alacak) ? ` · ${fmt(+r.usd_borc || +r.usd_alacak)} $` : ''}`,
+  })) }, [eski])
+  const birlesik = (cariId: string): EkSatir[] => [...ekstre(cariId), ...eskiSatirlar(String(list.find((c: any) => c.id === cariId)?.muhasebe_kodu || '').startsWith('120.03'))].sort((a, b) => a.tarih.localeCompare(b.tarih))
 
   function ekstreYazdir(c: any) {
     const ek = birlesik(c.id)
-    const rows = ek.map(h => `<tr><td>${fmtDate(h.tarih)}</td><td>${h.aciklama}</td><td>${h.tur}</td><td style="text-align:right">${h.borc ? fmt(h.borc) : ''}</td><td style="text-align:right">${h.alacak ? fmt(h.alacak) : ''}</td><td style="text-align:right;font-weight:600">${h.bakiye == null ? '' : fmt(h.bakiye)}</td></tr>`).join('')
+    const rows = ek.map(h => `<tr><td>${fmtDate(h.tarih)}</td><td>${h.aciklama}</td><td>${h.tur}</td><td style="text-align:right">${h.borc ? fmt(h.borc) : ''}</td><td style="text-align:right">${h.alacak ? fmt(h.alacak) : ''}</td><td style="text-align:right;font-weight:600">${h.bakiye != null && h.bakiye > 0.004 ? fmt(h.bakiye) : ''}</td><td style="text-align:right;font-weight:600">${h.bakiye != null && h.bakiye < -0.004 ? fmt(-h.bakiye) : ''}</td></tr>`).join('')
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>${c.ad} - Ekstre</title><style>
       body{font-family:Arial,sans-serif;color:#0b0e0b;padding:40px;max-width:860px;margin:0 auto}h1{font-size:20px;margin:0 0 4px}.muted{color:#6b7366;font-size:12px}
       table{width:100%;border-collapse:collapse;margin-top:24px}th,td{padding:8px 6px;font-size:12.5px;border-bottom:1px solid #ddd;text-align:left}th{color:#6b7366;font-size:11px;text-transform:uppercase}
       .header{display:flex;justify-content:space-between;border-bottom:2px solid #e55f28;padding-bottom:16px;margin-bottom:16px}.toplam{margin-top:16px;text-align:right;font-size:15px;font-weight:700}@media print{body{padding:0}}</style></head><body>
       <div class="header"><div><h1>ALYA PLASTİK</h1><p class="muted">Cari Hesap Ekstresi</p></div><div style="text-align:right"><h1>${c.ad}</h1><p class="muted">${new Date().toLocaleDateString('tr-TR')} itibarıyla</p></div></div>
-      <table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Tür</th><th style="text-align:right">Borç</th><th style="text-align:right">Alacak</th><th style="text-align:right">Bakiye</th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>Tarih</th><th>Açıklama</th><th>Tür</th><th style="text-align:right">Borç</th><th style="text-align:right">Alacak</th><th style="text-align:right">Borç bakiye</th><th style="text-align:right">Alacak bakiye</th></tr></thead><tbody>${rows}</tbody></table>
       <p class="toplam">Güncel Bakiye: ${fmt(+c.bakiye)}</p></body></html>`
     const w = window.open('', '_blank'); if (w) { w.document.write(html); w.document.close(); w.focus(); setTimeout(() => w.print(), 300) }
   }
@@ -226,7 +227,7 @@ export default function CariPage() {
       render: c => Math.abs(+c.bakiye) < 0.005 && Math.abs(+c.bakiye_usd || 0) < 0.005 && Math.abs(+c.bakiye_eur || 0) < 0.005 ? <span style={{ color: 'var(--adm-tx3)' }}>Kapalı</span> : (
         <div>
           {Math.abs(+c.bakiye) >= 0.005 && <><Money v={Math.abs(+c.bakiye)} tone={+c.bakiye > 0 ? 'green' : 'red'} /><div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>{+c.bakiye > 0 ? 'bize borçlu' : 'biz borçluyuz'}</div></>}
-          {(['USD', 'EUR'] as const).map(pb => { const d = dvz(c[pb === 'USD' ? 'bakiye_usd' : 'bakiye_eur'], pb); return Math.abs(d.n) >= 0.005 && <div key={pb} title={d.tip} style={{ fontSize: 12, fontWeight: 600, marginTop: 3, cursor: 'help', color: d.n > 0 ? 'var(--adm-green)' : 'var(--adm-red)' }}>{d.txt} <span style={{ fontWeight: 400, fontSize: 10.5, color: 'var(--adm-tx3)' }}>{d.n > 0 ? 'bize borçlu' : 'biz borçluyuz'}</span></div> })}
+          {(['USD', 'EUR'] as const).map(pb => { const d = dvz(c[pb === 'USD' ? 'bakiye_usd' : 'bakiye_eur'], pb); return !String(c.muhasebe_kodu || '').startsWith('120.03') && Math.abs(d.n) >= 0.005 && <div key={pb} title={d.tip} style={{ fontSize: 12, fontWeight: 600, marginTop: 3, cursor: 'help', color: d.n > 0 ? 'var(--adm-green)' : 'var(--adm-red)' }}>{d.txt} <span style={{ fontWeight: 400, fontSize: 10.5, color: 'var(--adm-tx3)' }}>{d.n > 0 ? 'bize borçlu' : 'biz borçluyuz'}</span></div> })}
         </div>),
       total: rs => <div><Money v={sum(rs, c => c.bakiye)} tone="auto" /><div style={{ fontSize: 11 }}>{sum(rs, c => c.bakiye_usd || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $</div></div>, csv: c => +c.bakiye,
     },
@@ -303,7 +304,7 @@ export default function CariPage() {
                   <Money v={Math.abs(+detay.bakiye)} tone={Math.abs(+detay.bakiye) < 0.005 ? undefined : +detay.bakiye > 0 ? 'green' : 'red'} size={17} />
                   <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>{Math.abs(+detay.bakiye) < 0.005 ? 'hesap kapalı' : +detay.bakiye > 0 ? 'bize borçlu' : 'biz borçluyuz'}</div>
                 </div>
-                {(['USD', 'EUR'] as const).map(pb => { const d = dvz(detay[pb === 'USD' ? 'bakiye_usd' : 'bakiye_eur'], pb); return Math.abs(d.n) >= 0.005 && <div key={pb} title={d.tip} style={{ padding: 12, borderRadius: 10, background: 'var(--adm-s2)', cursor: 'help' }}>
+                {(['USD', 'EUR'] as const).map(pb => { const d = dvz(detay[pb === 'USD' ? 'bakiye_usd' : 'bakiye_eur'], pb); return !String(detay.muhasebe_kodu || '').startsWith('120.03') && Math.abs(d.n) >= 0.005 && <div key={pb} title={d.tip} style={{ padding: 12, borderRadius: 10, background: 'var(--adm-s2)', cursor: 'help' }}>
                   <div className="adm-kpi-label" style={{ marginBottom: 4 }}>Bakiye ({pb})</div>
                   <div style={{ fontSize: 17, fontWeight: 700, color: d.n > 0 ? 'var(--adm-green)' : 'var(--adm-red)' }}>{d.txt}</div>
                   <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>{d.tip || (d.n > 0 ? 'bize borçlu' : 'biz borçluyuz')}</div>
@@ -339,19 +340,20 @@ export default function CariPage() {
             {dTab === 'ekstre' && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '10px 20px 0', gap: 8 }}>
-                  <button className="adm-btn-ghost" style={{ fontSize: 12 }} disabled={!dEk.length} onClick={() => csvDownload(`ekstre-${detay.ad}.csv`, dEk.map(h => ({ Tarih: h.tarih, Açıklama: h.aciklama, Tür: h.tur, Borç: h.borc, Alacak: h.alacak, Bakiye: h.bakiye ?? '' })))}><Download size={12} />CSV</button>
+                  <button className="adm-btn-ghost" style={{ fontSize: 12 }} disabled={!dEk.length} onClick={() => csvDownload(`ekstre-${detay.ad}.csv`, dEk.map(h => ({ Tarih: h.tarih, Açıklama: h.aciklama, Tür: h.tur, Borç: h.borc, Alacak: h.alacak, 'Borç bakiye': h.bakiye != null && h.bakiye > 0.004 ? h.bakiye : '', 'Alacak bakiye': h.bakiye != null && h.bakiye < -0.004 ? -h.bakiye : '' })))}><Download size={12} />CSV</button>
                 </div>
                 {dEk.length === 0 ? <Empty icon={<FileBarChart size={28} />} title="Hareket yok" sub="Bu cariye ait onaylı fatura ya da işlem bulunmuyor" /> : (
                   <div style={{ overflow: 'auto', padding: '8px 0' }}>
                     <table className="adm-tbl">
-                      <thead><tr><th>Tarih</th><th>Açıklama</th><th style={{ textAlign: 'right' }}>Borç</th><th style={{ textAlign: 'right' }}>Alacak</th><th style={{ textAlign: 'right' }}>Bakiye</th></tr></thead>
+                      <thead><tr><th>Tarih</th><th>Açıklama</th><th style={{ textAlign: 'right' }}>Borç</th><th style={{ textAlign: 'right' }}>Alacak</th><th style={{ textAlign: 'right' }}>Borç bakiye</th><th style={{ textAlign: 'right' }}>Alacak bakiye</th></tr></thead>
                       <tbody>{[...dEk].reverse().map((h, i) => (
                         <tr key={i}>
                           <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(h.tarih)}</td>
                           <td><div style={{ fontWeight: 500 }}>{h.aciklama}</div><div style={{ fontSize: 11, color: h.eski ? 'var(--adm-ac)' : 'var(--adm-tx3)' }}>{h.tur}</div></td>
                           <td style={{ textAlign: 'right' }}>{h.borc ? <Money v={h.borc} bold={false} /> : ''}</td>
                           <td style={{ textAlign: 'right' }}>{h.alacak ? <Money v={h.alacak} bold={false} /> : ''}</td>
-                          <td style={{ textAlign: 'right' }}>{h.bakiye == null ? '' : <Money v={h.bakiye} tone="auto" />}</td>
+                          <td style={{ textAlign: 'right' }}>{h.bakiye != null && h.bakiye > 0.004 ? <Money v={h.bakiye} tone="auto" /> : ''}</td>
+                          <td style={{ textAlign: 'right' }}>{h.bakiye != null && h.bakiye < -0.004 ? <Money v={-h.bakiye} tone="auto" /> : ''}</td>
                         </tr>))}</tbody>
                     </table>
                     {dEk.some(h => h.eski) && <div style={{ padding: '8px 20px', fontSize: 11.5, color: 'var(--adm-tx3)' }}>Turuncu &quot;Eski program&quot; satırları eski programdan aktarılmış geçmiştir; yürüyen bakiyeye dahil değildir, güncel bakiye yukarıdaki kutuda gösterilir.</div>}
