@@ -17,6 +17,7 @@ export type RaporNiyet =
   | { tur: 'pos' }
   | { tur: 'kdv'; yil: number; ay: number }
   | { tur: 'odeme' }
+  | { tur: 'ekstre'; arama: string; kod: string }
 type Hucre = string | number | null
 type Sonuc = { yanit: string; araclar: string[] }
 
@@ -57,6 +58,11 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
     return null
   }
   if (/tedarikci|satici|borclarimiz|odeyecegimiz|odenecek(ler)?\b|ne kadar borcumuz|borcumuz (var|ne)/.test(t) && /borc|odeme|odenecek|liste|bakiye|ekstre/.test(t) && !/kdv|fatura|cek|senet|maas|personel/.test(t)) return { tur: 'odeme' }
+  if (/ekstre|hesap (dokum|hareket|ozet)|hareketleri|carisi|cari hesabi/.test(t) && !/banka|kasa|\bk ?karti|kredi kart|\bpos\b|tahsilat listesi|stok|kdv/.test(t)) {
+    const kod = /\b(120|320)\.\d{2}\.\d{3}[a-z]?\b/.exec(String(soru))?.[0] || ''
+    const arama = t.replace(/\b(120|320) \d{2} \d{3}[a-z]?\b/g, ' ').replace(/\b(ekstre(si)?|ekstreyi|cari(si|nin|yi)?|hesap(i|in)?|dokumu|dokum|hareket(leri|lerini)?|ozet(i)?|excel|ver|al|cikar|goster|lazim|listesi|liste|detayli|detay|tum|icin|ile|ve|bir|bana|olarak|dis mekan|ic mekan|tl|nin|nın)\b/g, ' ').replace(/\s+/g, ' ').trim()
+    if (kod || arama.length >= 2) return { tur: 'ekstre', arama, kod }
+  }
   if (/(alis|satis|gelen|giden)? ?fatura(lar)?.{0,15}(liste|excel|dokum)|fatura listesi|(alis|satis) fatura/.test(t) && !/stok|kalem/.test(t)) {
     const AY0 = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik'], i0 = AY0.findIndex(a => t.includes(a)), b0 = bugunISO()
     return { tur: 'kdv', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +b0.slice(0, 4), ay: i0 >= 0 ? i0 + 1 : +b0.slice(5, 7) }
@@ -449,10 +455,45 @@ async function odemeRapor(sb: SupabaseClient): Promise<Sonuc> {
   return bitir(sb, 'Tedarikçi borçları (ödenecekler)', sayfalar, govde, ['rapor_odeme'])
 }
 
+/* ─────────────── Cari ekstresi: Borç | Alacak | Borç bakiye | Alacak bakiye (yürüyen), dış mekanda yalnızca TL ─────────────── */
+async function ekstreRapor(sb: SupabaseClient, arama: string, kod: string): Promise<Sonuc | null> {
+  const cl = await sayfala(sb, 'cari_hesaplar', 'id,ad,muhasebe_kodu,vergi_no,bakiye,bakiye_usd,bakiye_eur')
+  let aday: any[]
+  if (kod) aday = cl.filter((c: any) => String(c.muhasebe_kodu || '').toUpperCase().startsWith(kod.toUpperCase()))
+  else { const kel = arama.split(' ').filter(w => w.length >= 2); aday = kel.length ? cl.filter((c: any) => { const a = nrm(c.ad); return kel.every(w => a.includes(w)) }) : [] }
+  if (!aday.length) return null
+  // Aynı firmanın G / alt hesapları (036 + 036G) tek ekstrede birleşir
+  const ana = (k: string) => String(k || '').replace(/[A-Za-z]$/, '')
+  const kodlar = new Set(aday.map((c: any) => ana(c.muhasebe_kodu)))
+  if (kodlar.size > 1) return { yanit: `"${arama || kod}" için birden fazla cari buldum, hangisi?\n` + aday.slice(0, 10).map((c: any) => `• ${c.muhasebe_kodu || ''} ${c.ad}`).join('\n') + '\nKod veya daha uzun ünvanla tekrar sor (örn. "120.03.045 ekstresi").', araclar: ['rapor_ekstre'] }
+  const c = aday[0], dis = String(c.muhasebe_kodu || '').startsWith('120.03')
+  const hr = (await sayfala(sb, 'cari_eski_hareketler', 'grup,tarih,sira,evrak_no,evrak_cinsi,vade,aciklama,tl_borc,tl_alacak,usd_borc,usd_alacak,eur_borc,eur_alacak,nakil', q => q.in('cari_id', aday.map((x: any) => x.id)))).sort((a: any, b: any) => String(a.tarih).localeCompare(String(b.tarih)) || (+a.sira || 0) - (+b.sira || 0))
+  const tl = hr.filter((x: any) => !x.grup || x.grup === 'TL')
+  let run = 0, tb = 0, ta = 0
+  const sat: Hucre[][] = tl.map((x: any) => { const b = +x.tl_borc || 0, a = +x.tl_alacak || 0; run = r2(run + b - a); tb += b; ta += a; return [String(x.tarih).slice(0, 10), x.evrak_no || '', x.nakil ? 'Devir' : (x.evrak_cinsi || ''), x.vade || '', x.aciklama || '', r2(b), r2(a), run > 0 ? run : 0, run < 0 ? -run : 0] })
+  sat.push(['TOPLAM', '', '', '', '', r2(tb), r2(ta), run > 0 ? run : 0, run < 0 ? -run : 0])
+  const sut = ['Tarih', 'Evrak no', 'Evrak cinsi', 'Vade', 'Açıklama', 'Borç', 'Alacak', 'Borç bakiye', 'Alacak bakiye']
+  const guncel = r2(aday.reduce((t: number, x: any) => t + (+x.bakiye || 0), 0))
+  const sayfalar: Sayfa[] = [
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Cari', c.ad], ['Cari kodu', c.muhasebe_kodu || ''], ['Vergi no', c.vergi_no || ''], ['Toplam borç (TL)', r2(tb)], ['Toplam alacak (TL)', r2(ta)], ['Hareket sayısı', tl.length], [guncel >= 0 ? 'Bakiye (müşteri bize borçlu, TL)' : 'Bakiye (biz borçluyuz, TL)', r2(Math.abs(guncel))], ['Ekstre ile sistem bakiyesi', Math.abs(run - guncel) < 0.02 ? 'Tutuyor' : `FARK VAR (ekstre ${TL(run)} / sistem ${TL(guncel)})`]] },
+    { ad: 'Ekstre', sutunlar: sut, satirlar: sat, sari: 5 },
+  ]
+  if (!dis) for (const [g, ad, bk, ak] of [['USD', 'USD hareketleri', 'usd_borc', 'usd_alacak'], ['EUR', 'EUR hareketleri', 'eur_borc', 'eur_alacak']] as const) {
+    const d = hr.filter((x: any) => x.grup === g); if (!d.length) continue
+    let rn = 0
+    const rows: Hucre[][] = d.map((x: any) => { const b = +x[bk] || 0, a = +x[ak] || 0; rn = r2(rn + b - a); return [String(x.tarih).slice(0, 10), x.evrak_no || '', x.evrak_cinsi || '', x.aciklama || '', r2(b), r2(a), rn > 0 ? rn : 0, rn < 0 ? -rn : 0] })
+    sayfalar.push({ ad, sutunlar: ['Tarih', 'Evrak no', 'Evrak cinsi', 'Açıklama', `${g} borç`, `${g} alacak`, `${g} borç bakiye`, `${g} alacak bakiye`], satirlar: rows, sari: 4 })
+  }
+  const son = tl.slice(-12)
+  const govde = [`${c.ad} (${c.muhasebe_kodu || ''}) — CARİ EKSTRESİ (TL)`, `Toplam borç ${TL(tb)} TL · toplam alacak ${TL(ta)} TL · ${run >= 0 ? 'Borç bakiye (müşteri bize borçlu)' : 'Alacak bakiye (biz borçluyuz)'}: ${TL(Math.abs(run))} TL`, Math.abs(run - guncel) < 0.02 ? 'Ekstre toplamı sistem bakiyesiyle tutuyor.' : `DİKKAT: ekstre ${TL(run)} ile sistem bakiyesi ${TL(guncel)} farklı.`, '', 'SON HAREKETLER:', ...son.map((x: any) => `• ${String(x.tarih).slice(0, 10)} ${x.evrak_cinsi || (x.nakil ? 'Devir' : '')}${x.evrak_no ? ' ' + x.evrak_no : ''}: ${+x.tl_borc ? 'Borç ' + TL(+x.tl_borc) : 'Alacak ' + TL(+x.tl_alacak)} TL`)]
+  if (dis) govde.push('', 'Not: Dış mekan carileri TL çalışır; USD/EUR sütunu yok.')
+  return bitir(sb, `${c.ad} ekstresi`, sayfalar, govde, ['rapor_ekstre'])
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   const n = raporNiyeti(soru)
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: ['cari_ara'] }
   if (!gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -466,6 +507,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       case 'pos': return await posRapor(sb)
       case 'kdv': return await kdvRapor(sb, n.yil, n.ay)
       case 'odeme': return await odemeRapor(sb)
+      case 'ekstre': return await ekstreRapor(sb, n.arama, n.kod)
     }
   } catch (e: any) {
     console.error('[ai-rapor]', n.tur, e?.message)
