@@ -16,6 +16,7 @@ export type RaporNiyet =
   | { tur: 'ihr_rakam'; yil: number }
   | { tur: 'pos' }
   | { tur: 'kdv'; yil: number; ay: number }
+  | { tur: 'odeme' }
 type Hucre = string | number | null
 type Sonuc = { yanit: string; araclar: string[] }
 
@@ -54,6 +55,11 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
     if (/tahsil|alacak|bakiye|borc|odeme/.test(t)) return { tur: 'ihr_tahsilat' }
     if (/rakam|ne kadar|usd|dolar|euro|\btl\b|satis|ciro|toplam|donem|kac/.test(t)) return { tur: 'ihr_rakam', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bugunISO().slice(0, 4) }
     return null
+  }
+  if (/tedarikci|satici|borclarimiz|odeyecegimiz|odenecek(ler)?\b|ne kadar borcumuz|borcumuz (var|ne)/.test(t) && /borc|odeme|odenecek|liste|bakiye|ekstre/.test(t) && !/kdv|fatura|cek|senet|maas|personel/.test(t)) return { tur: 'odeme' }
+  if (/(alis|satis|gelen|giden)? ?fatura(lar)?.{0,15}(liste|excel|dokum)|fatura listesi|(alis|satis) fatura/.test(t) && !/stok|kalem/.test(t)) {
+    const AY0 = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik'], i0 = AY0.findIndex(a => t.includes(a)), b0 = bugunISO()
+    return { tur: 'kdv', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +b0.slice(0, 4), ay: i0 >= 0 ? i0 + 1 : +b0.slice(5, 7) }
   }
   if (/yuklen|indirilecek kdv|kdv (listesi|detay|dokum|raporu)|kdv.{0,12}liste|liste.{0,12}kdv/.test(t) && !/hesaplanan kdv (orani|nedir)/.test(t)) {
     const AY = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik']
@@ -421,10 +427,32 @@ async function kdvRapor(sb: SupabaseClient, yil: number, ay: number): Promise<So
   return bitir(sb, `${ayAd} ${yil} KDV listesi`, sayfalar, govde, ['rapor_kdv'])
 }
 
+/* ─────────────── Tedarikçi borçları (ödenecekler) ─────────────── */
+async function odemeRapor(sb: SupabaseClient): Promise<Sonuc> {
+  const cl = (await sayfala(sb, 'cari_hesaplar', 'id,ad,muhasebe_kodu,tip,bakiye,bakiye_usd,bakiye_eur')).filter((c: any) => c.tip === 'tedarikci' || String(c.muhasebe_kodu || '').startsWith('320'))
+  const ids = new Set(cl.map((c: any) => c.id)), top: Record<string, { b: number; a: number }> = {}
+  for (const h of await sayfala(sb, 'cari_eski_hareketler', 'cari_id,grup,tl_borc,tl_alacak', q => q.eq('grup', 'TL'))) if (ids.has(h.cari_id)) { const k = top[h.cari_id] = top[h.cari_id] || { b: 0, a: 0 }; k.b += +h.tl_borc || 0; k.a += +h.tl_alacak || 0 }
+  const borclu = cl.filter((c: any) => (+c.bakiye || 0) < -0.5).sort((a: any, b: any) => (+a.bakiye) - (+b.bakiye))
+  const alacakli = cl.filter((c: any) => (+c.bakiye || 0) > 0.5).sort((a: any, b: any) => (+b.bakiye) - (+a.bakiye))
+  const satir = (c: any): Hucre[] => { const b = +c.bakiye || 0, h = top[c.id] || { b: 0, a: 0 }; return [c.muhasebe_kodu || '', c.ad, r2(Math.abs(b)), r2(h.b), r2(h.a), b > 0 ? r2(b) : 0, b < 0 ? r2(-b) : 0] }
+  const tab = (l: any[]): Hucre[][] => { const r = l.map(satir); if (r.length) r.push(topSat(r, [2, 3, 4, 5, 6], [1, 'TOPLAM'])); return r }
+  const sut = ['Cari kodu', 'Unvan', 'Ödenecek TL', 'Borç', 'Alacak', 'Borç bakiye', 'Alacak bakiye']
+  const dv = cl.filter((c: any) => Math.abs(+c.bakiye_usd || 0) > 0.5 || Math.abs(+c.bakiye_eur || 0) > 0.5)
+  const toplam = r2(borclu.reduce((t: number, c: any) => t - (+c.bakiye || 0), 0))
+  const sayfalar: Sayfa[] = [
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Şirketin borçlu olduğu tedarikçi sayısı', borclu.length], ['Toplam ödenecek (TL)', toplam], ['Tedarikçiden alacağımız olan sayısı', alacakli.length], ['Tedarikçilerden alacağımız toplam (TL)', r2(alacakli.reduce((t: number, c: any) => t + (+c.bakiye || 0), 0))], ['Döviz bakiyeli tedarikçi sayısı', dv.length], ['Rapor tarihi', bugunISO()]] },
+    { ad: 'Ödenecekler', sutunlar: sut, satirlar: tab(borclu), sari: 3 },
+    { ad: 'Bizim Alacağımız', sutunlar: sut, satirlar: tab(alacakli), sari: 3 },
+  ]
+  if (dv.length) sayfalar.push({ ad: 'Döviz Bakiyeler', sutunlar: ['Cari kodu', 'Unvan', 'USD bakiye', 'EUR bakiye'], satirlar: dv.map((c: any) => [c.muhasebe_kodu || '', c.ad, r2(+c.bakiye_usd || 0), r2(+c.bakiye_eur || 0)]) })
+  const govde = [`TEDARİKÇİ BORÇLARI (ödenecekler) — ${borclu.length} tedarikçi, toplam ${TL(toplam)} TL`, '', ...borclu.slice(0, 12).map((c: any, i: number) => `${i + 1}. ${c.ad} — ${TL(-(+c.bakiye))} TL`), borclu.length > 12 ? `… ve ${borclu.length - 12} tedarikçi daha (tamamı Excel'de)` : '', alacakli.length ? `Ayrıca ${alacakli.length} tedarikçide bizim alacağımız var (Excel'de ayrı sayfa).` : '', 'Not: Bakiye < 0 = şirket tedarikçiye borçlu. USD/EUR TL ile toplanmaz.'].filter((x, i, a) => x !== '' || a[i - 1] !== '')
+  return bitir(sb, 'Tedarikçi borçları (ödenecekler)', sayfalar, govde, ['rapor_odeme'])
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   const n = raporNiyeti(soru)
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'] }
   if (!gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -437,6 +465,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       case 'ihr_rakam': return await ihracatRakam(sb, n.yil)
       case 'pos': return await posRapor(sb)
       case 'kdv': return await kdvRapor(sb, n.yil, n.ay)
+      case 'odeme': return await odemeRapor(sb)
     }
   } catch (e: any) {
     console.error('[ai-rapor]', n.tur, e?.message)
