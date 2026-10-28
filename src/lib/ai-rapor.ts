@@ -45,6 +45,13 @@ const RENK_SON = /\s+(ANTRASİT|ANTARASİT|ANTASİT|ANTRASIT|BEYAZ|BEJ|GRİ|GRI|
 const renksiz = (ad: string) => String(ad || '').replace(/\s+/g, ' ').trim().replace(RENK_SON, '')
 const renkAdi = (ad: string) => { const m = RENK_SON.exec(String(ad || '').trim()); return m ? m[1].toLocaleUpperCase('tr') : '' }
 
+/** Soru kelimeleri arasından cari ünvanında gerçekten geçenlerle (kelime başı) eşleştirir; "ekstresini", "excel" gibi fazlalıklar elenir. */
+function cariEsle(cl: any[], kel: string[]): any[] {
+  const ad = (c: any) => nrm(c.ad).split(' ')
+  const gecen = kel.filter(w => w.length >= 3 && cl.some((c: any) => ad(c).some(x => x.startsWith(w))))
+  if (!gecen.length) return []
+  return cl.filter((c: any) => gecen.every(w => ad(c).some(x => x.startsWith(w))))
+}
 /** Soru bu sabit raporlardan birine uyuyor mu? Emin değilse null (yapay zekaya bırakılır). */
 export function raporNiyeti(soru: string): RaporNiyet | null {
   const t = nrm(soru)
@@ -61,7 +68,7 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
   if (/tedarikci|satici|borclarimiz|odeyecegimiz|odenecek(ler)?\b|ne kadar borcumuz|borcumuz (var|ne)/.test(t) && /borc|odeme|odenecek|liste|bakiye|ekstre/.test(t) && !/kdv|fatura|cek|senet|maas|personel/.test(t)) return { tur: 'odeme' }
   if (/ekstre|hesap (dokum|hareket|ozet)|hareketleri|carisi|cari hesabi|\bcari\b.{0,12}\b(excel|dokum|detay|hareket)|\b(excel|dokum)\b.{0,12}\bcari\b/.test(t) && !/banka|kasa|\bk ?karti|kredi kart|\bpos\b|tahsilat|stok|kdv/.test(t)) {
     const kod = /\b(120|320)\.\d{2}\.\d{3}[a-z]?\b/.exec(String(soru))?.[0] || ''
-    const arama = t.replace(/\b(120|320) \d{2} \d{3}[a-z]?\b/g, ' ').replace(/\b(ekstre(si)?|ekstreyi|cari(si|nin|yi)?|hesap(i|in)?|dokumu|dokum|hareket(leri|lerini)?|ozet(i)?|excel|ver|al|cikar|goster|lazim|listesi|liste|detayli|detay|tum|icin|ile|ve|bir|bana|olarak|dis mekan|ic mekan|tl|nin|nın)\b/g, ' ').replace(/\s+/g, ' ').trim()
+    const arama = t.replace(/\b(120|320) \d{2} \d{3}[a-z]?\b/g, ' ').replace(/\b(ekstre\w*|cari\w*|hesab\w*|hesap\w*|dokum\w*|excel\w*|hareket(leri|lerini)?|ozet(i)?|excel|ver|al|cikar|goster|lazim|listesi|liste|detayli|detay|tum|icin|ile|ve|bir|bana|olarak|dis mekan|ic mekan|tl|nin|nın)\b/g, ' ').replace(/\s+/g, ' ').trim()
     if (kod || arama.length >= 2) return { tur: 'ekstre', arama, kod }
   }
   if (/(alis|satis|gelen|giden)? ?fatura(lar)?.{0,15}(liste|excel|dokum)|fatura listesi|(alis|satis) fatura/.test(t) && !/stok|kalem/.test(t)) {
@@ -466,7 +473,7 @@ async function ekstreRapor(sb: SupabaseClient, arama: string, kod: string): Prom
   const cl = await sayfala(sb, 'cari_hesaplar', 'id,ad,muhasebe_kodu,vergi_no,bakiye,bakiye_usd,bakiye_eur')
   let aday: any[]
   if (kod) aday = cl.filter((c: any) => String(c.muhasebe_kodu || '').toUpperCase().startsWith(kod.toUpperCase()))
-  else { const kel = arama.split(' ').filter(w => w.length >= 2); aday = kel.length ? cl.filter((c: any) => { const a = nrm(c.ad); return kel.every(w => a.includes(w)) }) : [] }
+  else { const kel = arama.split(' ').filter(w => w.length >= 2); aday = kel.length ? cariEsle(cl, kel) : [] }
   if (!aday.length) return null
   // Aynı firmanın G / alt hesapları (036 + 036G) tek ekstrede birleşir
   const ana = (k: string) => String(k || '').replace(/[A-Za-z]$/, '')
@@ -505,7 +512,7 @@ async function fiyatRapor(sb: SupabaseClient, kod: string, arama: string): Promi
   let cariler: any[] = []
   const allCl = await sayfala(sb, 'cari_hesaplar', 'id,ad,muhasebe_kodu')
   if (kel.length) {
-    cariler = allCl.filter((c: any) => { const a = nrm(c.ad); return kel.every(w => a.includes(w)) })
+    cariler = cariEsle(allCl, kel)
     if (!cariler.length) return { yanit: `"${arama}" adında bir cari bulamadım. Firma adını başka yazıp tekrar sor (örn. "okko" ya da cari kodu).`, araclar: ['rapor_fiyat'] }
   }
   const kal = (await sayfala(sb, 'fatura_kalemleri', 'fatura_id,urun_adi,miktar,birim_fiyat,kdv_orani,toplam', q => q.ilike('urun_adi', `%${num}%`))).filter((k: any) => {
