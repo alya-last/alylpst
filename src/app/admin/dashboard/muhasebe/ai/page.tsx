@@ -52,6 +52,7 @@ const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
   { baslik: 'K. kartı', sorular: ['k.kartı tahsilatlarım'] },
   { baslik: 'KDV ve fatura', sorular: ['eylül ayı yüklenilen (indirilecek) KDV listesi', 'ekim ayı KDV listesi', 'eylül ayı alış faturaları listesi excel'] },
   { baslik: 'Cari ekstre', sorular: ['VTK cari excel ver', 'VTK ekstresi', '120.03.016 Yanko ekstresi excel'] },
+  { baslik: 'Ürün fiyatı', sorular: ['okko firmasına ALY-411 saksı birim fiyat kaçtan satmışım'] },
   { baslik: 'Tedarikçi', sorular: ['tedarikçilere ne kadar borcumuz var liste excel'] },
 ]
 const BELGE_ISTEKLERI = [
