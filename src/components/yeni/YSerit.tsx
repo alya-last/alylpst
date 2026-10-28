@@ -41,23 +41,16 @@ export default function YSerit({ kategoriler, products, dil = "tr" }: { kategori
   const liste = aktifSec ? urunler.filter(p => p.category === aktifSec) : urunler;
 
   return (
-    <section id="collection" className="bg-[#f5f5f2]" style={{ paddingBlock: "clamp(56px,7vw,100px)" }}>
+    <section id="collection" className="bg-[#f5f5f2]" style={{ paddingBlock: "clamp(32px,4vw,56px)" }}>
       <div className="yt-wrap">
-        <div className="flex flex-wrap items-end justify-between gap-3 mb-10">
-          <div>
-            <p className="text-[13px] tracking-[0.2em] text-black/45 mb-3">{t.etiket}</p>
-            <h2 className="font-semibold tracking-[-0.02em]" style={{ fontSize: "clamp(32px,4.4vw,56px)" }}>{t.baslik}</h2>
-          </div>
-          <Link href={kurumsalYolu(dil, "urunler")} className="font-semibold border-b-2 border-black pb-0.5 hover:text-[var(--yt-accent)] hover:border-[var(--yt-accent)]">{Y[dil].yeni.tum}</Link>
-        </div>
-
-        <div className="flex gap-3 mb-8" role="tablist">
+        <div className="flex flex-wrap items-center gap-3 mb-6" role="tablist">
           {([["dis", u.dis, adetDis], ["ic", u.ic, adetIc]] as const).map(([m, e, n]) => (
             <button key={m} type="button" role="tab" aria-selected={mekan === m} onClick={() => secMekan(m)}
               className={`rounded-full px-6 py-3 text-[16px] font-semibold transition-colors ${mekan === m ? "bg-black text-white" : "bg-white text-black/70 border border-black/15 hover:border-black/40"}`}>
               {e} <span className={mekan === m ? "text-white/60 font-normal" : "text-black/35 font-normal"}>({n})</span>
             </button>
           ))}
+          <Link href={kurumsalYolu(dil, "urunler")} className="ml-auto text-[15px] font-semibold border-b-2 border-black pb-0.5 hover:text-[var(--yt-accent)] hover:border-[var(--yt-accent)]">{Y[dil].yeni.tum}</Link>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-5">
