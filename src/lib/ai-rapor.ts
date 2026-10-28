@@ -18,6 +18,7 @@ export type RaporNiyet =
   | { tur: 'kdv'; yil: number; ay: number }
   | { tur: 'odeme' }
   | { tur: 'ekstre'; arama: string; kod: string }
+  | { tur: 'fiyat'; kod: string; arama: string }
 type Hucre = string | number | null
 type Sonuc = { yanit: string; araclar: string[] }
 
@@ -74,6 +75,11 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
     return { tur: 'kdv', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: ayI >= 0 ? ayI + 1 : +bg.slice(5, 7) }
   }
   if (/\bk ?karti|kredi kart|\bpos\b/.test(t) && /tahsilat|liste|yat|bekle|ne kadar|rakam|excel/.test(t)) return { tur: 'pos' }
+  const kodlar0 = kodlariBul(soru)
+  if (kodlar0.length === 1 && /fiyat|kactan|kaca |kac tl|birim f|brim f|\bbirim\b|\bbrim\b/.test(t) && !/stok|recete|maliyet|alis fiyat/.test(t)) {
+    const arama = t.split(' ').filter(w => w.length >= 3 && !/^a[yl]{2,3}g?-?\d/.test(w) && !/^\d+[a-z]{0,2}$/.test(w) && !/^(aly|alyg|aylg|saksi|saksisi|brim|birim|fiyati|fiyat|fiyatlari|kactan|kaca|kac|satmisim|satmisiz|satmistik|sattim|sattik|satildi|satis|firma|firmasina|firmasi|firmaya|firmanin|musteri|musteriye|musterisine|musterinin|cari|carisine|ne|kadar|ver|excel|liste|listesi|icin|ile|ve|bir|bana|olarak|tl|kdv|hangi|son|ilk|nekadar|bakalim|diyecek|soyle|goster|nin|nun)$/.test(w)).join(' ')
+    return { tur: 'fiyat', kod: kodlar0[0], arama }
+  }
   const kodlar = kodlariBul(soru)
   if (kodlar.length && /sat|adet|ne kadar|rakam|kac|ciro/.test(t) && !/stok|recete|maliyet/.test(t)) return { tur: 'urun', kodlar }
   if (/hammadde/.test(t)) return /stok|stog|depo|kalan/.test(t) ? null : { tur: 'hammadde', mekan }
@@ -491,10 +497,52 @@ async function ekstreRapor(sb: SupabaseClient, arama: string, kod: string): Prom
   return bitir(sb, `${c.ad} ekstresi`, sayfalar, govde, ['rapor_ekstre'])
 }
 
+/* ─────────────── Ürün birim satış fiyatı: hangi faturada, hangi firmaya, kaçtan satılmış ─────────────── */
+async function fiyatRapor(sb: SupabaseClient, kod: string, arama: string): Promise<Sonuc | null> {
+  const num = (/\d+/.exec(kod) || [''])[0]
+  if (!num) return null
+  const kel = arama.split(' ').filter(w => w.length >= 2)
+  let cariler: any[] = []
+  const allCl = await sayfala(sb, 'cari_hesaplar', 'id,ad,muhasebe_kodu')
+  if (kel.length) {
+    cariler = allCl.filter((c: any) => { const a = nrm(c.ad); return kel.every(w => a.includes(w)) })
+    if (!cariler.length) return { yanit: `"${arama}" adında bir cari bulamadım. Firma adını başka yazıp tekrar sor (örn. "okko" ya da cari kodu).`, araclar: ['rapor_fiyat'] }
+  }
+  const kal = (await sayfala(sb, 'fatura_kalemleri', 'fatura_id,urun_adi,miktar,birim_fiyat,kdv_orani,toplam', q => q.ilike('urun_adi', `%${num}%`))).filter((k: any) => {
+    const m = /(ALYG?)\s*-?\s*(\d+[A-Z]{0,2})/.exec(String(k.urun_adi || '').toUpperCase().replace(/İ/g, 'I'))
+    return !!m && kodEslesir(`${m[1]}-${m[2]}`, kod)
+  })
+  if (!kal.length) return { yanit: `${kod} kodlu ürün hiçbir faturada geçmiyor.`, araclar: ['rapor_fiyat'] }
+  const ids = [...new Set(kal.map((k: any) => k.fatura_id))]
+  const fat: any[] = []
+  for (let i = 0; i < ids.length; i += 150) fat.push(...await sayfala(sb, 'faturalar', 'id,no,tip,tarih,durum,cari_id,para_birimi,kdv_dahil', q => q.in('id', ids.slice(i, i + 150))))
+  const fm = new Map(fat.map((f: any) => [f.id, f]))
+  const cid = new Set(cariler.map((c: any) => c.id))
+  const cm = new Map(allCl.map((c: any) => [c.id, c]))
+  const satir = kal.map((k: any) => ({ k, f: fm.get(k.fatura_id) })).filter(x => x.f && x.f.tip === 'satis' && x.f.durum !== 'iptal' && x.f.durum !== 'taslak' && (!cid.size || cid.has(x.f.cari_id)))
+    .sort((a, b) => String(a.f.tarih).localeCompare(String(b.f.tarih)))
+  if (!satir.length) return { yanit: `${kod} ürünü${cariler.length ? ' ' + cariler[0].ad + ' için' : ''} satış faturasında bulunamadı.`, araclar: ['rapor_fiyat'] }
+  const rows: Hucre[][] = satir.map(({ k, f }) => { const c: any = cm.get(f.cari_id); return [String(f.tarih).slice(0, 10), f.no || '', c?.ad || '', k.urun_adi || '', +k.miktar || 0, +k.birim_fiyat || 0, f.para_birimi || 'TRY', f.kdv_dahil ? 'KDV dahil' : 'KDV hariç', +k.kdv_orani || 0, r2(+k.toplam || (+k.miktar || 0) * (+k.birim_fiyat || 0))] })
+  const toplamAdet = r2(satir.reduce((t, x) => t + (+x.k.miktar || 0), 0))
+  const fiyatlar = [...new Set(satir.map(x => `${r2(+x.k.birim_fiyat || 0)}|${x.f.para_birimi || 'TRY'}`))]
+  const pb = (x: string) => { const [f, b] = x.split('|'); return `${TL(+f)} ${b === 'TRY' ? 'TL' : b}` }
+  const son = satir[satir.length - 1], ilk = satir[0]
+  rows.push(['TOPLAM', '', '', '', toplamAdet, '', '', '', '', r2(rows.reduce((t, r) => t + (+(r[9] as number) || 0), 0))])
+  const mus = new Map<string, { adet: number; tutar: number; fiyat: Set<string> }>()
+  for (const { k, f } of satir) { const ad = (cm.get(f.cari_id) as any)?.ad || '?'; const m = mus.get(ad) || { adet: 0, tutar: 0, fiyat: new Set<string>() }; m.adet += +k.miktar || 0; m.tutar += (+k.miktar || 0) * (+k.birim_fiyat || 0); m.fiyat.add(String(r2(+k.birim_fiyat || 0))); mus.set(ad, m) }
+  const musRows: Hucre[][] = [...mus.entries()].sort((a, b) => b[1].adet - a[1].adet).map(([ad, m]) => [ad, r2(m.adet), m.adet ? r2(m.tutar / m.adet) : 0, [...m.fiyat].join(' / ')])
+  const ad = String(satir[0].k.urun_adi || kod)
+  const govde = [`${ad} — birim satış fiyatı${cariler.length ? ' · ' + cariler[0].ad : ''}`, `${satir.length} faturada toplam ${TL(toplamAdet)} adet satılmış.`, fiyatlar.length === 1 ? `Hep aynı fiyattan: ${pb(fiyatlar[0])} (${ilk.f.kdv_dahil ? 'KDV dahil' : 'KDV hariç'}).` : `Fiyatlar: ${fiyatlar.map(pb).join(', ')}. Son fiyat ${pb(`${r2(+son.k.birim_fiyat || 0)}|${son.f.para_birimi || 'TRY'}`)}.`, '', ...satir.slice(-12).map(({ k, f }) => `• ${String(f.tarih).slice(0, 10)} ${f.no}: ${TL(+k.miktar || 0)} adet × ${TL(+k.birim_fiyat || 0)} ${f.para_birimi === 'TRY' || !f.para_birimi ? 'TL' : f.para_birimi}`)]
+  return bitir(sb, `${kod} birim fiyat${cariler.length ? ' ' + cariler[0].ad : ''}`, [
+    { ad: 'Fatura satırları', sutunlar: ['Tarih', 'Fatura no', 'Cari', 'Ürün', 'Adet', 'Birim fiyat', 'Para birimi', 'KDV', 'KDV oranı %', 'Satır tutarı'], satirlar: rows },
+    { ad: 'Müşteriye göre', sutunlar: ['Cari', 'Adet', 'Ortalama birim fiyat', 'Fiyat(lar)'], satirlar: musRows },
+  ], govde, ['rapor_fiyat'])
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   const n = raporNiyeti(soru)
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -509,6 +557,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       case 'kdv': return await kdvRapor(sb, n.yil, n.ay)
       case 'odeme': return await odemeRapor(sb)
       case 'ekstre': return await ekstreRapor(sb, n.arama, n.kod)
+      case 'fiyat': return await fiyatRapor(sb, n.kod, n.arama)
     }
   } catch (e: any) {
     console.error('[ai-rapor]', n.tur, e?.message)
