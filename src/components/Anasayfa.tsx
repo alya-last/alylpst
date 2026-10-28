@@ -8,6 +8,7 @@ import SchemaOrg        from "@/components/layout/SchemaOrg";
 import WhatsAppFab      from "@/components/ui/WhatsAppFab";
 import YHeader from "@/components/yeni/YHeader";
 import YHero from "@/components/yeni/YHero";
+import YRakam from "@/components/yeni/YRakam";
 import YUrunler from "@/components/yeni/YUrunler";
 import YKoleksiyon from "@/components/yeni/YKoleksiyon";
 import YUretim from "@/components/yeni/YUretim";
@@ -59,6 +60,7 @@ export default async function Anasayfa({ dil }: { dil: Dil }) {
       <YHeader settings={settings} dil={dil} urunler={gorunenler} />
       <main>
         <YHero dil={dil} gorseller={slaytGorsel} />
+        <YRakam dil={dil} stats={stats} settings={settings} />
         <YUrunler products={vitrin} dil={dil} />
         <YKoleksiyon dil={dil} icGorsel={ilk("ic")} disGorsel={ilk("dis")} />
         <YUretim dil={dil} stats={stats} settings={settings} gorsel={img.hero2} />
