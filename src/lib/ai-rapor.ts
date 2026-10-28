@@ -4,6 +4,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { excelKaydet, type Sayfa } from '@/lib/ai-excel'
 import { araciCalistir, hamCalistir, bugunISO } from '@/lib/ai-admin'
+import { aiJson, veriBlok } from '@/lib/ai'
 
 type Mekan = 'ic' | 'dis' | 'hepsi'
 export type RaporNiyet =
@@ -554,8 +555,43 @@ export async function ekstreYaniti(sb: SupabaseClient, arama: string): Promise<S
   try { return await ekstreRapor(sb, a, kod) } catch (e: any) { console.error('[ai-rapor] ekstreYaniti', e?.message); return null }
 }
 
+/** Sabit kalıplar (regex) soruyu tanımazsa: yapay zeka yalnızca "hangi hazır rapor?" diye sınıflandırır; rakamı/dosyayı yine sabit rapor üretir. */
+async function niyetSinifla(soru: string): Promise<RaporNiyet | null> {
+  const t = nrm(soru)
+  if (!/excel|liste|rapor|ekstre|extre|fiyat|sat(mis|tim|ti|is)|tahsilat|alacak|bakiye|stok|kdv|ihracat|borc|k ?karti|\bpos\b|cari|hesap|dokum/.test(t) || t.split(' ').length > 40) return null
+  const schema = { type: 'object', additionalProperties: false, required: ['tur', 'mekan', 'firma', 'urun_kodu', 'yil', 'ay'], properties: {
+    tur: { type: 'string', enum: ['tahsilat', 'stok', 'satis', 'urun_satis', 'hammadde', 'ihracat_tahsilat', 'ihracat_rakam', 'kredi_karti', 'kdv', 'tedarikci_borc', 'cari_ekstre', 'urun_fiyat', 'yok'] },
+    mekan: { type: 'string', enum: ['ic', 'dis', 'hepsi'] }, firma: { type: 'string' }, urun_kodu: { type: 'string' }, yil: { type: 'integer' }, ay: { type: 'integer' } } }
+  const r = await aiJson<{ tur: string; mekan: Mekan; firma: string; urun_kodu: string; yil: number; ay: number }>([
+    { role: 'system', content: `Sınıflandırıcısın. Kullanıcının sorusu şu hazır raporlardan birine uyuyorsa tur olarak onu seç, uymuyorsa "yok":
+tahsilat = iç/dış mekan müşterilerinden tahsil edilecek (bakiyesi olan) cari listesi; stok = ürün/mamul stok listesi; satis = iç/dış mekan satış listesi (adet, tutar); urun_satis = tek ürün kodunun (ALY-xxx) toplam satışı;
+hammadde = satışa göre hammadde kullanımı; ihracat_tahsilat = ihracat müşterilerinden alacak; ihracat_rakam = ihracat satış rakamı; kredi_karti = k.kartı/POS tahsilatları; kdv = aylık KDV/yüklenilen KDV/fatura listesi;
+tedarikci_borc = tedarikçilere borçlarımız; cari_ekstre = TEK firmanın cari ekstresi/hesap dökümü/cari excel'i (firma alanına firma adını yaz); urun_fiyat = bir ürün kodunu (ALY-xxx) bir firmaya KAÇ TL birim fiyatla sattık (urun_kodu ve firma yaz).
+Emin değilsen "yok". Alanlar bilinmiyorsa mekan="hepsi", metinler "", sayılar 0. Yazım hatalarını (extre=ekstre, brim=birim) tolere et. Bugün ${bugunISO()}.` },
+    { role: 'user', content: veriBlok('soru', soru) }], 'rapor_niyeti', schema, { maxTokens: 150, timeoutMs: 12000 })
+  const mk = r.mekan === 'ic' || r.mekan === 'dis' ? r.mekan : 'hepsi'
+  const firma = nrm(r.firma || '').replace(/\b(firmasi\w*|musteri\w*|cari\w*)\b/g, ' ').replace(/\s+/g, ' ').trim()
+  const kod = kodlariBul(r.urun_kodu || soru)
+  switch (r.tur) {
+    case 'tahsilat': return { tur: 'tahsilat', mekan: mk }
+    case 'stok': return mk === 'hepsi' ? null : { tur: 'stok', mekan: mk }
+    case 'satis': return mk === 'hepsi' ? null : { tur: 'satis', mekan: mk }
+    case 'urun_satis': return kod.length ? { tur: 'urun', kodlar: kod } : null
+    case 'hammadde': return { tur: 'hammadde', mekan: mk }
+    case 'ihracat_tahsilat': return { tur: 'ihr_tahsilat' }
+    case 'ihracat_rakam': return { tur: 'ihr_rakam', yil: r.yil > 2000 ? r.yil : +bugunISO().slice(0, 4) }
+    case 'kredi_karti': return { tur: 'pos' }
+    case 'kdv': return { tur: 'kdv', yil: r.yil > 2000 ? r.yil : +bugunISO().slice(0, 4), ay: r.ay >= 1 && r.ay <= 12 ? r.ay : +bugunISO().slice(5, 7) }
+    case 'tedarikci_borc': return { tur: 'odeme' }
+    case 'cari_ekstre': return firma.length >= 2 ? { tur: 'ekstre', arama: firma, kod: /\b(120|320)\.\d{2}\.\d{3}[a-z]?\b/.exec(soru)?.[0] || '' } : null
+    case 'urun_fiyat': return kod.length ? { tur: 'fiyat', kod: kod[0], arama: firma } : null
+    default: return null
+  }
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
-  const n = raporNiyeti(soru)
+  let n = raporNiyeti(soru)
+  if (!n) { try { n = await niyetSinifla(soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
   if (!n) return null
   const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
