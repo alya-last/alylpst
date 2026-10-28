@@ -457,6 +457,12 @@ export async function araciCalistir(sb: SupabaseClient, ad: string, a: Record<st
           const yillik = /y[ıi]ll[ıi]k|son\s*(1|bir|12|on\s*iki)\s*(y[ıi]l|ay)|12\s*ay/i.test(ma) ? '&donem=son12' : ''
           return kisalt({ excel_yolu: `/api/admin/satis-excel?mekan=${mekan}${yillik}`, not: 'Dosya hazır (yıllık satış dosyasıyla aynı düzende). excel_yolu değerini cevapta aynen yaz, ne içerdiğini 1-2 cümleyle söyle.' })
         }
+        if (a.arac === 'cari_ekstre') {
+          // Tek carinin ekstresi: ham döküm yerine onaylı düzen (Borç/Alacak/Borç bakiye/Alacak bakiye, dış mekanda yalnızca TL, güncel bakiyeyle tutan)
+          const ar = String((a.arac_args as any)?.arama || a.baslik || '')
+          const r = await (await import('@/lib/ai-rapor')).ekstreYaniti(sb, ar)
+          if (r) return kisalt({ hazir_cevap: r.yanit, not: 'hazir_cevap metnini AYNEN (bağlantı dahil) kullanıcıya ilet; rakam veya bağlantı ekleme/değiştirme.' })
+        }
         const { excelKaydet, jsonTablolar } = await import('@/lib/ai-excel')
         let sayfalar: any[] = Array.isArray(a.sayfalar) ? a.sayfalar : []
         if (a.arac) {
