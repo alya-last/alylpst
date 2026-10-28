@@ -546,6 +546,14 @@ async function fiyatRapor(sb: SupabaseClient, kod: string, arama: string): Promi
   ], govde, ['rapor_fiyat'])
 }
 
+/** Yapay zeka "excel_olustur(arac: cari_ekstre)" dediğinde ham döküm yerine onaylı ekstre Excel'i üretilsin. */
+export async function ekstreYaniti(sb: SupabaseClient, arama: string): Promise<Sonuc | null> {
+  const kod = /\b(120|320)\.\d{2}\.\d{3}[a-z]?\b/.exec(String(arama))?.[0] || ''
+  const a = nrm(arama).replace(/\b(ekstre\w*|extre\w*|cari\w*|hesap\w*|excel\w*|ver|liste\w*)\b/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!kod && a.length < 2) return null
+  try { return await ekstreRapor(sb, a, kod) } catch (e: any) { console.error('[ai-rapor] ekstreYaniti', e?.message); return null }
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   const n = raporNiyeti(soru)
   if (!n) return null
