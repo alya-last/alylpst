@@ -138,7 +138,13 @@ export default function TekliflerPage() {
   function cariSec(id: string) {
     const c = cari[id]; setF({ cari_id: id, ...(c ? { musteri_adi: c.ad, musteri_email: c.email || '', musteri_tel: c.telefon || '' } : {}) })
   }
-  function dilDegis(dil: Dil) { if (!ed) return; setF({ dil, ...(ed.f.kosullar.trim() === '' || ed.f.kosullar === KOSUL[ed.f.dil] ? { kosullar: KOSUL[dil] } : {}) }) }
+  // İngilizce teklif = yurt dışı müşteri: USD ve KDV %0 (ihracat) önerilir; Türkçeye dönülürse (elle değiştirilmediyse) TL ve %20'ye geri döner. Hepsi sonradan düzenlenebilir.
+  function dilDegis(dil: Dil) {
+    if (!ed) return
+    const f = ed.f, kos = f.kosullar.trim() === '' || f.kosullar === KOSUL[f.dil] ? { kosullar: KOSUL[dil] } : {}
+    const para = dil === 'en' && f.para_birimi === 'TRY' ? { para_birimi: 'USD', kur: '', kdv_orani: 0 } : dil === 'tr' && f.para_birimi === 'USD' ? { para_birimi: 'TRY', kur: tcmbUsd, kdv_orani: 20 } : {}
+    setF({ dil, ...para, ...kos })
+  }
 
   async function kaydet() {
     if (!ed || busy || kilitli) return
