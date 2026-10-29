@@ -164,7 +164,7 @@ async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   if (urunSat.length) urunSat.push(['', '', 'TOPLAM', '', null, toplam, null])
   const sayfalar: Sayfa[] = [
     { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', mekan === 'hepsi' ? 'İç + dış mekan' : mekanAd(mekan)], ['Ürün sayısı', sirali.length], ['Stoklu ürün sayısı', stoklu.length], ['Stoksuz (0) ürün sayısı', sirali.length - stoklu.length - eksi.length], ['Eksi stoklu ürün sayısı', eksi.length], ['Toplam mamul stok (adet)', toplam], ['Rapor tarihi', bugunISO()]] },
-    { ad: 'Ürün Stok', sutunlar: ['Sıra', 'Ürün Kodu', 'Ürün', 'Mekan', 'Varyant (stoklu)', 'Toplam Adet', 'Pay %'], satirlar: urunSat },
+    { ad: 'Ürün Stok', sutunlar: ['Sıra', 'Ürün Kodu', 'Ürün', 'Mekan', 'Varyant sayısı', 'Toplam Adet', 'Pay %'], satirlar: urunSat },
     { ad: 'Renk Ebat Detay', sutunlar: ['Ürün Kodu', 'Ürün', 'Mekan', 'Renk / Ebat', 'Adet'], satirlar: varSat },
   ]
   const govde = [`${mekan === 'hepsi' ? 'İÇ + DIŞ MEKAN' : mekanAd(mekan).toUpperCase()} MAMUL STOK (${bugunISO()}) — toplam ${AD(toplam)} adet, ${stoklu.length} üründe stok var (${sirali.length} üründen)`, '']
