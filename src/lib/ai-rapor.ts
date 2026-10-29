@@ -12,6 +12,7 @@ export type RaporNiyet =
   | { tur: 'stok'; mekan: Mekan }
   | { tur: 'satis'; mekan: Mekan }
   | { tur: 'urun'; kodlar: string[] }
+  | { tur: 'urun_ad'; arama: string } // ürün KODU yok, ürün ADI var ("line saksı satışlarım"): satış dosyasındaki adlardan kodlar bulunup 'urun' raporu verilir
   | { tur: 'hammadde'; mekan: Mekan }
   | { tur: 'ihr_tahsilat' }
   | { tur: 'ihr_rakam'; yil: number }
@@ -94,7 +95,24 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
   if (/tahsilat|alacak listesi|alacaklar[iı]m|bakiyesi olan|kimden ne tahsil/.test(t) && !/\bcek\b|\bsenet\b/.test(t)) return { tur: 'tahsilat', mekan }
   if (/\b(stok|stoku|stogu|depo)\b/.test(t) && mekanVar && !/hammadde|boya|koli|ambalaj|kritik|minimum/.test(t)) return { tur: 'stok', mekan }
   if (/sat(mis|tim|ti|is|ilan|tik)|satis|ciro/.test(t) && mekanVar) return { tur: 'satis', mekan }
+  // Ürün ADI ile satış/müşteri sorusu (kod yok): "line saksı satışlarımı müşteri detaylı excel ver"
+  if (!kodlar.length && /sat(mis|tim|ti|is|ilan|tik)|satis|adet|ne kadar|ciro|musteri/.test(t) && !/stok|stog|recete|maliyet|hammadde|fiyat|tahsilat|bakiye|borc|kdv|fatura/.test(t) && /saksi|sepet|sandik|casa|selesi|kova|firca|deterjanlik|banyo seti|camasir|set\b|\b(line|polo|cornet|efes|venus|tripot|ufo|kozalak|somon|kale|ordek|kordon|guvec|ahsap|dantel|orgu|kapakli|kaktus|3d|cesme|kemer|milas|datca|kosk|arajman|gondol|armut|vitrin|turuva|cit|lotte)\b/.test(t)) return { tur: 'urun_ad', arama: t }
   return null
+}
+
+const URUN_AD_DURAK = /^(satis\w*|sat\w*|musteri\w*|detay\w*|excel\w*|ver\w*|bana|ne|kadar|kac|adet\w*|ciro\w*|liste\w*|tum\w*|icin|ile|ve|bir|olarak|tl|hangi|goster\w*|cikar\w*|lazim|isterim|ister\w*|rapor\w*|dokum\w*|toplam\w*|aylik|yillik|bu|yil|ekim|2026|nin|nun|ait)$/
+/** Satış dosyasındaki ürün adlarından, soruda geçen ürün adına uyan ana kodları bulur ("line saksı" → ALY-421…424). Emin değilse boş döner. */
+async function urunAdindanKodlar(sb: SupabaseClient, arama: string): Promise<string[]> {
+  const rows = await sayfala(sb, 'satis_adetleri', 'kod,ad')
+  const urunler = new Map<string, string>()
+  for (const x of rows) { const k = anaKod(x.kod); if (k && !urunler.has(k)) urunler.set(k, nrm(String(x.ad || '').replace(/^\s*ALYG?\s*-?\s*[\dA-Z/]+\s+/i, ''))) }
+  const kel = arama.split(' ').filter(w => (w.length >= 3 || /^\d[a-z]$/.test(w)) && !URUN_AD_DURAK.test(w))
+  const tum = [...urunler.values()]
+  const gecen = kel.filter(w => tum.some(ad => ad.split(' ').some(x => x.startsWith(w))))
+  if (!gecen.length) return []
+  const bulunan = [...urunler.entries()].filter(([, ad]) => gecen.every(w => ad.split(' ').some(x => x.startsWith(w)))).map(([k]) => k)
+  // Çok geniş eşleşme (ör. sadece "saksı") yanlış rapor verir: belirsizse yapay zekaya bırak
+  return bulunan.length > 0 && bulunan.length <= 12 && gecen.some(w => !/^(saksi\w*|sepet\w*|sandik\w*|set\w*)$/.test(w)) ? bulunan.sort() : []
 }
 
 async function sayfala(sb: SupabaseClient, tablo: string, kolon: string, f?: (q: any) => any): Promise<any[]> {
@@ -288,7 +306,7 @@ async function satis(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
 async function urunSatis(sb: SupabaseClient, kodlar: string[]): Promise<Sonuc> {
   const [rows, ms] = await Promise.all([
     sayfala(sb, 'satis_adetleri', 'ay,kod,ad,mekan,adet,tutar'),
-    Promise.all(kodlar.map(k => sayfala(sb, 'satis_cari', 'ay,cari_adi,kod,adet,tutar', q => q.ilike('kod', k + '%')).catch(() => []))),
+    Promise.all(kodlar.map(k => sayfala(sb, 'satis_cari', 'ay,cari_adi,kod,adet,tutar,ihracat', q => q.ilike('kod', k + '%')).catch(() => []))),
   ])
   const sonAy = Math.max(1, ...rows.map(x => +x.ay || 0)), ayList = Array.from({ length: sonAy }, (_, i) => i + 1), aySut = ayList.map(n => AYLAR[n - 1])
   const ozet: Hucre[][] = [], aAdet: Hucre[][] = [], aTutar: Hucre[][] = [], renk: Hucre[][] = [], mus: Hucre[][] = [], govde: string[] = [], bulunamayan: string[] = []
@@ -313,6 +331,22 @@ async function urunSatis(sb: SupabaseClient, kodlar: string[]): Promise<Sonuc> {
     govde.push(`${kod} ${ad}${renk.length > 1 && kk.length > 1 ? ` (${kk.length} renk)` : ''}: ${AD(adet)} adet — ${TL(tutar)} TL (ort. ${TL(adet ? tutar / adet : 0)} TL/adet), ${AYLAR[Math.min(...ays) - 1]}–${AYLAR[Math.max(...ays) - 1]} arası`)
   })
   if (!ozet.length) return { yanit: `${kodlar.join(', ')} kodlu ürün için satış kaydı bulunamadı. Kod yazımını kontrol edin (satış dosyasında renk ekli kodlar var: ALYG-01A, ALYG-01BJ gibi).`, araclar: ['rapor_urun_satis'] }
+  // Müşteri × ürün özeti ve müşteri/ürün/ay detayı (onaylı düzen: müşteri tutara göre azalan, ürün başına adet sütunu, toplam satırı)
+  const pv: Record<string, { ih: boolean; a: Record<string, number>; t: number; ia: number; it: number; ay: Set<number> }> = {}
+  const dm = new Map<string, { cari: string; ih: boolean; kod: string; ay: number; a: number; t: number }>()
+  kodlar.forEach((kod, i) => {
+    for (const x of ms[i] as any[]) {
+      if (!kodEslesir(x.kod, kod)) continue
+      const a = +x.adet || 0, t = +x.tutar || 0, p = pv[x.cari_adi] = pv[x.cari_adi] || { ih: false, a: {}, t: 0, ia: 0, it: 0, ay: new Set<number>() }
+      p.ih = p.ih || !!x.ihracat; p.a[kod] = (p.a[kod] || 0) + a; p.t += t; p.ay.add(+x.ay); if (a < 0 || t < 0) { p.ia += a; p.it += t }
+      const key = `${x.cari_adi}|${String(x.kod).toUpperCase()}|${x.ay}`, d = dm.get(key) || { cari: x.cari_adi, ih: !!x.ihracat, kod: String(x.kod).toUpperCase(), ay: +x.ay, a: 0, t: 0 }
+      d.a += a; d.t += t; dm.set(key, d)
+    }
+  })
+  const pvSirali = Object.entries(pv).sort((a, b) => b[1].t - a[1].t), pvT = pvSirali.reduce((s, [, v]) => s + v.t, 0)
+  const musOz: Hucre[][] = pvSirali.map(([m, v]) => [m, v.ih ? 'İhracat' : 'İç piyasa', ...kodlar.map(k => r2(v.a[k] || 0)), r2(Object.values(v.a).reduce((s, x) => s + x, 0)), r2(v.t), pvT ? r2(v.t / pvT * 100) : 0, r2(v.ia), r2(v.it), v.ay.size])
+  if (musOz.length) musOz.push(['TOPLAM', '', ...kodlar.map(k => r2(pvSirali.reduce((s, [, v]) => s + (v.a[k] || 0), 0))), r2(pvSirali.reduce((s, [, v]) => s + Object.values(v.a).reduce((q, x) => q + x, 0), 0)), r2(pvT), 100, r2(pvSirali.reduce((s, [, v]) => s + v.ia, 0)), r2(pvSirali.reduce((s, [, v]) => s + v.it, 0)), null])
+  const musDetay: Hucre[][] = [...dm.values()].sort((a, b) => a.cari.localeCompare(b.cari, 'tr') || a.kod.localeCompare(b.kod) || a.ay - b.ay).map(d => [d.cari, d.ih ? 'İhracat' : 'İç piyasa', d.kod, AYLAR[d.ay - 1] || String(d.ay), r2(d.a), r2(d.t), d.a ? r2(d.t / d.a) : 0])
   if (ozet.length > 1) ozet.push(['', 'TOPLAM', '', r2(gAdet), gAdet ? r2(gTutar / gAdet) : 0, r2(gTutar), '', '', null])
   const sayfalar: Sayfa[] = [
     { ad: 'Özet', sutunlar: ['Ürün Kodu', 'Ürün', 'Mekan', 'Satılan Adet', 'Birim Fiyat (TL)', 'Tutar (TL)', 'İlk Satış Ayı', 'Son Satış Ayı', 'Güncel Stok (adet)'], satirlar: ozet },
@@ -320,7 +354,8 @@ async function urunSatis(sb: SupabaseClient, kodlar: string[]): Promise<Sonuc> {
     { ad: 'Aylık Tutar', sutunlar: ['Ürün Kodu', 'Ürün', ...aySut, 'Toplam (TL)'], satirlar: aTutar },
   ]
   if (renk.length > aAdet.length) sayfalar.push({ ad: 'Renk Kırılımı', sutunlar: ['Kod', 'Ürün', 'Renk', 'Adet', 'Birim Fiyat (TL)', 'Tutar (TL)'], satirlar: renk })
-  if (mus.length) sayfalar.push({ ad: 'Müşteriler', sutunlar: ['Ürün Kodu', 'Müşteri', 'Net Adet', 'Net Tutar (TL)', 'İade Adet', 'İade TL'], satirlar: mus })
+  if (musOz.length) sayfalar.push({ ad: 'Müşteri Özeti', sutunlar: ['Müşteri', 'Tür', ...kodlar.map(k => `${k} Adet`), 'Toplam Adet', 'Toplam Tutar (TL)', 'Pay %', 'İade Adet', 'İade TL', 'Sipariş Ayı Sayısı'], satirlar: musOz })
+  if (musDetay.length) sayfalar.push({ ad: 'Müşteri Aylık Detay', sutunlar: ['Müşteri', 'Tür', 'Kod', 'Ay', 'Net Adet', 'Net Tutar (TL)', 'Birim Fiyat (TL)'], satirlar: musDetay })
   if (ozet.length > 1) govde.push('', `GENEL TOPLAM: ${AD(gAdet)} adet — ${TL(gTutar)} TL`)
   if (mus.length) { govde.push('', 'EN ÇOK ALAN MÜŞTERİLER:'); mus.slice(0, 8).forEach((m, i) => govde.push(`${i + 1}. ${m[0]} · ${m[1]}: ${AD(+(m[2] as number))} adet — ${TL(+(m[3] as number))} TL`)) }
   if (bulunamayan.length) govde.push('', `Satış kaydı bulunamayan kod: ${bulunamayan.join(', ')}`)
@@ -607,7 +642,7 @@ Emin değilsen "yok". Alanlar bilinmiyorsa mekan="hepsi", metinler "", sayılar 
     case 'tahsilat': return { tur: 'tahsilat', mekan: mk }
     case 'stok': return mk === 'hepsi' ? null : { tur: 'stok', mekan: mk }
     case 'satis': return mk === 'hepsi' ? null : { tur: 'satis', mekan: mk }
-    case 'urun_satis': return kod.length ? { tur: 'urun', kodlar: kod } : null
+    case 'urun_satis': return kod.length ? { tur: 'urun', kodlar: kod } : { tur: 'urun_ad', arama: nrm(soru) }
     case 'hammadde': return { tur: 'hammadde', mekan: mk }
     case 'ihracat_tahsilat': return { tur: 'ihr_tahsilat' }
     case 'ihracat_rakam': return { tur: 'ihr_rakam', yil: r.yil > 2000 ? r.yil : +bugunISO().slice(0, 4) }
@@ -624,7 +659,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   let n = raporNiyeti(soru)
   if (!n) { try { n = await niyetSinifla(soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -632,6 +667,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       case 'stok': return await stok(sb, n.mekan)
       case 'satis': return await satis(sb, n.mekan)
       case 'urun': return await urunSatis(sb, n.kodlar)
+      case 'urun_ad': { const kk = await urunAdindanKodlar(sb, n.arama); return kk.length ? await urunSatis(sb, kk) : null }
       case 'hammadde': return await hammadde(sb, n.mekan)
       case 'ihr_tahsilat': return await ihracatTahsilat(sb)
       case 'ihr_rakam': return await ihracatRakam(sb, n.yil)
