@@ -2,6 +2,7 @@
 import { usePathname } from 'next/navigation'
 import QuickActions from './QuickActions'
 import NotifBell from './NotifBell'
+import HizliArama from './HizliArama'
 import MuhasebeRehberi from './MuhasebeRehberi'
 import MuhasebeUyarilar from './MuhasebeUyarilar'
 import GrupUyarilar from './GrupUyarilar'
@@ -16,6 +17,7 @@ export default function AdminTopBar({ title }: { title: string }) {
     <div className="adm-topbar">
       <h1>{title}</h1>
       <div style={{marginLeft:'auto', display:'flex', alignItems:'center'}}>
+        <HizliArama/>
         {muhasebe && <MuhasebeUyarilar/>}
         {muhasebe && <MuhasebeRehberi/>}
         {grup && <GrupUyarilar key={grup} grup={grup}/>}
