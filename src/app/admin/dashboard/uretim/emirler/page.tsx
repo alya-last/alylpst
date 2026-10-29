@@ -95,6 +95,7 @@ export default function UretimEmirleriPage() {
   const fireKat = 1 + (+fr?.hedef_fire_orani || 0) / 100
   const formIhtiyac = fr ? emirIhtiyac({ recete_id: fr.id }, d.receteKalemleri, d.hammaddeler, planAdet).map(x => ({ ...x, gerekli: x.gerekli * fireKat })) : []
   const formKavite = kalip[form.kalip_id]?.kavite_sayisi || fr?.kavite_sayisi || 1
+  const toplamBaski = planAdet ? Math.ceil((planAdet * fireKat) / formKavite) : 0
   const tahminiSaat = +form.hedef_cevrim > 0 && planAdet ? (Math.ceil((planAdet * fireKat) / formKavite) * +form.hedef_cevrim) / 3600 : 0
   const fh = form.urun_id ? urunHazirlik(form.urun_id) : null
 
@@ -333,7 +334,7 @@ export default function UretimEmirleriPage() {
       {/* Yeni emir */}
       <Modal open={modal} onClose={() => setModal(false)} width={880} title="Yeni Üretim Emri"
         footer={<>
-          {tahminiSaat > 0 && <span style={{ marginRight: 'auto', fontSize: 12.5, color: 'var(--adm-tx3)' }}>Tahmini süre: <b style={{ color: 'var(--adm-tx)' }}>{fmtN(tahminiSaat, 1)} saat</b>{frMal ? <> · Maliyet: <b style={{ color: 'var(--adm-tx)' }}>{fmtK(frMal.firedahil * planAdet)}</b></> : null}</span>}
+          {tahminiSaat > 0 && <span style={{ marginRight: 'auto', fontSize: 12.5, color: 'var(--adm-tx3)' }}>Toplam baskı: <b style={{ color: 'var(--adm-tx)' }}>{fmtInt(toplamBaski)}</b> ({formKavite} göz) · Çalışma süresi: <b style={{ color: 'var(--adm-tx)' }}>{fmtN(tahminiSaat, 1)} saat</b> · <b style={{ color: 'var(--adm-tx)' }}>{fmtN(tahminiSaat / 24, 2)} gün</b> (24 saat/gün){frMal ? <> · Maliyet: <b style={{ color: 'var(--adm-tx)' }}>{fmtK(frMal.firedahil * planAdet)}</b></> : null}</span>}
           <button type="button" className="adm-btn-ghost" onClick={() => setModal(false)}>İptal</button>
           <button type="button" className="adm-btn-ghost" disabled={busy} onClick={() => kaydetEmir(false)}>Planla</button>
           <button type="button" className="adm-btn" disabled={busy} onClick={() => kaydetEmir(true)}><Play size={13} />Oluştur ve Başlat</button></>}>
