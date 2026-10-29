@@ -1,7 +1,33 @@
 // Fiyat teklifi ortak tipler ve hesaplar. Sunucudaki rpc_teklif_kaydet ile AYNI yuvarlama kuralı: her satır 2 ondalığa yuvarlanır.
-export type TKalem = { variant_id: string; urun_adi: string; aciklama: string; miktar: number; birim: string; birim_fiyat: number; iskonto_yuzde: number }
+// kod/koli_*: fiyat listesinden seçilen kalemin ürün kodu ve koli bilgisi (teklife kopyalanır; sonradan liste değişse de teklif değişmez)
+export type TKalem = { variant_id: string; urun_adi: string; aciklama: string; miktar: number; birim: string; birim_fiyat: number; iskonto_yuzde: number; kod?: string; koli_ici_adet?: number | null; koli_m3?: number | null; koli_kg?: number | null }
 export type Dil = 'tr' | 'en'
 export const PARA = ['TRY', 'USD', 'EUR', 'GBP', 'RUB']
+/** Fiyat listesi (proforma) satırı: fiyat USD'dir. */
+export type ListeUrun = { id: string; kod: string; ad_tr: string; ad_en: string | null; koli_ici_adet: number | null; konteyner_40hc: number | null; olcu: string | null; koli_m3: number | null; koli_kg: number | null; usd_fiyat: number; aktif: boolean }
+export const listeEtiket = (u: ListeUrun, dil: Dil) => `${u.kod} · ${dil === 'en' && u.ad_en ? u.ad_en : u.ad_tr}`
+/** Liste fiyatı teklifin para birimine çevrilir: USD → aynen, TRY → USD × kur, diğerleri → otomatik fiyat yok (null). */
+export function listeFiyatiPara(usd: number, para: string, kur: number): number | null {
+  if (para === 'USD') return yuvarla(+usd, 4)
+  if (para === 'TRY' && +kur > 0) return yuvarla(+usd * +kur, 2)
+  return null
+}
+/** İskonto: müşteriye özel % ile miktar kademesinden YÜKSEK olanı uygulanır (üst üste binmez). */
+export function iskontoBul(cariYuzde: number, kademeler: { min_miktar: number | string; iskonto_yuzdesi: number | string; aktif?: boolean }[], miktar: number): number {
+  const kademe = Math.max(0, ...kademeler.filter(k => k.aktif !== false && +k.min_miktar <= miktar).map(k => +k.iskonto_yuzdesi))
+  return Math.min(100, Math.max(+cariYuzde || 0, kademe))
+}
+/** Kalem listeden geldiyse koli/m³/kg toplamı (koli adedi yukarı yuvarlanır). */
+export function koliOzet(kalemler: TKalem[]) {
+  let koli = 0, m3 = 0, kg = 0, eksik = 0
+  for (const k of kalemler) {
+    if (!k.urun_adi.trim()) continue
+    if (!k.koli_ici_adet || !(+k.miktar > 0)) { eksik++; continue }
+    const n = Math.ceil(+k.miktar / k.koli_ici_adet)
+    koli += n; m3 += n * (+k.koli_m3 || 0); kg += n * (+k.koli_kg || 0)
+  }
+  return { koli, m3: yuvarla(m3, 3), kg: yuvarla(kg, 1), eksik }
+}
 export const DURUM: Record<string, { l: string; tone: 'muted' | 'blue' | 'green' | 'red' | 'amber' }> = {
   taslak: { l: 'Taslak', tone: 'muted' }, gonderildi: { l: 'Gönderildi', tone: 'blue' }, kabul: { l: 'Kabul edildi', tone: 'green' }, red: { l: 'Reddedildi', tone: 'red' }, iptal: { l: 'İptal', tone: 'muted' },
 }
@@ -38,8 +64,8 @@ export function dogrula(f: { musteri_adi: string; kalemler: TKalem[]; para_birim
 }
 
 const L = {
-  tr: { baslik: 'FİYAT TEKLİFİ', no: 'Teklif No', tarih: 'Tarih', gecerlilik: 'Geçerlilik', sayin: 'Sayın', urun: 'Ürün / Hizmet', miktar: 'Miktar', birim: 'Birim', fiyat: 'Birim Fiyat', isk: 'İskonto', tutar: 'Tutar', ara: 'Ara Toplam', kdv: 'KDV', toplam: 'GENEL TOPLAM', kosul: 'Koşullar', imza: 'Yetkili İmza', gecer: 'Bu teklif belirtilen tarihe kadar geçerlidir.' },
-  en: { baslik: 'QUOTATION', no: 'Quotation No', tarih: 'Date', gecerlilik: 'Valid until', sayin: 'To', urun: 'Description', miktar: 'Qty', birim: 'Unit', fiyat: 'Unit Price', isk: 'Disc.', tutar: 'Amount', ara: 'Subtotal', kdv: 'VAT', toplam: 'TOTAL', kosul: 'Terms', imza: 'Authorized Signature', gecer: 'This quotation is valid until the date stated above.' },
+  tr: { baslik: 'FİYAT TEKLİFİ', no: 'Teklif No', tarih: 'Tarih', gecerlilik: 'Geçerlilik', sayin: 'Sayın', urun: 'Ürün / Hizmet', miktar: 'Miktar', birim: 'Birim', fiyat: 'Birim Fiyat', isk: 'İskonto', tutar: 'Tutar', ara: 'Ara Toplam', kdv: 'KDV', toplam: 'GENEL TOPLAM', kosul: 'Koşullar', imza: 'Yetkili İmza', gecer: 'Bu teklif belirtilen tarihe kadar geçerlidir.', koliIci: 'adet/koli', koli: 'Toplam koli', hacim: 'Toplam hacim', agirlik: 'Toplam ağırlık' },
+  en: { baslik: 'QUOTATION', no: 'Quotation No', tarih: 'Date', gecerlilik: 'Valid until', sayin: 'To', urun: 'Description', miktar: 'Qty', birim: 'Unit', fiyat: 'Unit Price', isk: 'Disc.', tutar: 'Amount', ara: 'Subtotal', kdv: 'VAT', toplam: 'TOTAL', kosul: 'Terms', imza: 'Authorized Signature', gecer: 'This quotation is valid until the date stated above.', koliIci: 'pcs/box', koli: 'Total boxes', hacim: 'Total volume', agirlik: 'Total weight' },
 }
 export const etiket = (d: Dil) => L[d]
 
