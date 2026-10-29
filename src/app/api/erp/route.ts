@@ -11,7 +11,7 @@ const TABLES = new Set([
   'sevkiyatlar','ihracat_detaylari',
   'kalite_kontrol_kayitlari','fire_kayitlari',
   'roller','kasa_banka_hesaplari',
-  'fiyat_listeleri','fiyat_listesi_kalemleri','iskonto_kademeleri','banka_ekstre_kayitlari',
+  'fiyat_listeleri','fiyat_listesi_kalemleri','fiyat_listesi_urunleri','iskonto_kademeleri','banka_ekstre_kayitlari',
   'maliyet_ayar','maliyet_hammadde','maliyet_makine','maliyet_urun',
 ])
 

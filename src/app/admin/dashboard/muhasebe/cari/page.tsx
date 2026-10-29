@@ -21,7 +21,7 @@ const TIP: Record<string, { l: string; tone: any; Icon: any }> = {
   musteri: { l: 'Müşteri', tone: 'blue', Icon: User }, tedarikci: { l: 'Tedarikçi', tone: 'amber', Icon: Building2 }, diger: { l: 'Diğer', tone: 'muted', Icon: User },
 }
 const DURUM: Record<string, { l: string; tone: any }> = { taslak: { l: 'Taslak', tone: 'muted' }, onaylandi: { l: 'Açık', tone: 'blue' }, odendi: { l: 'Ödendi', tone: 'green' }, iptal: { l: 'İptal', tone: 'red' } }
-const bosForm = { tip: 'musteri', kod: '', ad: '', vergi_no: '', telefon: '', email: '', adres: '', notlar: '', fiyat_listesi_id: '' }
+const bosForm = { tip: 'musteri', kod: '', ad: '', vergi_no: '', telefon: '', email: '', adres: '', notlar: '', fiyat_listesi_id: '', iskonto_yuzde: '' as string | number }
 
 const vergiGecerli = (v: string) => !v || /^\d{10}$|^\d{11}$/.test(v.replace(/\s/g, ''))
 const waNumara = (t: string) => { const d = (t || '').replace(/\D/g, ''); return d.startsWith('90') ? d : d.startsWith('0') ? '9' + d : d.length === 10 ? '90' + d : d }
@@ -132,7 +132,7 @@ export default function CariPage() {
 
   /* ── CRUD ── */
   function openNew() { setEditing(null); setForm(bosForm); setModal(true) }
-  function openEdit(c: any) { setEditing(c); setForm({ tip: c.tip, kod: c.kod || '', ad: c.ad, vergi_no: c.vergi_no || '', telefon: c.telefon || '', email: c.email || '', adres: c.adres || '', notlar: c.notlar || '', fiyat_listesi_id: c.fiyat_listesi_id || '' }); setModal(true) }
+  function openEdit(c: any) { setEditing(c); setForm({ tip: c.tip, kod: c.kod || '', ad: c.ad, vergi_no: c.vergi_no || '', telefon: c.telefon || '', email: c.email || '', adres: c.adres || '', notlar: c.notlar || '', fiyat_listesi_id: c.fiyat_listesi_id || '', iskonto_yuzde: +c.iskonto_yuzde || '' }); setModal(true) }
 
   async function save(e: React.FormEvent) {
     e.preventDefault(); if (busy) return
@@ -140,7 +140,7 @@ export default function CariPage() {
     const dup = list.find(c => c.ad.trim().toLocaleLowerCase('tr') === form.ad.trim().toLocaleLowerCase('tr') && c.id !== editing?.id)
     if (dup && !confirm(`“${dup.ad}” adlı bir cari zaten var. Yine de kaydedilsin mi?`)) return
     setBusy(true)
-    const payload = { ...form, kod: form.kod.trim().toUpperCase() || undefined, ad: form.ad.trim(), vergi_no: form.vergi_no.replace(/\s/g, '') || null, fiyat_listesi_id: form.fiyat_listesi_id || null }
+    const payload = { ...form, kod: form.kod.trim().toUpperCase() || undefined, ad: form.ad.trim(), vergi_no: form.vergi_no.replace(/\s/g, '') || null, fiyat_listesi_id: form.fiyat_listesi_id || null, iskonto_yuzde: Math.min(100, Math.max(0, +form.iskonto_yuzde || 0)) }
     const r: any = editing ? await muh.from('cari_hesaplar').update({ ...payload, updated_at: new Date().toISOString() }).eq('id', editing.id) : await muh.from('cari_hesaplar').insert(payload)
     setBusy(false)
     if (r?.error) { toast.show(/cari_hesaplar_kod_uq|duplicate key/i.test(String(r.error)) ? `“${payload.kod}” kodu başka bir carde kullanılıyor` : r.error, true); return }
@@ -394,6 +394,7 @@ export default function CariPage() {
           <Field label="Telefon"><input className="adm-inp" value={form.telefon} onChange={e => setForm((f: any) => ({ ...f, telefon: e.target.value }))} placeholder="05xx xxx xx xx" /></Field>
           <Field label="E-posta"><input type="email" className="adm-inp" value={form.email} onChange={e => setForm((f: any) => ({ ...f, email: e.target.value }))} /></Field>
           <Field label="Fiyat Listesi"><select className="adm-inp" value={form.fiyat_listesi_id} onChange={e => setForm((f: any) => ({ ...f, fiyat_listesi_id: e.target.value }))}><option value="">Varsayılan</option>{fiyatListeleri.map(f => <option key={f.id} value={f.id}>{f.ad}</option>)}</select></Field>
+          <Field label="Özel iskonto %" hint="Tekliflerde bu müşteri için otomatik uygulanır"><input type="number" min="0" max="100" step="any" className="adm-inp" value={form.iskonto_yuzde} onChange={e => setForm((f: any) => ({ ...f, iskonto_yuzde: e.target.value }))} /></Field>
           <Field label="Adres" span={2}><input className="adm-inp" value={form.adres} onChange={e => setForm((f: any) => ({ ...f, adres: e.target.value }))} /></Field>
           <Field label="Notlar" span={2}><textarea className="adm-inp" rows={2} value={form.notlar} onChange={e => setForm((f: any) => ({ ...f, notlar: e.target.value }))} /></Field>
         </FormGrid>

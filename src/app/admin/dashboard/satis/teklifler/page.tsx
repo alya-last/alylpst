@@ -9,19 +9,21 @@ import { Page, PageHead, Kpi, KpiGrid, Badge, Tabs, Modal, Field, FormGrid, Card
 import { DataGrid, type Col } from '@/components/admin/erp/DataGrid'
 import { topluSilCalistir } from '@/lib/toplu-sil'
 import TeklifGoruntu from '@/components/admin/teklif/TeklifGoruntu'
-import { DURUM, PARA, bosKalem, bugunTR, dogrula, epostaMetni, gecerlilikDurumu, gunEkle, satirNet, teklifHesapla, yuvarla, type Dil, type TKalem } from '@/lib/teklif'
-import { Plus, Printer, Save, Copy, Sparkles, Trash2, ShoppingCart, FileText, Clock, CheckCircle2, Percent } from 'lucide-react'
+import { DURUM, PARA, bosKalem, bugunTR, dogrula, epostaMetni, gecerlilikDurumu, gunEkle, iskontoBul, koliOzet, listeEtiket, listeFiyatiPara, satirNet, teklifHesapla, yuvarla, type Dil, type ListeUrun, type TKalem } from '@/lib/teklif'
+import { erp } from '@/lib/erp-client'
+import { Plus, Printer, Save, Copy, Sparkles, Trash2, ShoppingCart, FileText, Clock, CheckCircle2, Percent, Tag } from 'lucide-react'
 
 const fmt = (n: number, pb = 'TRY') => `${new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)} ${pb}`
 const tarihTR = (t: string | null) => (t ? t.split('-').reverse().join('.') : '—')
 const KOSUL = { tr: 'Fiyatlarımıza KDV dahil değildir.', en: 'Prices exclude VAT.' }
-type F = { cari_id: string; musteri_adi: string; musteri_email: string; musteri_tel: string; basvuru_id: string; tarih: string; gecerlilik: string; para_birimi: string; kdv_orani: number; dil: Dil; kosullar: string; notlar: string }
+type F = { cari_id: string; musteri_adi: string; musteri_email: string; musteri_tel: string; basvuru_id: string; tarih: string; gecerlilik: string; para_birimi: string; kur: string; kdv_orani: number; dil: Dil; kosullar: string; notlar: string }
 type Ed = { id: string | null; no: string; durum: string; siparisId: string | null; f: F; kalemler: TKalem[] }
-const bosF = (): F => ({ cari_id: '', musteri_adi: '', musteri_email: '', musteri_tel: '', basvuru_id: '', tarih: bugunTR(), gecerlilik: gunEkle(bugunTR(), 15), para_birimi: 'TRY', kdv_orani: 20, dil: 'tr', kosullar: KOSUL.tr, notlar: '' })
+const bosF = (): F => ({ cari_id: '', musteri_adi: '', musteri_email: '', musteri_tel: '', basvuru_id: '', tarih: bugunTR(), gecerlilik: gunEkle(bugunTR(), 15), para_birimi: 'TRY', kur: '', kdv_orani: 20, dil: 'tr', kosullar: KOSUL.tr, notlar: '' })
 
 export default function TekliflerPage() {
   const toast = useToast()
-  const { d, loading: katYukleniyor } = useUretim(['cariTam', 'variants', 'products', 'fiyatListeleri', 'fiyatKalemleri', 'iskontolar'])
+  const { d, loading: katYukleniyor, reload: katYenile } = useUretim(['cariTam', 'variants', 'products', 'fiyatListeleri', 'fiyatKalemleri', 'iskontolar', 'fiyatUrunleri'])
+  const [fyModal, setFyModal] = useState(false), [fyAra, setFyAra] = useState('')
   const [liste, setListe] = useState<any[]>([])
   const [site, setSite] = useState<any>(null)
   const [yuk, setYuk] = useState(true)
@@ -64,6 +66,19 @@ export default function TekliflerPage() {
   }
   const firma = site ? [site.company, site.address, [site.phone, site.email].filter(Boolean).join(' · ')].filter(Boolean).join('\n') : 'Alya Plastik'
 
+  /* ── Proforma fiyat listesi (USD): ürün seçilince fiyat, iskonto ve koli bilgisi otomatik gelir ── */
+  const listeUrunleri = useMemo(() => (d.fiyatUrunleri as ListeUrun[]).filter(u => u.aktif !== false), [d.fiyatUrunleri])
+  const listeKod = useMemo(() => Object.fromEntries(listeUrunleri.map(u => [u.kod, u])) as Record<string, ListeUrun>, [listeUrunleri])
+  const listeEtk = useMemo(() => { const m: Record<string, ListeUrun> = {}; for (const u of listeUrunleri) { m[listeEtiket(u, 'tr')] = u; m[listeEtiket(u, 'en')] = u } return m }, [listeUrunleri])
+  const sayi = (x: any) => (x == null ? null : +x)
+  function listeKalemi(u: ListeUrun, f: F, miktar: number): Partial<TKalem> {
+    const fiyat = listeFiyatiPara(+u.usd_fiyat, f.para_birimi, +f.kur)
+    return { variant_id: '', kod: u.kod, urun_adi: listeEtiket(u, f.dil), koli_ici_adet: sayi(u.koli_ici_adet), koli_m3: sayi(u.koli_m3), koli_kg: sayi(u.koli_kg),
+      ...(fiyat !== null ? { birim_fiyat: fiyat, iskonto_yuzde: iskontoBul(+cari[f.cari_id]?.iskonto_yuzde || 0, d.iskontolar, miktar) } : {}) }
+  }
+  const yenidenFiyatla = (f: F, ks: TKalem[]) => ks.map(k => (k.kod && listeKod[k.kod] ? { ...k, ...listeKalemi(listeKod[k.kod], f, +k.miktar) } : k))
+  const listeTemizle = { kod: undefined, koli_ici_adet: null, koli_m3: null, koli_kg: null }
+
   /* ── Başvurudan gelen ?basvuru=ID ── */
   useEffect(() => {
     if (yuk) return
@@ -82,26 +97,35 @@ export default function TekliflerPage() {
   async function ac(t: any) {
     const { data, error } = await web.from('teklif_kalemleri').select('*').eq('teklif_id', t.id).order('sira')
     if (error) return toast.show(error.message, true)
-    setEd({ id: t.id, no: t.no, durum: t.durum, siparisId: t.siparis_id, f: { cari_id: t.cari_id || '', musteri_adi: t.musteri_adi, musteri_email: t.musteri_email || '', musteri_tel: t.musteri_tel || '', basvuru_id: t.basvuru_id || '', tarih: t.tarih, gecerlilik: t.gecerlilik || '', para_birimi: t.para_birimi, kdv_orani: +t.kdv_orani, dil: t.dil, kosullar: t.kosullar || '', notlar: t.notlar || '' },
-      kalemler: (data || []).map((k: any) => ({ variant_id: k.variant_id || '', urun_adi: k.urun_adi, aciklama: k.aciklama || '', miktar: +k.miktar, birim: k.birim, birim_fiyat: +k.birim_fiyat, iskonto_yuzde: +k.iskonto_yuzde })) })
+    setEd({ id: t.id, no: t.no, durum: t.durum, siparisId: t.siparis_id, f: { cari_id: t.cari_id || '', musteri_adi: t.musteri_adi, musteri_email: t.musteri_email || '', musteri_tel: t.musteri_tel || '', basvuru_id: t.basvuru_id || '', tarih: t.tarih, gecerlilik: t.gecerlilik || '', para_birimi: t.para_birimi, kur: t.kur ? String(+t.kur) : '', kdv_orani: +t.kdv_orani, dil: t.dil, kosullar: t.kosullar || '', notlar: t.notlar || '' },
+      kalemler: (data || []).map((k: any) => ({ variant_id: k.variant_id || '', urun_adi: k.urun_adi, aciklama: k.aciklama || '', miktar: +k.miktar, birim: k.birim, birim_fiyat: +k.birim_fiyat, iskonto_yuzde: +k.iskonto_yuzde, kod: k.kod || undefined, koli_ici_adet: sayi(k.koli_ici_adet), koli_m3: sayi(k.koli_m3), koli_kg: sayi(k.koli_kg) })) })
     setSekme('duzenle'); setAi({ metin: '', busy: false, sonuc: null, kapali: false })
   }
   const kopya = (t: any) => ac(t).then(() => setEd(e => e && ({ ...e, id: null, no: '', durum: 'taslak', siparisId: null, f: { ...e.f, tarih: bugunTR(), gecerlilik: gunEkle(bugunTR(), 15) } })))
 
-  const setF = (p: Partial<F>) => setEd(e => e && ({ ...e, f: { ...e.f, ...p } }))
+  // Para birimi, kur, dil veya cari değişince listeden gelen kalemlerin fiyatı/iskontosu yeniden hesaplanır
+  const setF = (p: Partial<F>) => setEd(e => {
+    if (!e) return e
+    const f = { ...e.f, ...p }, yeniden = 'para_birimi' in p || 'kur' in p || 'dil' in p || 'cari_id' in p
+    return { ...e, f, kalemler: yeniden ? yenidenFiyatla(f, e.kalemler) : e.kalemler }
+  })
   const setK = (i: number, p: Partial<TKalem>) => setEd(e => e && ({ ...e, kalemler: e.kalemler.map((k, j) => j === i ? { ...k, ...p } : k) }))
   const kilitli = ed?.durum === 'kabul'
 
   function urunSec(i: number, text: string) {
     if (!ed) return
+    const lu = listeEtk[text]
+    if (lu) return setK(i, listeKalemi(lu, ed.f, ed.kalemler[i].miktar))
     const v = vList.find((x: any) => x.label === text)
-    if (!v) return setK(i, { urun_adi: text, variant_id: '' })
+    if (!v) return setK(i, { urun_adi: text, variant_id: '', ...listeTemizle })
     const fb = ed.f.para_birimi === 'TRY' ? fiyatBul(v.id, ed.f.cari_id, ed.kalemler[i].miktar) : null
-    setK(i, { variant_id: v.id, urun_adi: v.label, ...(fb ? { birim_fiyat: fb.fiyat, iskonto_yuzde: fb.isk } : {}) })
+    setK(i, { variant_id: v.id, urun_adi: v.label, ...listeTemizle, ...(fb ? { birim_fiyat: fb.fiyat, iskonto_yuzde: fb.isk } : {}) })
   }
   function miktarDegis(i: number, m: number) {
     if (!ed) return
-    const k = ed.kalemler[i]; const fb = k.variant_id && ed.f.para_birimi === 'TRY' ? fiyatBul(k.variant_id, ed.f.cari_id, m) : null
+    const lu = ed.kalemler[i].kod ? listeKod[ed.kalemler[i].kod!] : undefined
+    if (lu) { const p = listeKalemi(lu, ed.f, m); return setK(i, { miktar: m, ...(p.birim_fiyat !== undefined ? { birim_fiyat: p.birim_fiyat, iskonto_yuzde: p.iskonto_yuzde } : {}) }) }
+    const k = ed.kalemler[i]; const fb =k.variant_id && ed.f.para_birimi === 'TRY' ? fiyatBul(k.variant_id, ed.f.cari_id, m) : null
     setK(i, { miktar: m, ...(fb ? { birim_fiyat: fb.fiyat, iskonto_yuzde: fb.isk } : {}) })
   }
   function cariSec(id: string) {
@@ -115,6 +139,7 @@ export default function TekliflerPage() {
     const h = dogrula({ musteri_adi: ed.f.musteri_adi, kalemler: ed.kalemler, para_birimi: ed.f.para_birimi, gecerlilik: ed.f.gecerlilik, tarih: ed.f.tarih })
     const kritik = h.filter(x => !x.includes('0 olan'))
     if (kritik.length) return toast.show(kritik[0], true)
+    if (ed.f.para_birimi === 'TRY' && dolu.some(k => k.kod) && !(+ed.f.kur > 0)) return toast.show('TL teklifte liste fiyatları USD’den çevrilir: kuru girin (1 USD = ? TL)', true)
     if (h.length && !confirm(h.join('\n') + '\n\nYine de kaydedilsin mi?')) return
     setBusy(true)
     const { data, error } = await web.rpc('rpc_teklif_kaydet', { p_id: ed.id, p_teklif: { ...ed.f }, p_kalemler: dolu.map(k => ({ ...k })) })
@@ -166,6 +191,12 @@ export default function TekliflerPage() {
     if (fb) { base.birim_fiyat = fb.fiyat; base.iskonto_yuzde = fb.isk }
     setEd(e => e && ({ ...e, kalemler: [...(e.kalemler.length === 1 && !e.kalemler[0].urun_adi.trim() ? [] : e.kalemler), base] }))
   }
+  async function fiyatKaydet(u: ListeUrun, v: number) {
+    if (!(v >= 0) || v === +u.usd_fiyat) return
+    const r: any = await erp.from('fiyat_listesi_urunleri').update({ usd_fiyat: v, updated_at: new Date().toISOString() }).eq('id', u.id)
+    if (r.error) return toast.show(r.error.message, true)
+    toast.show(`${u.kod}: ${v} USD olarak kaydedildi`); katYenile()
+  }
   function yazdir() { setSekme('onizleme'); setTimeout(() => window.print(), 250) }
 
   const bugun = bugunTR()
@@ -192,7 +223,7 @@ export default function TekliflerPage() {
       <style>{`@media print { body * { visibility: hidden !important; } #teklif-alani, #teklif-alani * { visibility: visible !important; } #teklif-alani { position: absolute !important; left: 0; top: 0; box-shadow: none !important; width: 100% !important; min-height: 0 !important; } @page { size: A4; margin: 0 } }`}</style>
       <AdminTopBar title="Fiyat Teklifleri" />
       <Page>
-        <PageHead title="Fiyat Teklifleri" sub="Başvurudan veya sıfırdan teklif hazırla → PDF/e-posta ile gönder → kabulde satış siparişine çevir" actions={<button className="adm-btn" onClick={yeni}><Plus size={14} />Yeni Teklif</button>} />
+        <PageHead title="Fiyat Teklifleri" sub="Başvurudan veya sıfırdan teklif hazırla → PDF/e-posta ile gönder → kabulde satış siparişine çevir" actions={<><button className="adm-btn-ghost" onClick={() => setFyModal(true)}><Tag size={14} />Fiyat listesi</button><button className="adm-btn" onClick={yeni}><Plus size={14} />Yeni Teklif</button></>} />
         <KpiGrid min={180}>
           <Kpi label="Bekleyen teklif" value={acikTeklif.length} Icon={FileText} color="var(--adm-blue)" sub={`TL: ${fmt(acikTeklif.filter(t => t.para_birimi === 'TRY').reduce((a, t) => a + +t.toplam, 0))}`} />
           <Kpi label="Süresi dolan" value={gecen.length} Icon={Clock} color={gecen.length ? 'var(--adm-red)' : 'var(--adm-green)'} sub="gönderildi, geçerliliği bitti" onClick={() => setTab('doldu')} />
@@ -226,7 +257,8 @@ export default function TekliflerPage() {
                 <Field label="Dil"><select className="adm-inp" value={ed.f.dil} onChange={e => dilDegis(e.target.value as Dil)}><option value="tr">Türkçe</option><option value="en">İngilizce</option></select></Field>
                 <Field label="Tarih"><input type="date" className="adm-inp" value={ed.f.tarih} onChange={e => setF({ tarih: e.target.value })} /></Field>
                 <Field label="Geçerlilik"><input type="date" className="adm-inp" value={ed.f.gecerlilik} onChange={e => setF({ gecerlilik: e.target.value })} /></Field>
-                <Field label="Para birimi" hint={ed.f.para_birimi !== 'TRY' ? 'Fiyat listesi TL’dir; döviz fiyatlarını elle girin' : undefined}><select className="adm-inp" value={ed.f.para_birimi} onChange={e => setF({ para_birimi: e.target.value })}>{PARA.map(p => <option key={p}>{p}</option>)}</select></Field>
+                <Field label="Para birimi" hint={ed.f.para_birimi === 'USD' ? 'Liste fiyatı USD: otomatik gelir' : ed.f.para_birimi === 'TRY' ? 'Liste fiyatı USD × kur ile TL’ye çevrilir' : 'Bu para biriminde liste yok; fiyatları elle girin'}><select className="adm-inp" value={ed.f.para_birimi} onChange={e => setF({ para_birimi: e.target.value })}>{PARA.map(p => <option key={p}>{p}</option>)}</select></Field>
+                {ed.f.para_birimi === 'TRY' && <Field label="Kur (1 USD = ? TL)" hint={ed.kalemler.some(k => k.kod) && !(+ed.f.kur > 0) ? 'Kur girilmeden liste fiyatı TL’ye çevrilemez' : undefined}><input type="number" min="0" step="any" className="adm-inp" value={ed.f.kur} onChange={e => setF({ kur: e.target.value })} placeholder="örn. 44,50" /></Field>}
                 <Field label="KDV %"><input type="number" min="0" max="100" step="any" className="adm-inp" value={ed.f.kdv_orani} onChange={e => setF({ kdv_orani: +e.target.value })} /></Field>
               </FormGrid>
 
@@ -245,11 +277,11 @@ export default function TekliflerPage() {
               </Card>}
 
               <Card title="Kalemler" pad={0}>
-                <datalist id="teklif-urunler">{vList.map((v: any) => <option key={v.id} value={v.label} />)}</datalist>
+                <datalist id="teklif-urunler">{listeUrunleri.map((u: ListeUrun) => <option key={'l' + u.id} value={listeEtiket(u, ed.f.dil)} />)}{vList.map((v: any) => <option key={v.id} value={v.label} />)}</datalist>
                 <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead><tr>{['Ürün / hizmet', 'Miktar', 'Birim', 'Birim fiyat', 'İskonto %', 'Tutar', ''].map((h, i) => <th key={i} style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, color: 'var(--adm-tx3)' }}>{h}</th>)}</tr></thead>
                   <tbody>{ed.kalemler.map((k, i) => <tr key={i}>
-                    <td style={{ padding: 4, minWidth: 240 }}><input className="adm-inp" list="teklif-urunler" value={k.urun_adi} onChange={e => urunSec(i, e.target.value)} placeholder="Katalogdan seçin veya yazın" />{k.variant_id && d.fiyatKalemleri.length > 0 && !fiyatBul(k.variant_id, ed.f.cari_id, k.miktar) && ed.f.para_birimi === 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>fiyat listesinde yok</div>}</td>
+                    <td style={{ padding: 4, minWidth: 240 }}><input className="adm-inp" list="teklif-urunler" value={k.urun_adi} onChange={e => urunSec(i, e.target.value)} placeholder="Fiyat listesinden seçin veya yazın" />{k.kod && listeKod[k.kod] && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>Liste {fmt(+listeKod[k.kod].usd_fiyat, 'USD')}{ed.f.para_birimi === 'TRY' ? ` × kur ${ed.f.kur || '?'}` : ''}{+k.iskonto_yuzde ? ` · iskonto %${k.iskonto_yuzde}` : ''}{k.koli_ici_adet ? ` · ${k.koli_ici_adet} adet/koli` : ''}</div>}{k.kod && ed.f.para_birimi !== 'USD' && ed.f.para_birimi !== 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>bu para biriminde liste yok, fiyatı girin</div>}{k.variant_id && d.fiyatKalemleri.length > 0 && !fiyatBul(k.variant_id, ed.f.cari_id, k.miktar) && ed.f.para_birimi === 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>fiyat listesinde yok</div>}</td>
                     <td style={{ padding: 4 }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 90 }} value={k.miktar} onChange={e => miktarDegis(i, +e.target.value)} /></td>
                     <td style={{ padding: 4 }}><input className="adm-inp" style={{ width: 70 }} value={k.birim} maxLength={20} onChange={e => setK(i, { birim: e.target.value })} /></td>
                     <td style={{ padding: 4 }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 110 }} value={k.birim_fiyat} onChange={e => setK(i, { birim_fiyat: +e.target.value })} /></td>
@@ -259,7 +291,7 @@ export default function TekliflerPage() {
                 </table></div>
                 <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <button type="button" className="adm-btn-ghost" onClick={() => setEd(e => e && ({ ...e, kalemler: [...e.kalemler, bosKalem()] }))}><Plus size={12} />Kalem ekle</button>
-                  <span style={{ fontSize: 13 }}>Ara {fmt(s.ara, ed.f.para_birimi)} · KDV {fmt(s.kdv, ed.f.para_birimi)} · <b>Toplam {fmt(s.toplam, ed.f.para_birimi)}</b></span>
+                  <span style={{ fontSize: 13, textAlign: 'right' }}>{(() => { const ko = koliOzet(ed.kalemler); return ko.koli > 0 ? <span style={{ display: 'block', fontSize: 11.5, color: 'var(--adm-tx3)' }}>{ko.koli} koli · {ko.m3} m³ · {ko.kg} kg{ko.eksik ? ` (${ko.eksik} kalemin koli bilgisi yok)` : ''}</span> : null })()}Ara {fmt(s.ara, ed.f.para_birimi)} · KDV {fmt(s.kdv, ed.f.para_birimi)} · <b>Toplam {fmt(s.toplam, ed.f.para_birimi)}</b></span>
                 </div>
               </Card>
               <Field label="Koşullar (teklifte görünür)"><textarea className="adm-inp" rows={3} maxLength={2000} value={ed.f.kosullar} onChange={e => setF({ kosullar: e.target.value })} placeholder="Ödeme, teslim süresi, teslim yeri…" /></Field>
@@ -267,7 +299,27 @@ export default function TekliflerPage() {
             </fieldset>)}
         </>}
       </Modal>
+
+      <Modal open={fyModal} onClose={() => setFyModal(false)} width={900} title="Proforma fiyat listesi (USD)" footer={<button type="button" className="adm-btn-ghost" onClick={() => setFyModal(false)}>Kapat</button>}>
+        <div style={{ fontSize: 12.5, color: 'var(--adm-tx3)', marginBottom: 8 }}>Tekliflerde ürün seçilince fiyat buradan gelir. Fiyatı değiştirmek yalnızca yeni teklifleri etkiler; kaydedilmiş teklifler değişmez. Koli, hacim ve ağırlık bilgileri “ALYA PLASTIK PRICE LIST USD 2026” dosyasından alınmıştır.</div>
+        <input className="adm-inp" style={{ marginBottom: 8, width: '100%' }} placeholder="Kod veya ürün adı ara…" value={fyAra} onChange={e => setFyAra(e.target.value)} />
+        <div style={{ maxHeight: '60vh', overflow: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+          <thead><tr>{['Kod', 'Ürün', 'Adet/koli', 'Koli m³', 'Koli kg', '40HC adet', 'USD fiyat'].map((h, i) => <th key={i} style={{ padding: '6px 8px', textAlign: i > 1 ? 'right' : 'left', fontSize: 11, color: 'var(--adm-tx3)', position: 'sticky', top: 0, background: 'var(--adm-bg, #fff)' }}>{h}</th>)}</tr></thead>
+          <tbody>{(d.fiyatUrunleri as ListeUrun[]).filter(u => !fyAra.trim() || `${u.kod} ${u.ad_tr} ${u.ad_en || ''}`.toLocaleLowerCase('tr').includes(fyAra.trim().toLocaleLowerCase('tr'))).map(u => <FiyatSatir key={u.id} u={u} kaydet={fiyatKaydet} />)}</tbody>
+        </table></div>
+      </Modal>
       {toast.node}
     </div>
   )
+}
+
+function FiyatSatir({ u, kaydet }: { u: ListeUrun; kaydet: (u: ListeUrun, v: number) => void }) {
+  const [v, setV] = useState(String(+u.usd_fiyat))
+  useEffect(() => { setV(String(+u.usd_fiyat)) }, [u.usd_fiyat])
+  const td = { padding: '4px 8px', borderTop: '1px solid var(--adm-bd, #ddd)' } as const
+  return <tr>
+    <td style={{ ...td, whiteSpace: 'nowrap' }}><b>{u.kod}</b></td><td style={td}>{u.ad_tr}</td>
+    <td style={{ ...td, textAlign: 'right' }}>{u.koli_ici_adet ?? '—'}</td><td style={{ ...td, textAlign: 'right' }}>{u.koli_m3 ?? '—'}</td><td style={{ ...td, textAlign: 'right' }}>{u.koli_kg ?? '—'}</td><td style={{ ...td, textAlign: 'right' }}>{u.konteyner_40hc ?? '—'}</td>
+    <td style={{ ...td, textAlign: 'right' }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 90, textAlign: 'right' }} value={v} onChange={e => setV(e.target.value)} onBlur={() => kaydet(u, +v)} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} /></td>
+  </tr>
 }

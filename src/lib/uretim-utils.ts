@@ -37,6 +37,7 @@ const FETCH = {
   fiyatListeleri:  () => erp.all('fiyat_listeleri'),
   fiyatKalemleri:  () => erp.all('fiyat_listesi_kalemleri'),
   iskontolar:      () => erp.all('iskonto_kademeleri'),
+  fiyatUrunleri:   () => erp.all('fiyat_listesi_urunleri', '*', q => q.order('sira', { ascending: true })),
   cariTam:         () => muh.all('cari_hesaplar', '*', q => q.order('ad', { ascending: true })),
 }
 export type UKey = keyof typeof FETCH
