@@ -170,7 +170,10 @@ async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   const j = json(await hamCalistir(() => araciCalistir(sb, 'stok_durumu', { tur: 'mamul', ...(mekan !== 'hepsi' ? { mekan } : {}) })))
   const SANDIK: Record<string, [string, string]> = { 'sandik no 1': ['ALY-300', 'SANDIK NO:1'], 'sandik no 2': ['ALY-301', 'SANDIK NO:2'], 'sandik no 3': ['ALY-302', 'SANDIK NO:3'], 'sandik 3 lu set': ['ALY-303', 'SANDIK 3 LÜ SET'], 'sandik no 1 eko': ['ALY-310', 'SANDIK NO:1 EKO'], 'sandik no 2 eko': ['ALY-311', 'SANDIK NO:2 EKO'], 'sandik no 3 eko': ['ALY-312', 'SANDIK NO:3 EKO'], 'sandik 3 lu set eko': ['ALY-313', 'SANDIK 3 LÜ SET EKO'] }
   const urunler: any[] = []
+  // Muhasebede kaydı olmayan (yalnız panelde tanımlı) kodlar muhasebe stok raporlarına girmez
+  const MUH_YOK = /^ALYG?-?(110|212|441|555|711|900|200[2-6])$/i
   for (const u0 of (j.mamul?.urunler || []) as any[]) {
+    if (MUH_YOK.test(String(u0.kod || '').trim())) continue
     const u = { ...u0, urun: muhAd(u0.kod, u0.urun) }
     if (String(u.kod).toUpperCase() !== 'ALY-502') { urunler.push(u); continue }
     // Panelde sandıklar ALY-502 altında varyant; muhasebede kendi kodlarıyla (ALY-300…313) ayrı ürün
