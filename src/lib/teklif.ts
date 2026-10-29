@@ -4,11 +4,13 @@ export type TKalem = { variant_id: string; urun_adi: string; aciklama: string; m
 export type Dil = 'tr' | 'en'
 export const PARA = ['TRY', 'USD', 'EUR', 'GBP', 'RUB']
 /** Fiyat listesi (proforma) satırı: fiyat USD'dir. */
-export type ListeUrun = { id: string; kod: string; ad_tr: string; ad_en: string | null; koli_ici_adet: number | null; konteyner_40hc: number | null; olcu: string | null; koli_m3: number | null; koli_kg: number | null; usd_fiyat: number; aktif: boolean }
+export type ListeUrun = { id: string; kod: string; ad_tr: string; ad_en: string | null; koli_ici_adet: number | null; konteyner_40hc: number | null; olcu: string | null; koli_m3: number | null; koli_kg: number | null; usd_fiyat: number; tl_fiyat?: number | null; aktif: boolean }
 export const listeEtiket = (u: ListeUrun, dil: Dil) => `${u.kod} · ${dil === 'en' && u.ad_en ? u.ad_en : u.ad_tr}`
 /** Liste fiyatı teklifin para birimine çevrilir: USD → aynen, TRY → USD × kur, diğerleri → otomatik fiyat yok (null). */
-export function listeFiyatiPara(usd: number, para: string, kur: number): number | null {
+/** TL teklifte ürünün elle girilmiş TL liste fiyatı (tl) varsa o kullanılır, yoksa USD × kur. */
+export function listeFiyatiPara(usd: number, para: string, kur: number, tl?: number | null): number | null {
   if (para === 'USD') return yuvarla(+usd, 4)
+  if (para === 'TRY' && tl != null && +tl > 0) return yuvarla(+tl, 2)
   if (para === 'TRY' && +kur > 0) return yuvarla(+usd * +kur, 2)
   return null
 }
