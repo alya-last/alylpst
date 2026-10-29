@@ -38,7 +38,7 @@ export default function HizliArama() {
     setSayfa(s)
     if (yuklendi.current) return
     yuklendi.current = true; setYuk(true)
-    const al = async (p: Promise<any>) => { try { const r = await p; return Array.isArray(r?.data) ? r.data : [] } catch { return [] } }
+    const al = async (p: PromiseLike<any>) => { try { const r = await p; return Array.isArray(r?.data) ? r.data : [] } catch { return [] } }
     ;(async () => {
       const [cari, tek, sip, fat] = await Promise.all([
         al(muh.from('cari_hesaplar').select('id,ad,vergi_no,telefon').order('ad', { ascending: true }).limit(3000)),
