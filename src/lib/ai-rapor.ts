@@ -161,6 +161,9 @@ const MUH_AD: Record<string, string> = {
   'ALYG-05': 'KEMER (KARE) SAKSI NO:1 35 LT', 'ALYG-06': 'KEMER (KARE) SAKSI NO:2 75 LT', 'ALYG-07': 'MİLAS (DİKDÖRTGEN) SAKSI NO:1 90 LT', 'ALYG-08': 'MİLAS (DİKDÖRTGEN) SAKSI NO:2 225 LT',
   'ALYG-09': 'DATÇA (AÇILI) SAKSI NO:1 55 LT', 'ALYG-10': 'DATÇA (AÇILI) SAKSI NO:2 99 LT', 'ALYG-11': 'KÖŞK (DİKDÖRTGEN) SAKSI', 'ALYG-12': 'ARAJMAN SAKSI NO:1 20 LT',
   'ALYG-13': 'ARAJMAN SAKSI NO:2 50 LT', 'ALYG-14': 'ARAJMAN SAKSI NO:3 73 LT', 'ALYG-15': 'ARAJMAN SAKSI NO:4 200 LT', 'ALYG-16': 'GONDOL SAKSI NO:1 28 LT', 'ALYG-17': 'GONDOL SAKSI NO:2 60 LT',
+  // Panelde tek kodla tanımlı, muhasebede başka kodlarla (ALY-10/xx, 231-232, 409-411, 121-122, 20/xx) kayıtlı ürünler
+  'ALY-110': 'KORDON AYAKLI SAKSI', 'ALY-900': 'GÜVEÇ AYAKLI SAKSI', 'ALY-212': 'KOZALAK KRİSTAL SAKSI', 'ALY-441': 'VENÜS ASKILI BALKON SAKSI', 'ALY-555': 'KOZALAK KAKTÜS SAKSI',
+  'ALY-711': '3D KİRLİ ÇAMAŞIR SEPETİ', 'ALY-2002': '3D ÇAMAŞIR SELESİ', 'ALY-2003': '3D ÇÖP KOVASI', 'ALY-2004': '3D DETERJANLIK', 'ALY-2005': '3D KLOZET FIRÇASI', 'ALY-2006': "3D 5'Lİ BANYO SETİ",
   'ALYG-18': 'ARMUT SAKSI 165 LT', 'ALYG-19': 'VİTRİN SAKSI NO:1 110 LT', 'ALYG-20': 'VİTRİN SAKSI NO:2 200 LT', 'ALYG-21': 'TURUVA SAKSI 54 LT', 'ALYG-22': 'ÇİT SAKSI', 'ALYG-24': 'LOTTE SAKSI',
 }
 const muhAd = (kod: string, ad: string) => MUH_AD[String(kod || '').toUpperCase()] || ad
@@ -170,10 +173,7 @@ async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   const j = json(await hamCalistir(() => araciCalistir(sb, 'stok_durumu', { tur: 'mamul', ...(mekan !== 'hepsi' ? { mekan } : {}) })))
   const SANDIK: Record<string, [string, string]> = { 'sandik no 1': ['ALY-300', 'SANDIK NO:1'], 'sandik no 2': ['ALY-301', 'SANDIK NO:2'], 'sandik no 3': ['ALY-302', 'SANDIK NO:3'], 'sandik 3 lu set': ['ALY-303', 'SANDIK 3 LÜ SET'], 'sandik no 1 eko': ['ALY-310', 'SANDIK NO:1 EKO'], 'sandik no 2 eko': ['ALY-311', 'SANDIK NO:2 EKO'], 'sandik no 3 eko': ['ALY-312', 'SANDIK NO:3 EKO'], 'sandik 3 lu set eko': ['ALY-313', 'SANDIK 3 LÜ SET EKO'] }
   const urunler: any[] = []
-  // Muhasebede kaydı olmayan (yalnız panelde tanımlı) kodlar muhasebe stok raporlarına girmez
-  const MUH_YOK = /^ALYG?-?(110|212|441|555|711|900|200[2-6])$/i
   for (const u0 of (j.mamul?.urunler || []) as any[]) {
-    if (MUH_YOK.test(String(u0.kod || '').trim())) continue
     const u = { ...u0, urun: muhAd(u0.kod, u0.urun) }
     if (String(u.kod).toUpperCase() !== 'ALY-502') { urunler.push(u); continue }
     // Panelde sandıklar ALY-502 altında varyant; muhasebede kendi kodlarıyla (ALY-300…313) ayrı ürün
