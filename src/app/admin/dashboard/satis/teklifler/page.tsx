@@ -18,7 +18,7 @@ const tarihTR = (t: string | null) => (t ? t.split('-').reverse().join('.') : '�
 const KOSUL = { tr: 'Fiyatlarımıza KDV dahil değildir.', en: 'Prices exclude VAT.' }
 type F = { cari_id: string; musteri_adi: string; musteri_email: string; musteri_tel: string; basvuru_id: string; tarih: string; gecerlilik: string; para_birimi: string; kur: string; kdv_orani: number; dil: Dil; kosullar: string; notlar: string }
 type Ed = { id: string | null; no: string; durum: string; siparisId: string | null; f: F; kalemler: TKalem[] }
-const bosF = (): F => ({ cari_id: '', musteri_adi: '', musteri_email: '', musteri_tel: '', basvuru_id: '', tarih: bugunTR(), gecerlilik: gunEkle(bugunTR(), 15), para_birimi: 'TRY', kur: '', kdv_orani: 20, dil: 'tr', kosullar: KOSUL.tr, notlar: '' })
+const bosF = (kur = ''): F => ({ cari_id: '', musteri_adi: '', musteri_email: '', musteri_tel: '', basvuru_id: '', tarih: bugunTR(), gecerlilik: gunEkle(bugunTR(), 15), para_birimi: 'TRY', kur, kdv_orani: 20, dil: 'tr', kosullar: KOSUL.tr, notlar: '' })
 
 export default function TekliflerPage() {
   const toast = useToast()
@@ -30,6 +30,7 @@ export default function TekliflerPage() {
   const [tab, setTab] = useState('acik')
   const [ed, setEd] = useState<Ed | null>(null)
   const [sekme, setSekme] = useState('duzenle')
+  const [tcmbUsd, setTcmbUsd] = useState('') // TCMB USD satış kuru: TL teklifte kur boşsa öneri olarak otomatik gelir (düzenlenebilir)
   const [busy, setBusy] = useState(false)
   const [ai, setAi] = useState<{ metin: string; busy: boolean; sonuc: any | null; kapali: boolean }>({ metin: '', busy: false, sonuc: null, kapali: false })
 
@@ -39,6 +40,7 @@ export default function TekliflerPage() {
     setListe(t.data || []); setSite(s.data?.value || null); setYuk(false)
   }, []) // eslint-disable-line
   useEffect(() => { yukle() }, [yukle])
+  useEffect(() => { fetch('/api/admin/kurlar').then(r => r.json()).then(j => { if (+j?.USD > 0) setTcmbUsd(String(+(+j.USD).toFixed(4))) }).catch(() => {}) }, [])
 
   const cari = useMemo(() => byId(d.cariTam), [d.cariTam])
   const urun = useMemo(() => byId(d.products), [d.products])
@@ -93,7 +95,7 @@ export default function TekliflerPage() {
     })
   }, [yuk]) // eslint-disable-line
 
-  const yeni = () => { setEd({ id: null, no: '', durum: 'taslak', siparisId: null, f: bosF(), kalemler: [bosKalem()] }); setSekme('duzenle'); setAi({ metin: '', busy: false, sonuc: null, kapali: false }) }
+  const yeni = () => { setEd({ id: null, no: '', durum: 'taslak', siparisId: null, f: bosF(tcmbUsd), kalemler: [bosKalem()] }); setSekme('duzenle'); setAi({ metin: '', busy: false, sonuc: null, kapali: false }) }
   async function ac(t: any) {
     const { data, error } = await web.from('teklif_kalemleri').select('*').eq('teklif_id', t.id).order('sira')
     if (error) return toast.show(error.message, true)
@@ -111,6 +113,8 @@ export default function TekliflerPage() {
   })
   const setK = (i: number, p: Partial<TKalem>) => setEd(e => e && ({ ...e, kalemler: e.kalemler.map((k, j) => j === i ? { ...k, ...p } : k) }))
   const kilitli = ed?.durum === 'kabul'
+  // Kur sonradan geldiyse (sayfa açıkken) yeni teklifin boş kurunu doldur ve TL fiyatları hesapla
+  useEffect(() => { if (tcmbUsd && ed && !ed.id && ed.f.para_birimi === 'TRY' && !ed.f.kur) setF({ kur: tcmbUsd }) }, [tcmbUsd, ed?.id, ed?.f.para_birimi, ed?.f.kur]) // eslint-disable-line
 
   function urunSec(i: number, text: string) {
     if (!ed) return
@@ -118,6 +122,9 @@ export default function TekliflerPage() {
     if (lu) return setK(i, listeKalemi(lu, ed.f, ed.kalemler[i].miktar))
     const v = vList.find((x: any) => x.label === text)
     if (!v) return setK(i, { urun_adi: text, variant_id: '', ...listeTemizle })
+    // Katalog ürünü fiyat listesinde aynı kodla varsa liste fiyatı / iskonto / koli bilgisi otomatik gelir
+    const pk = String(urun[(d.variants as any[]).find((x: any) => x.id === v.id)?.product_id]?.code || '').toUpperCase(), lu2 = listeKod[pk]
+    if (lu2) return setK(i, { ...listeKalemi(lu2, ed.f, ed.kalemler[i].miktar), variant_id: v.id, urun_adi: v.label })
     const fb = ed.f.para_birimi === 'TRY' ? fiyatBul(v.id, ed.f.cari_id, ed.kalemler[i].miktar) : null
     setK(i, { variant_id: v.id, urun_adi: v.label, ...listeTemizle, ...(fb ? { birim_fiyat: fb.fiyat, iskonto_yuzde: fb.isk } : {}) })
   }
@@ -284,7 +291,7 @@ export default function TekliflerPage() {
                     <td style={{ padding: 4, minWidth: 240 }}><input className="adm-inp" list="teklif-urunler" value={k.urun_adi} onChange={e => urunSec(i, e.target.value)} placeholder="Fiyat listesinden seçin veya yazın" />{k.kod && listeKod[k.kod] && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>Liste {fmt(+listeKod[k.kod].usd_fiyat, 'USD')}{ed.f.para_birimi === 'TRY' ? ` × kur ${ed.f.kur || '?'}` : ''}{+k.iskonto_yuzde ? ` · iskonto %${k.iskonto_yuzde}` : ''}{k.koli_ici_adet ? ` · ${k.koli_ici_adet} adet/koli` : ''}</div>}{k.kod && ed.f.para_birimi !== 'USD' && ed.f.para_birimi !== 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>bu para biriminde liste yok, fiyatı girin</div>}{k.variant_id && d.fiyatKalemleri.length > 0 && !fiyatBul(k.variant_id, ed.f.cari_id, k.miktar) && ed.f.para_birimi === 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>fiyat listesinde yok</div>}</td>
                     <td style={{ padding: 4 }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 90 }} value={k.miktar} onChange={e => miktarDegis(i, +e.target.value)} /></td>
                     <td style={{ padding: 4 }}><input className="adm-inp" style={{ width: 70 }} value={k.birim} maxLength={20} onChange={e => setK(i, { birim: e.target.value })} /></td>
-                    <td style={{ padding: 4 }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 110 }} value={k.birim_fiyat} onChange={e => setK(i, { birim_fiyat: +e.target.value })} /></td>
+                    <td style={{ padding: 4 }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 110 }} value={k.birim_fiyat} onChange={e => setK(i, { birim_fiyat: +e.target.value })} />{k.urun_adi.trim() && !(+k.birim_fiyat > 0) && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)', maxWidth: 130 }}>{ed.f.para_birimi === 'TRY' && !ed.f.kur && k.kod ? 'Kur girin: fiyat kurdan hesaplanır' : k.kod ? 'Bu para biriminde liste fiyatı yok, elle girin' : 'Fiyat listesinde yok, elle girin'}</div>}</td>
                     <td style={{ padding: 4 }}><input type="number" min="0" max="100" step="any" className="adm-inp" style={{ width: 80 }} value={k.iskonto_yuzde} onChange={e => setK(i, { iskonto_yuzde: +e.target.value })} /></td>
                     <td style={{ padding: 4, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(satirNet(k), ed.f.para_birimi)}</td>
                     <td style={{ padding: 4 }}><button type="button" className="adm-btn-danger" style={{ padding: '3px 7px' }} disabled={ed.kalemler.length <= 1} onClick={() => setEd(e => e && ({ ...e, kalemler: e.kalemler.filter((_, j) => j !== i) }))}><Trash2 size={12} /></button></td></tr>)}</tbody>
