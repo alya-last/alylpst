@@ -664,7 +664,7 @@ async function hammadde(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<S
   sayfalar.unshift({ ad: 'Özet', sutunlar: ['Mekan', 'Satılan Adet', 'Hammadde (kg)', 'Hammadde (ton)', 'Gramajı Tanımsız Ürün', 'Onların Adedi'], satirlar: ozetSat })
   const ekstra = jsonTablolar(j).filter(s => /aylik|ay/i.test(s.ad) && !/urun|ozet|özet/i.test(s.ad))
   sayfalar.push(...ekstra.slice(0, 2))
-  govde.push('Not: Bu, SATILAN ürünlerin ağırlığıdır (adet × reçete gramajı); fire ve stoka üretim dahil değildir. Satış dosyası Eylül ayına kadardır.')
+  govde.push('Not: Bu, SATILAN ürünlerin ağırlığıdır (adet × reçete gramajı); fire ve stoka üretim dahil değildir.', `Dönem: ${j.donem}`)
   return bitir(sb, `Satışa göre hammadde ${mekan === 'hepsi' ? 'iç ve dış mekan' : mekanAd(mekan).toLowerCase()}`, sayfalar, govde, ['rapor_hammadde'])
 }
 
