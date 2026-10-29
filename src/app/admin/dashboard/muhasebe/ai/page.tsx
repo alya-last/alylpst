@@ -37,6 +37,7 @@ const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
     'dış mekan 2026 sene başından beri ne kadar satmışım excel',
     'ALYG-01 ÇEŞME(YUVARLAK) SAKSI 28 LT ne kadar satmışım',
     '2026 döneminde dış mekan satışlarımda ne kadar hammadde kullanmışım',
+    'dış mekan stoğumdaki ürünlerde kaç kg hammadde var',
   ] },
   { baslik: 'İç mekan', sorular: [
     'iç mekan tahsilat listesi bakiyesi olanlar excel',
@@ -44,6 +45,18 @@ const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
     'iç mekan 2026 sene başından beri satış excel',
     'ayl-101, aly-102, aly-132 ne kadar satmışım excel',
     '2026 dönemi ne kadar iç mekan satmışım',
+    'iç mekan stoklarımın hepsini excel ver',
+    'iç mekanda satışıma göre ne kadar boya kullandım (%2)',
+    'iç mekan stoğumdaki ürünlerde ne kadar boya var (%2)',
+    'iç mekan stoğumdaki ürünlerde kaç kg hammadde var',
+  ] },
+  { baslik: 'Hammadde, boya, koli', sorular: [
+    'hammaddelerim neler stokları ile',
+    'boya stoklarımı ver',
+    'koli ve etiket stoklarımı ver',
+    'moblen hammadde alışlarım excel',
+    'hammadde alımları excel',
+    'ESPAPLAST PLASTİK KDV carisi faturalar excel',
   ] },
   { baslik: 'İhracat', sorular: [
     'ihracatta tahsil etmediğim müşterilerin listesi',

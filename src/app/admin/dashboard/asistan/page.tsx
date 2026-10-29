@@ -18,6 +18,8 @@ const ONERILER = [
   'Üretimdeki emirlerin durumu',
   'Son 7 günde site ziyareti nasıl?',
   'Güncel dolar/euro kuru ne, genel olarak yorumun ne?',
+  'İç mekanda satışıma göre ne kadar boya kullandım (%2)?',
+  'Hammadde ve boya stoklarım neler?',
 ]
 
 export default function AsistanPage() {
