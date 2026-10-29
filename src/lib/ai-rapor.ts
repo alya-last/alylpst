@@ -15,6 +15,7 @@ export type RaporNiyet =
   | { tur: 'urun_ad'; arama: string } // ürün KODU yok, ürün ADI var ("line saksı satışlarım"): satış dosyasındaki adlardan kodlar bulunup 'urun' raporu verilir
   | { tur: 'hammadde'; mekan: Mekan }
   | { tur: 'hm_stok'; grup: HmGrup; arama: string } // hammadde / boya / koli / etiket DEPO STOĞU ("hammaddelerim neler", "boya stoğu", "koli stokları")
+  | { tur: 'hm_alis'; arama: string; hareket: boolean } // hammadde ALIŞLARI / stok hareketleri (stok_hareketleri tablosu): "moblen hammadde alışlarım"
   | { tur: 'ihr_tahsilat' }
   | { tur: 'ihr_rakam'; yil: number }
   | { tur: 'pos' }
@@ -93,6 +94,8 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
   }
   const kodlar = kodlariBul(soru)
   if (kodlar.length && /sat|adet|ne kadar|rakam|kac|ciro/.test(t) && !/stok|recete|maliyet/.test(t)) return { tur: 'urun', kodlar }
+  const hma = hmAlisNiyeti(t)
+  if (hma) return hma
   const hmn = hmStokNiyeti(t, kodlar)
   if (hmn) return hmn
   if (/hammadde/.test(t)) return /stok|stog|depo|kalan/.test(t) ? null : { tur: 'hammadde', mekan }
@@ -102,6 +105,18 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
   // Ürün ADI ile satış/müşteri sorusu (kod yok): "line saksı satışlarımı müşteri detaylı excel ver"
   if (!kodlar.length && /sat(mis|tim|ti|is|ilan|tik)|satis|adet|ne kadar|ciro|musteri/.test(t) && !/stok|stog|recete|maliyet|hammadde|fiyat|tahsilat|bakiye|borc|kdv|fatura/.test(t) && /saksi|sepet|sandik|casa|selesi|kova|firca|deterjanlik|banyo seti|camasir|set\b|\b(line|polo|cornet|efes|venus|tripot|ufo|kozalak|somon|kale|ordek|kordon|guvec|ahsap|dantel|orgu|kapakli|kaktus|3d|cesme|kemer|milas|datca|kosk|arajman|gondol|armut|vitrin|turuva|cit|lotte)\b/.test(t)) return { tur: 'urun_ad', arama: t }
   return null
+}
+
+/** "moblen hammadde alışlarım", "granür alışları", "moblen stok hareketleri": hammaddenin giriş (alış) / hareket geçmişi. */
+function hmAlisNiyeti(t: string): RaporNiyet | null {
+  const alis = /\b(alis|alim|alisi|alislari\w*|alislarim\w*|aldigim\w*|aldik|aldim|satin ?alma\w*|satinalma\w*|giris\w*)\b|alislar|alisim/.test(t)
+  const hrk = /hareket/.test(t)
+  if (!(alis || hrk)) return null
+  if (!/hammadde|ham madde|moblen|granur|granul|copolimer|kopolimer|compakt|kompakt|kristal|rotasyon|\bpp\b|polipropilen|boya|\bkoli|etiket/.test(t)) return null
+  if (/sat(mis|tim|ti|is|ilan|tik)|satis|ciro|musteri|tahsilat|bakiye|borc|kdv|fatura|recete|maliyet|teklif|ekstre|cari|ihracat|urun/.test(t) && !/hammadde/.test(t)) return null
+  const GEN = /^(hammadde\w*|ham|madde\w*|alis\w*|alim\w*|aldi\w*|satin\w*|satinalma\w*|giris\w*|hareket\w*|stok\w*|stog\w*|liste\w*|excel\w*|ver|bana|goster\w*|tum\w*|neler|nelerim|ne|kadar|kac|icin|ile|ve|bir|bu|ay|aylik|2026|detay\w*|dokum\w*|bilgi\w*|olan|bizim|benim|ekim|bugune|kadar)$/
+  const ara = t.split(' ').filter(w => w.length >= 2 && !GEN.test(w)).join(' ')
+  return { tur: 'hm_alis', arama: ara, hareket: hrk && !alis }
 }
 
 /** "hammaddelerim neler", "boya stoğu", "yeşil boya var mı", "line koli kaç adet" gibi DEPO stoğu soruları (satış/fiyat/maliyet/reçete soruları değil). */
@@ -432,6 +447,39 @@ async function hmStok(sb: SupabaseClient, grup: HmGrup, arama: string): Promise<
   return bitir(sb, `Hammadde boya koli etiket stok${arama ? ' ' + arama : ''}`, sayfalar, govde.slice(0, -1), ['rapor_hammadde_stok'])
 }
 
+const TIPAD: Record<string, string> = { satinalma: 'Satın alma', uretim_cikis: 'Üretim çıkışı', uretim_giris: 'Üretim girişi', sevkiyat: 'Sevkiyat', sayim: 'Sayım / devir', manuel_duzeltme: 'Manuel düzeltme', iade: 'İade', fire: 'Fire', satis: 'Satış' }
+const hmCari = (ac: string) => { const m = /^Muhasebe stok kartı \([^)]*\) - (.*)$/.exec(String(ac || '')); return (m ? m[1] : String(ac || '')).split(' | ')[0].trim() }
+async function hmAlis(sb: SupabaseClient, arama: string, hareketMi: boolean): Promise<Sonuc | null> {
+  const hm = (await sayfala(sb, 'hammaddeler', 'id,kod,ad,birim,mevcut_stok')) as any[]
+  const kel = nrm(arama).split(' ').filter(Boolean)
+  const hedef = hm.filter(h => !kel.length || kel.every(w => nrm(h.ad + ' ' + h.kod).split(' ').some(x => x.startsWith(w))))
+  const idler = new Map(hedef.map(h => [h.id, h]))
+  const hr = (await sayfala(sb, 'stok_hareketleri', 'hammadde_id,tarih,tip,yon,miktar,birim_maliyet,aciklama')).filter((x: any) => idler.has(x.hammadde_id))
+  if (!hr.length) return null
+  hr.sort((a: any, b: any) => String(a.tarih).localeCompare(String(b.tarih)))
+  const alislar = hr.filter((x: any) => x.tip === 'satinalma' && x.yon === 'giris')
+  const tut = (x: any) => (+x.miktar || 0) * (+x.birim_maliyet || 0)
+  const adlar = [...new Set(hr.map((x: any) => idler.get(x.hammadde_id).ad))]
+  const tek = adlar.length === 1
+  // Cari bazlı özet
+  const cm = new Map<string, { n: number; kg: number; tl: number; fyKg: number }>()
+  for (const x of alislar) { const c = hmCari(x.aciklama) || '—', o = cm.get(c) || { n: 0, kg: 0, tl: 0, fyKg: 0 }; o.n++; o.kg += +x.miktar || 0; o.tl += tut(x); o.fyKg += +x.birim_maliyet > 0 ? +x.miktar || 0 : 0; cm.set(c, o) }
+  const topKg = alislar.reduce((t: number, x: any) => t + (+x.miktar || 0), 0), topTl = alislar.reduce((t: number, x: any) => t + tut(x), 0), fyKg = alislar.filter((x: any) => +x.birim_maliyet > 0).reduce((t: number, x: any) => t + (+x.miktar || 0), 0)
+  const bak = new Map<string, number>()
+  const hrk: Hucre[][] = hr.map((x: any) => { const ad = idler.get(x.hammadde_id).ad, d = (x.yon === 'giris' ? 1 : -1) * (+x.miktar || 0), b = r2((bak.get(ad) || 0) + d); bak.set(ad, b); return [String(x.tarih).slice(0, 10), ad, TIPAD[x.tip] || x.tip, hmCari(x.aciklama), x.yon === 'giris' ? +x.miktar || 0 : null, x.yon === 'cikis' ? +x.miktar || 0 : null, +x.birim_maliyet > 0 ? +x.birim_maliyet : null, +x.birim_maliyet > 0 ? r2(tut(x)) : null, b, String(x.aciklama || '')] })
+  const sayfalar: Sayfa[] = [
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Hammadde', tek ? adlar[0] : `${adlar.length} kalem`], ['Alış (satın alma) sayısı', alislar.length], ['Toplam alınan miktar (kg)', r2(topKg)], ['Fiyatlı alışların tutarı (TL, KDV hariç)', r2(topTl)], ['Fiyatlı alışlarda ort. birim fiyat (TL/kg)', fyKg ? r2(topTl / fyKg) : 0], ['Fiyatsız alış (ödünç/numune vb.) kg', r2(topKg - fyKg)], ['Güncel stok (kg)', r2(hedef.filter(h => hr.some((x: any) => x.hammadde_id === h.id)).reduce((t, h) => t + (+h.mevcut_stok || 0), 0))], ['Rapor tarihi', bugunISO()]] },
+    { ad: 'Cari Bazlı Alışlar', sutunlar: ['Cari / Kaynak', 'Alış sayısı', 'Miktar kg', 'Tutar TL', 'Ort. fiyat TL/kg'], satirlar: [...cm.entries()].sort((a, b) => b[1].kg - a[1].kg).map(([c, o]) => [c, o.n, r2(o.kg), r2(o.tl), o.fyKg ? r2(o.tl / o.fyKg) : null]) },
+    { ad: 'Alışlar', sutunlar: ['Tarih', 'Hammadde', 'Cari / Kaynak', 'Miktar kg', 'Birim fiyat TL', 'Tutar TL', 'Açıklama'], satirlar: alislar.map((x: any) => [String(x.tarih).slice(0, 10), idler.get(x.hammadde_id).ad, hmCari(x.aciklama), +x.miktar || 0, +x.birim_maliyet > 0 ? +x.birim_maliyet : null, +x.birim_maliyet > 0 ? r2(tut(x)) : null, String(x.aciklama || '')]) },
+    { ad: 'Tüm Stok Hareketleri', sutunlar: ['Tarih', 'Hammadde', 'Hareket', 'Cari / Kaynak', 'Giren kg', 'Çıkan kg', 'Birim fiyat TL', 'Tutar TL', 'Kalan stok kg', 'Açıklama'], satirlar: hrk },
+  ]
+  const govde = [`${tek ? adlar[0].toUpperCase() : 'HAMMADDE'} ${hareketMi ? 'STOK HAREKETLERİ' : 'ALIŞLARI'} (${bugunISO()})`, '', `Alış: ${alislar.length} kayıt, ${AD(topKg)} kg · fiyatlı kısım ${TL(topTl)} TL (ort. ${fyKg ? TL(topTl / fyKg) : '—'} TL/kg)`]
+  for (const [c, o] of [...cm.entries()].sort((a, b) => b[1].kg - a[1].kg).slice(0, 8)) govde.push(`• ${c}: ${AD(o.kg)} kg${o.fyKg ? ` · ${TL(o.tl)} TL` : ' · fiyatsız (ödünç/numune)'}`)
+  const alisBaslik = alislar.length - fyKg > 0 && alislar.some((x: any) => !(+x.birim_maliyet > 0)) ? 'Not: fiyatsız girişler ödünç/numune olabilir, tutara katılmadı.' : ''
+  if (alisBaslik) govde.push('', alisBaslik)
+  return bitir(sb, `${tek ? adlar[0] : 'Hammadde'} ${hareketMi ? 'stok hareketleri' : 'alışları'}`, sayfalar, govde, ['rapor_hammadde_alis'])
+}
+
 /* ─────────────── Satıştan hammadde kullanımı ─────────────── */
 async function hammadde(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   const j = json(await hamCalistir(() => araciCalistir(sb, 'satis_hammadde', { mekan })))
@@ -728,7 +776,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   let n = raporNiyeti(soru)
   if (!n) { try { n = await niyetSinifla(soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -739,6 +787,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       case 'urun_ad': { const kk = await urunAdindanKodlar(sb, n.arama); return kk.length ? await urunSatis(sb, kk) : null }
       case 'hammadde': return await hammadde(sb, n.mekan)
       case 'hm_stok': return await hmStok(sb, n.grup, n.arama)
+      case 'hm_alis': return await hmAlis(sb, n.arama, n.hareket)
       case 'ihr_tahsilat': return await ihracatTahsilat(sb)
       case 'ihr_rakam': return await ihracatRakam(sb, n.yil)
       case 'pos': return await posRapor(sb)
