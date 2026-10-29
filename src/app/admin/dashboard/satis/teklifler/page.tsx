@@ -67,6 +67,12 @@ export default function TekliflerPage() {
     const isk = Math.max(0, ...d.iskontolar.filter((k: any) => k.aktif !== false && +k.min_miktar <= miktar).map((k: any) => +k.iskonto_yuzdesi))
     return { fiyat: +it.fiyat, isk }
   }
+  // Katalog varyantı → proforma ürün kodu: ürün kodu seri kodudur (ALY-421 = Line serisi); "No:N" adından gerçek kod bulunur (No:2 → ALY-422)
+  function varyantListeKodu(pk: string, v: any): string {
+    const no = /\bno\s*:?\s*(\d)\b/i.exec(`${v?.name || ''} ${v?.size || ''}`)?.[1], baz = /^ALY-(\d+)$/.exec(pk)
+    if (no && baz) { const c2 = `ALY-${+baz[1] + +no - 1}`, lu = listeKod[c2]; if (lu && new RegExp(`NO\\s*:?\\s*${no}\\b`, 'i').test(lu.ad_tr)) return c2 }
+    return pk
+  }
   // Müşteriye özel fiyat listesi (cari kartında seçili): proforma ürün kodu → ADET fiyatı (TL). Liste varyant bazlıdır; "No:N" serilerinde kod+N-1 eşlenir (ALY-131 No:4 → ALY-134)
   function musteriAdetFiyat(kod: string | undefined, cariId: string): number | null {
     const lid = cari[cariId]?.fiyat_listesi_id
@@ -74,9 +80,7 @@ export default function TekliflerPage() {
     for (const k of d.fiyatKalemleri as any[]) {
       if (k.fiyat_listesi_id !== lid) continue
       const v = (d.variants as any[]).find(x => x.id === k.variant_id); if (!v) continue
-      const pk = String(urun[v.product_id]?.code || '').toUpperCase(), no = /\bno\s*:?\s*(\d)\b/i.exec(`${v.name || ''} ${v.size || ''}`)?.[1], baz = /^ALY-(\d+)$/.exec(pk)
-      let hedef = pk
-      if (no && baz) { const c2 = `ALY-${+baz[1] + +no - 1}`, lu = listeKod[c2]; if (lu && new RegExp(`NO\\s*:?\\s*${no}\\b`, 'i').test(lu.ad_tr)) hedef = c2 }
+      const hedef = varyantListeKodu(String(urun[v.product_id]?.code || '').toUpperCase(), v)
       if (hedef === kod && +k.fiyat > 0) return +k.fiyat
     }
     return null
@@ -140,7 +144,7 @@ export default function TekliflerPage() {
     const v = vList.find((x: any) => x.label === text)
     if (!v) return setK(i, { urun_adi: text, variant_id: '', ...listeTemizle })
     // Katalog ürünü fiyat listesinde aynı kodla varsa liste fiyatı / iskonto / koli bilgisi otomatik gelir
-    const pk = String(urun[(d.variants as any[]).find((x: any) => x.id === v.id)?.product_id]?.code || '').toUpperCase(), lu2 = listeKod[pk]
+    const vr = (d.variants as any[]).find((x: any) => x.id === v.id), pk = String(urun[vr?.product_id]?.code || '').toUpperCase(), lu2 = listeKod[varyantListeKodu(pk, vr)]
     if (lu2) return setK(i, { ...listeKalemi(lu2, ed.f, ed.kalemler[i].miktar), variant_id: v.id, urun_adi: v.label })
     const fb = ed.f.para_birimi === 'TRY' ? fiyatBul(v.id, ed.f.cari_id, ed.kalemler[i].miktar) : null
     setK(i, { variant_id: v.id, urun_adi: v.label, ...listeTemizle, ...(fb ? { birim_fiyat: fb.fiyat, iskonto_yuzde: fb.isk } : {}) })
