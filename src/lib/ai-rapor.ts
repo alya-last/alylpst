@@ -150,10 +150,25 @@ async function tahsilat(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   return bitir(sb, `Tahsilat listesi ${mekan === 'hepsi' ? 'iç ve dış mekan' : mekanAd(mekan === 'dis' ? 'dis' : 'ic').toLowerCase()}`, sayfalar, govde, ['rapor_tahsilat'])
 }
 
+/* Muhasebe programındaki ürün adları (kod → ad). Panel/site adları farklı olabilir; raporlarda muhasebe adı esas. Listede olmayan kodda panel adı kalır. */
+const MUH_AD: Record<string, string> = {
+  'ALY-101': '3D SAKSI NO:1 0.70 LT', 'ALY-131': 'SOMON SAKSI NO:1 0,70 LT', 'ALY-201': 'VENÜS SAKSI NO:1 0.75 LT', 'ALY-221': 'VENÜS MENEKŞE SAKSI NO:1 0.43 LT',
+  'ALY-311': 'SANDIK NO:2 EKO', 'ALY-333': 'DANTEL SEPET', 'ALY-334': 'MİNİ SEPET', 'ALY-341': 'ÖRGÜ SEPET', 'ALY-342': 'KAPAKLI SEPET', 'ALY-351': 'CASA NO:1',
+  'ALY-405': 'KOZALAK SAKSI NO:1 0,75 LT', 'ALY-421': 'LİNE SAKSI NO:1 1,1 LT', 'ALY-501': 'AHŞAP DESENLİ SAKSI NO:1 0,50 LT', 'ALY-502': 'AHŞAP DESENLİ SAKSI NO:2 1.20 LT',
+  'ALY-511': 'KALE SAKSI NO:1 1,3 LT', 'ALY-601': 'UFO SAKSI NO:1 2 LT', 'ALY-641': 'TRİPOT SAKSI NO:1 0,70 LT', 'ALY-651': 'POLO SAKSI NO:1 2,2 LT',
+  'ALY-700': 'MİNİ EFES SAKSI 28 LT', 'ALY-906': 'CORNET SAKSI NO:1 12 LT', 'ALY-955': "ÖRDEK SAKSI 4'LÜ SET",
+  'ALYG-01': 'ÇEŞME (YUVARLAK) SAKSI NO:1 28 LT', 'ALYG-02': 'ÇEŞME (YUVARLAK) SAKSI NO:2 70 LT', 'ALYG-03': 'ÇEŞME (YUVARLAK) SAKSI NO:3 130 LT', 'ALYG-04': 'ÇEŞME (YUVARLAK) SAKSI NO:4 310 LT',
+  'ALYG-05': 'KEMER (KARE) SAKSI NO:1 35 LT', 'ALYG-06': 'KEMER (KARE) SAKSI NO:2 75 LT', 'ALYG-07': 'MİLAS (DİKDÖRTGEN) SAKSI NO:1 90 LT', 'ALYG-08': 'MİLAS (DİKDÖRTGEN) SAKSI NO:2 225 LT',
+  'ALYG-09': 'DATÇA (AÇILI) SAKSI NO:1 55 LT', 'ALYG-10': 'DATÇA (AÇILI) SAKSI NO:2 99 LT', 'ALYG-11': 'KÖŞK (DİKDÖRTGEN) SAKSI', 'ALYG-12': 'ARAJMAN SAKSI NO:1 20 LT',
+  'ALYG-13': 'ARAJMAN SAKSI NO:2 50 LT', 'ALYG-14': 'ARAJMAN SAKSI NO:3 73 LT', 'ALYG-15': 'ARAJMAN SAKSI NO:4 200 LT', 'ALYG-16': 'GONDOL SAKSI NO:1 28 LT', 'ALYG-17': 'GONDOL SAKSI NO:2 60 LT',
+  'ALYG-18': 'ARMUT SAKSI 165 LT', 'ALYG-19': 'VİTRİN SAKSI NO:1 110 LT', 'ALYG-20': 'VİTRİN SAKSI NO:2 200 LT', 'ALYG-21': 'TURUVA SAKSI 54 LT', 'ALYG-22': 'ÇİT SAKSI', 'ALYG-24': 'LOTTE SAKSI',
+}
+const muhAd = (kod: string, ad: string) => MUH_AD[String(kod || '').toUpperCase()] || ad
+
 /* ─────────────── Mamul stok (iç / dış mekan) ─────────────── */
 async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   const j = json(await hamCalistir(() => araciCalistir(sb, 'stok_durumu', { tur: 'mamul', ...(mekan !== 'hepsi' ? { mekan } : {}) })))
-  const urunler: any[] = j.mamul?.urunler || []
+  const urunler: any[] = (j.mamul?.urunler || []).map((u: any) => ({ ...u, urun: muhAd(u.kod, u.urun) }))
   const sirali = [...urunler].sort((a, b) => b.toplam_adet - a.toplam_adet)
   const toplam = sirali.reduce((t, x) => t + (+x.toplam_adet || 0), 0)
   const stoklu = sirali.filter(x => x.toplam_adet > 0), eksi = sirali.filter(x => x.toplam_adet < 0)
