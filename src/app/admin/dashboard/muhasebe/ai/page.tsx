@@ -65,6 +65,7 @@ const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
     'ihracatta tahsil etmediğim müşterilerin listesi',
     '2026 ihracat rakamları usd, euro ve TL',
   ] },
+  { baslik: 'Ay bazlı satış', sorular: ['ocak ayı iç mekan satışları', 'şubat ayı dış mekan satışları', 'ocak-mart iç mekan satışları', 'geçen ay iç mekan satışları', 'mart ayı kristal saksı satışları'] },
   { baslik: 'Gelir tablosu', sorular: ['ocak ayı gelir tablosu', 'ekim ayı gelir tablosu', 'şubat ayı yönetim raporu'] },
   { baslik: 'K. kartı', sorular: ['k.kartı tahsilatlarım'] },
   { baslik: 'KDV ve fatura', sorular: ['eylül ayı yüklenilen (indirilecek) KDV listesi', 'ekim ayı KDV listesi', 'eylül ayı alış faturaları listesi excel'] },
