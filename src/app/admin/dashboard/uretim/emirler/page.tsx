@@ -69,7 +69,15 @@ export default function UretimEmirleriPage() {
   const openNew = () => { setForm({ ...bos(), no: sonrakiNo() }); setModal(true) }
   function urunSec(uid: string) {
     const h = urunHazirlik(uid)
-    setForm((f: any) => ({ ...f, urun_id: uid, recete_id: h.recete?.id || '', kalip_id: h.recete?.kalip_id || '', hedef_cevrim: h.recete?.hedef_cevrim_suresi ? String(h.recete.hedef_cevrim_suresi) : '', siparis_id: '' }))
+    setForm((f: any) => ({ ...f, urun_id: uid, recete_id: h.recete?.id || '', kalip_id: h.recete?.kalip_id || '', hedef_cevrim: h.recete?.hedef_cevrim_suresi ? String(h.recete.hedef_cevrim_suresi) : (() => { const ks = d.kaliplar.filter((k: any) => k.urettigi_urun_id === uid); return ks.length === 1 && ks[0].hedef_cevrim_suresi ? String(+ks[0].hedef_cevrim_suresi) : '' })(), siparis_id: '' }))
+  }
+  // Kalıp seçilince hedef çevrim (kalıp kartından) ve — tek uyumlu makine varsa — makine otomatik gelir
+  function kalipSec(kid: string) {
+    const k = kalip[kid]
+    setForm((f: any) => {
+      const uy: string[] = Array.isArray(k?.uyumlu_makineler) ? k.uyumlu_makineler : []
+      return { ...f, kalip_id: kid, ...(k?.hedef_cevrim_suresi ? { hedef_cevrim: String(+k.hedef_cevrim_suresi) } : {}), ...(!f.makine_id && uy.length === 1 ? { makine_id: uy[0] } : {}) }
+    })
   }
   function siparisSec(sid: string) {
     setForm((f: any) => {
@@ -343,7 +351,7 @@ export default function UretimEmirleriPage() {
         <FormGrid cols={4}>
           <Field label="Reçete"><select className="adm-inp" value={form.recete_id} onChange={e => { const r = recete[e.target.value]; setForm((f: any) => ({ ...f, recete_id: e.target.value, ...(r?.hedef_cevrim_suresi ? { hedef_cevrim: String(r.hedef_cevrim_suresi) } : {}), ...(r?.kalip_id && !f.kalip_id ? { kalip_id: r.kalip_id } : {}) })) }}><option value="">Yok</option>{d.receteler.filter((r: any) => r.urun_id === form.urun_id).map((r: any) => <option key={r.id} value={r.id}>v{r.versiyon}{r.aktif ? ' (aktif)' : ''}</option>)}</select></Field>
           <Field label="Makine"><select className="adm-inp" value={form.makine_id} onChange={e => setForm((f: any) => ({ ...f, makine_id: e.target.value }))}><option value="">Sonra ata</option>{d.makineler.map((m: any) => <option key={m.id} value={m.id}>{m.ad} — {MAKINE_DURUM[m.durum]?.l}</option>)}</select></Field>
-          <Field label="Kalıp"><select className="adm-inp" value={form.kalip_id} onChange={e => setForm((f: any) => ({ ...f, kalip_id: e.target.value }))}><option value="">Kalıpsız</option>{d.kaliplar.map((k: any) => <option key={k.id} value={k.id}>{k.ad} — {k.durum}</option>)}</select></Field>
+          <Field label="Kalıp"><select className="adm-inp" value={form.kalip_id} onChange={e => kalipSec(e.target.value)}><option value="">Kalıpsız</option>{(d.kaliplar.some((k: any) => form.urun_id && k.urettigi_urun_id === form.urun_id) ? d.kaliplar.filter((k: any) => k.urettigi_urun_id === form.urun_id || k.id === form.kalip_id) : d.kaliplar).map((k: any) => <option key={k.id} value={k.id}>{k.ad} — {k.kavite_sayisi} göz{k.hedef_cevrim_suresi ? ` · ${k.hedef_cevrim_suresi} sn` : ''} · {k.durum}</option>)}</select></Field>
           <Field label="Bağlı sipariş"><select className="adm-inp" value={form.siparis_id} onChange={e => siparisSec(e.target.value)}><option value="">Yok (stok için)</option>{d.siparisler.filter((s: any) => !['tamamlandi', 'iptal', 'sevk_edildi'].includes(s.durum)).map((s: any) => <option key={s.id} value={s.id}>{s.no}{cari[s.cari_id] ? ` · ${cari[s.cari_id].ad}` : ''}</option>)}</select></Field>
           <Field label="Vardiya"><select className="adm-inp" value={form.vardiya} onChange={e => setForm((f: any) => ({ ...f, vardiya: e.target.value }))}>{VARDIYA.map(v => <option key={v}>{v}</option>)}</select></Field>
           <Field label="Hedef çevrim (sn)"><input type="number" step="0.1" className="adm-inp" value={form.hedef_cevrim} onChange={e => setForm((f: any) => ({ ...f, hedef_cevrim: e.target.value }))} /></Field>

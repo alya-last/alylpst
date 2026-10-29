@@ -12,7 +12,7 @@ import { topluSilCalistir } from '@/lib/toplu-sil'
 import TopluDuzenle from '@/components/admin/TopluDuzenle'
 import { ListChecks, Plus, Pencil, Trash2, Wrench, AlertTriangle, Package, Layers, Coins } from 'lucide-react'
 
-const bos = { kod: '', ad: '', urettigi_urun_id: '', kavite_sayisi: '1', lokasyon: '', bakim_periyodu_gun: '90', sonraki_bakim: '', durum: 'depoda', notlar: '', uyumlu: [] as string[] }
+const bos = { kod: '', ad: '', urettigi_urun_id: '', kavite_sayisi: '1', hedef_cevrim_suresi: '', lokasyon: '', bakim_periyodu_gun: '90', sonraki_bakim: '', durum: 'depoda', notlar: '', uyumlu: [] as string[] }
 const bakimBos = () => ({ tarih: todayISO(), aciklama: '', maliyet: '' })
 
 // bakım durumu — veritabanındaki v_kalip_bakim_durumu görünümüyle aynı mantık
@@ -58,7 +58,7 @@ export default function KalipPage() {
   const openNew = () => { setEditing(null); setForm(bos); setModal(true) }
   const openEdit = (k: any) => {
     setEditing(k)
-    setForm({ kod: k.kod, ad: k.ad, urettigi_urun_id: k.urettigi_urun_id || '', kavite_sayisi: String(k.kavite_sayisi || 1), lokasyon: k.lokasyon || '', bakim_periyodu_gun: String(k.bakim_periyodu_gun || 90), sonraki_bakim: k.sonraki_bakim || '', durum: k.durum, notlar: k.notlar || '', uyumlu: k.uyumlu_makineler || [] })
+    setForm({ kod: k.kod, ad: k.ad, urettigi_urun_id: k.urettigi_urun_id || '', kavite_sayisi: String(k.kavite_sayisi || 1), hedef_cevrim_suresi: k.hedef_cevrim_suresi ? String(+k.hedef_cevrim_suresi) : '', lokasyon: k.lokasyon || '', bakim_periyodu_gun: String(k.bakim_periyodu_gun || 90), sonraki_bakim: k.sonraki_bakim || '', durum: k.durum, notlar: k.notlar || '', uyumlu: k.uyumlu_makineler || [] })
     setModal(true)
   }
 
@@ -66,7 +66,7 @@ export default function KalipPage() {
     e.preventDefault(); if (busy) return
     if (d.kaliplar.some((k: any) => k.kod.toLowerCase() === form.kod.trim().toLowerCase() && k.id !== editing?.id)) return toast.show('Bu kalıp kodu zaten kullanılıyor', true)
     setBusy(true)
-    const payload: any = { kod: form.kod.trim(), ad: form.ad.trim(), urettigi_urun_id: form.urettigi_urun_id || null, kavite_sayisi: Math.max(1, +form.kavite_sayisi || 1), lokasyon: form.lokasyon || null, bakim_periyodu_gun: +form.bakim_periyodu_gun || 90, sonraki_bakim: form.sonraki_bakim || null, durum: form.durum, notlar: form.notlar || null, uyumlu_makineler: form.uyumlu }
+    const payload: any = { kod: form.kod.trim(), ad: form.ad.trim(), urettigi_urun_id: form.urettigi_urun_id || null, kavite_sayisi: Math.max(1, +form.kavite_sayisi || 1), hedef_cevrim_suresi: +form.hedef_cevrim_suresi > 0 ? +form.hedef_cevrim_suresi : null, lokasyon: form.lokasyon || null, bakim_periyodu_gun: +form.bakim_periyodu_gun || 90, sonraki_bakim: form.sonraki_bakim || null, durum: form.durum, notlar: form.notlar || null, uyumlu_makineler: form.uyumlu }
     const r: any = editing ? await erp.from('kaliplar').update(payload).eq('id', editing.id) : await erp.from('kaliplar').insert(payload)
     setBusy(false)
     if (r?.error) return toast.show(r.error, true)
@@ -206,6 +206,7 @@ export default function KalipPage() {
           <Field label="Ad *"><input className="adm-inp" required value={form.ad} onChange={e => setForm((f: any) => ({ ...f, ad: e.target.value }))} /></Field>
           <Field label="Ürettiği ürün"><select className="adm-inp" value={form.urettigi_urun_id} onChange={e => setForm((f: any) => ({ ...f, urettigi_urun_id: e.target.value }))}><option value="">—</option>{d.products.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
           <Field label="Kavite sayısı" hint="Bir çevrimde kaç adet çıkar"><input type="number" min="1" className="adm-inp" value={form.kavite_sayisi} onChange={e => setForm((f: any) => ({ ...f, kavite_sayisi: e.target.value }))} /></Field>
+          <Field label="Hedef çevrim (sn)" hint="Üretim emrinde kalıp seçilince otomatik gelir"><input type="number" step="0.1" min="0" className="adm-inp" value={form.hedef_cevrim_suresi} onChange={e => setForm((f: any) => ({ ...f, hedef_cevrim_suresi: e.target.value }))} /></Field>
           <Field label="Bakım periyodu (gün)"><input type="number" min="1" className="adm-inp" value={form.bakim_periyodu_gun} onChange={e => setForm((f: any) => ({ ...f, bakim_periyodu_gun: e.target.value }))} /></Field>
           <Field label="Sonraki bakım tarihi"><input type="date" className="adm-inp" value={form.sonraki_bakim} onChange={e => setForm((f: any) => ({ ...f, sonraki_bakim: e.target.value }))} /></Field>
           <Field label="Lokasyon"><input className="adm-inp" value={form.lokasyon} onChange={e => setForm((f: any) => ({ ...f, lokasyon: e.target.value }))} placeholder="Raf A-3" /></Field>
