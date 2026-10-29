@@ -217,13 +217,20 @@ export default function TekliflerPage() {
       setAi(a => ({ ...a, busy: false, sonuc: r.sonuc }))
     } catch (e: any) { setAi(a => ({ ...a, busy: false, kapali: e instanceof AiKapali })); toast.show(e.message, true) }
   }
-  function oneriEkle(o: any) {
-    if (!ed) return
-    const base = { ...bosKalem(), urun_adi: o.urun_adi, variant_id: o.variant_id || '', miktar: o.miktar || 1, birim: o.birim || 'adet' }
-    const fb = o.variant_id && ed.f.para_birimi === 'TRY' ? fiyatBul(o.variant_id, ed.f.cari_id, base.miktar) : null
+  function oneriKalemi(o: any): TKalem {
+    const lu = o.kod ? listeKod[o.kod] : undefined
+    if (lu) { const p = listeKalemi(lu, ed!.f, o.miktar || 1, 'koli'); return { ...bosKalem(), ...p, urun_adi: p.urun_adi || o.urun_adi, miktar: o.miktar || 1, birim: 'koli', aciklama: o.renk ? `Renk: ${o.renk}` : '', birim_fiyat: p.birim_fiyat ?? 0, iskonto_yuzde: p.iskonto_yuzde ?? 0 } as TKalem }
+    const base = { ...bosKalem(), urun_adi: o.urun_adi, variant_id: o.variant_id || '', miktar: o.miktar || 1, birim: o.birim || 'adet', aciklama: o.renk ? `Renk: ${o.renk}` : '' }
+    const fb = o.variant_id && ed!.f.para_birimi === 'TRY' ? fiyatBul(o.variant_id, ed!.f.cari_id, base.miktar) : null
     if (o.variant_id) base.urun_adi = vList.find((v: any) => v.id === o.variant_id)?.label || o.urun_adi
     if (fb) { base.birim_fiyat = fb.fiyat; base.iskonto_yuzde = fb.isk }
-    setEd(e => e && ({ ...e, kalemler: [...(e.kalemler.length === 1 && !e.kalemler[0].urun_adi.trim() ? [] : e.kalemler), base] }))
+    return base
+  }
+  function oneriEkle(o: any) { oneriTopluEkle([o]) }
+  function oneriTopluEkle(liste: any[]) {
+    if (!ed) return
+    const yeni = liste.map(oneriKalemi)
+    setEd(e => e && ({ ...e, kalemler: [...(e.kalemler.length === 1 && !e.kalemler[0].urun_adi.trim() ? [] : e.kalemler), ...yeni] }))
   }
   async function tlFiyatKaydet(u: ListeUrun, v: number | null) {
     if (v !== null && !(v >= 0)) return
@@ -306,15 +313,16 @@ export default function TekliflerPage() {
               </FormGrid>
 
               {!kilitli && <Card title={<span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Sparkles size={14} />AI ile kalem öner</span>} pad={12}>
-                <textarea className="adm-inp" rows={3} style={{ width: '100%' }} placeholder="Müşterinin talep mesajını yapıştırın (başvurudan geldiyse hazır)" value={ai.metin} onChange={e => setAi(a => ({ ...a, metin: e.target.value }))} />
+                <textarea className="adm-inp" rows={3} style={{ width: '100%' }} placeholder="Talep mesajını yapıştırın veya yazın. Örn: Line saksı No:2 toplam 1200 adet, beyaz-antrasit-krem-kahve 4 renge eşit böl" value={ai.metin} onChange={e => setAi(a => ({ ...a, metin: e.target.value }))} />
                 <button type="button" className="adm-btn-ghost" style={{ marginTop: 6 }} disabled={ai.busy || ai.kapali || (!ai.metin.trim() && !ed.f.basvuru_id)} onClick={aiOner}><Sparkles size={13} />{ai.busy ? 'Analiz ediliyor…' : 'Öner'}</button>
                 {ai.kapali && <span style={{ fontSize: 12, color: 'var(--adm-amber)', marginLeft: 8 }}>AI yapılandırılmamış</span>}
                 {ai.sonuc && <div style={{ marginTop: 8, display: 'grid', gap: 4 }}>
                   {ai.sonuc.uyari && <div style={{ fontSize: 12, color: 'var(--adm-amber)' }}>⚠ {ai.sonuc.uyari}</div>}
                   {ai.sonuc.oneriler.length === 0 && !ai.sonuc.uyari && <div style={{ fontSize: 12.5, color: 'var(--adm-tx3)' }}>Öneri çıkmadı.</div>}
                   {ai.sonuc.oneriler.map((o: any, i: number) => <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5 }}>
-                    <span style={{ flex: 1 }}><b>{o.variant_id ? vList.find((v: any) => v.id === o.variant_id)?.label : o.urun_adi}</b>{!o.variant_id && <Badge tone="amber" style={{ marginLeft: 6 }}>katalogda eşleşmedi</Badge>} {o.miktar ? `· ${o.miktar} ${o.birim || ''}` : <span style={{ color: 'var(--adm-tx3)' }}>· miktar belirtilmemiş</span>}<div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>{o.gerekce}</div></span>
+                    <span style={{ flex: 1 }}><b>{o.kod && listeKod[o.kod] ? listeEtiket(listeKod[o.kod], ed.f.dil) : o.variant_id ? vList.find((v: any) => v.id === o.variant_id)?.label : o.urun_adi}</b>{o.renk && <Badge tone="blue" style={{ marginLeft: 6 }}>{o.renk}</Badge>}{!o.variant_id && !o.kod && <Badge tone="amber" style={{ marginLeft: 6 }}>katalogda eşleşmedi</Badge>} {o.miktar ? `· ${o.miktar} ${o.birim || ''}${o.kod && listeKod[o.kod]?.koli_ici_adet ? ` = ${o.miktar * (+listeKod[o.kod].koli_ici_adet || 1)} adet` : ''}` : <span style={{ color: 'var(--adm-tx3)' }}>· miktar belirtilmemiş</span>}<div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>{o.gerekce}</div></span>
                     <button type="button" className="adm-btn-ghost" style={{ padding: '3px 9px', fontSize: 12 }} onClick={() => oneriEkle(o)}><Plus size={12} />Ekle</button></div>)}
+                  {ai.sonuc.oneriler.length > 1 && <div><button type="button" className="adm-btn" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => oneriTopluEkle(ai.sonuc.oneriler)}><Plus size={12} />Tümünü forma ekle ({ai.sonuc.oneriler.length})</button></div>}
                   <div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>Öneriler yalnızca katalogla eşleşme ve müşteri mesajındaki miktarlardır; fiyat listesinden alınır, kontrol edin.</div>
                 </div>}
               </Card>}

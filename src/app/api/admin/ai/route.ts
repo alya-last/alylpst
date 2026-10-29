@@ -150,7 +150,9 @@ SÖZLÜK: ${soz}` },
         const [v, p] = await Promise.all([y.sb.from('product_variants').select('id,product_id,name,color,size').limit(3000), y.sb.from('products').select('id,name').limit(3000)])
         const pn = new Map((p.data || []).map((x: any) => [x.id, x.name]))
         const katalog = (v.data || []).map((x: any) => ({ id: x.id, label: [pn.get(x.product_id), x.name, x.color, x.size].filter(Boolean).filter((a: any, i: number, arr: any[]) => arr.indexOf(a) === i).join(' · ') || x.name }))
-        return NextResponse.json({ ok: true, sonuc: await teklifKalemOner(mesaj, katalog), katalogBos: katalog.length === 0 })
+        const { data: lu } = await y.sb.from('fiyat_listesi_urunleri').select('kod,ad_tr,koli_ici_adet').eq('aktif', true).order('sira').limit(300)
+        const urunler = (lu || []).map((x: any) => ({ kod: x.kod, ad: x.ad_tr, koli_ici_adet: +x.koli_ici_adet || 1 }))
+        return NextResponse.json({ ok: true, sonuc: await teklifKalemOner(mesaj, katalog, urunler), katalogBos: katalog.length === 0 && urunler.length === 0 })
       }
       case 'gorsel_analiz': {
         if (typeof body.url !== 'string') return NextResponse.json({ error: 'Görsel adresi gerekli' }, { status: 400 })
