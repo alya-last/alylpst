@@ -78,7 +78,7 @@ export default function SatisSiparisleriPage() {
       if (tk.durum === 'kabul' || tk.siparis_id) return toast.show(`${tk.no} zaten siparişe çevrilmiş`, true)
       setEditing(null); setTeklifRef(tid)
       setForm({ no: sonrakiNo(), cari_id: tk.cari_id || '', tarih: todayISO(), teslim_tarihi: '', notlar: `Teklif ${tk.no}${tk.cari_id ? '' : ` — müşteri: ${tk.musteri_adi} (cari seçin)`}${kur !== 1 ? ` · fiyatlar ${kur} kuruyla TL'ye çevrildi` : ''}` })
-      setKalemler((k.data || []).map((x: any) => ({ variant_id: x.variant_id || '', urun_adi: x.urun_adi, miktar: +x.miktar, birim_fiyat: +(((+x.birim_fiyat) * (1 - (+x.iskonto_yuzde || 0) / 100)) * kur).toFixed(4) })))
+      setKalemler((k.data || []).map((x: any) => { const kn = x.birim === 'koli' && +x.koli_ici_adet > 0 ? +x.koli_ici_adet : 1 /* koli satırı: sipariş ADET olarak açılır (miktar × koli içi adet, fiyat ÷ koli içi adet) */; return { variant_id: x.variant_id || '', urun_adi: x.urun_adi, miktar: +x.miktar * kn, birim_fiyat: +(((+x.birim_fiyat / kn) * (1 - (+x.iskonto_yuzde || 0) / 100)) * kur).toFixed(4) } }))
       setModal(true); toast.show('Teklif kalemleri forma aktarıldı; cariyi seçip kaydedin')
     })()
   }, [loading]) // eslint-disable-line
