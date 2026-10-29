@@ -15,6 +15,7 @@ export type RaporNiyet =
   | { tur: 'urun_ad'; arama: string } // ürün KODU yok, ürün ADI var ("line saksı satışlarım"): satış dosyasındaki adlardan kodlar bulunup 'urun' raporu verilir
   | { tur: 'hammadde'; mekan: Mekan }
   | { tur: 'hm_stok'; grup: HmGrup; arama: string } // hammadde / boya / koli / etiket DEPO STOĞU ("hammaddelerim neler", "boya stoğu", "koli stokları")
+  | { tur: 'boya_kg'; kg: number; oran: number } // verilen hammadde kg × boya oranı
   | { tur: 'boya_kullanim'; mekan: Mekan; oran: number; kaynak?: 'stok' } // satılan iç mekan ürünlerin hammaddesi × boya oranı (varsayılan %2); dış mekanda boya yok
   | { tur: 'stok_kg'; mekan: Mekan } // eldeki MAMUL stoğun içindeki hammadde ağırlığı (stok adedi × ürün gramajı)
   | { tur: 'hm_alis'; arama: string; hareket: boolean } // hammadde ALIŞLARI / stok hareketleri (stok_hareketleri tablosu): "moblen hammadde alışlarım"
@@ -96,6 +97,12 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
   }
   const kodlar = kodlariBul(soru)
   if (kodlar.length && /sat|adet|ne kadar|rakam|kac|ciro/.test(t) && !/stok|recete|maliyet/.test(t)) return { tur: 'urun', kodlar }
+  const bkg = /(\d[\d.,]*)\s*(kg|kilo|ton)\b/.exec(soru.toLowerCase().replace(/ı/g, 'i'))
+  if (bkg && /boya|masterbatch/.test(t) && !/stok|stog|depo\w*|satis|satil|alis|alim|fiyat|maliyet/.test(t)) {
+    const sayi = +bkg[1].replace(/\./g, '').replace(',', '.'), kg = bkg[2] === 'ton' ? sayi * 1000 : sayi
+    const om = /%\s*(\d+(?:[.,]\d+)?)|\b0 (\d+)\b/.exec(t), o = om ? (om[2] ? +('0.' + om[2]) : +om[1].replace(',', '.')) : 2
+    if (kg > 0) return { tur: 'boya_kg', kg, oran: (o < 1 ? o * 100 : o) / 100 }
+  }
   const boyaOran = () => { const om = /%\s*(\d+(?:[.,]\d+)?)|\b0 (\d+)\b|oran\w*\s*(\d+(?:[.,]\d+)?)(?! \d)/.exec(t), o = om ? (om[2] ? +('0.' + om[2]) : +(om[1] || om[3]).replace(',', '.')) : 2; return (o < 1 ? o * 100 : o) / 100 }
   // Stoktaki (depodaki) ürünlerin boyası: stok adedi × gramaj × oran
   if (/boya|masterbatch/.test(t) && /\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && /kullan|tuket|sarf|harca|gitti|hesapla|icer|icinde|ne kadar boya|kac kg boya/.test(t) && !/alis|alim|fiyat|maliyet|minimum|kritik/.test(t)) return { tur: 'boya_kullanim', mekan: mekan === 'dis' ? 'dis' : 'ic', oran: boyaOran(), kaynak: 'stok' }
@@ -155,13 +162,20 @@ async function urunAdindanKodlar(sb: SupabaseClient, arama: string): Promise<str
   const rows = await sayfala(sb, 'satis_adetleri', 'kod,ad')
   const urunler = new Map<string, string>()
   for (const x of rows) { const k = anaKod(x.kod); if (k && !urunler.has(k)) urunler.set(k, nrm(String(x.ad || '').replace(/^\s*ALYG?\s*-?\s*[\dA-Z/]+\s+/i, ''))) }
-  const kel = arama.split(' ').filter(w => (w.length >= 3 || /^\d[a-z]$/.test(w)) && !URUN_AD_DURAK.test(w))
   const tum = [...urunler.values()]
-  const gecen = kel.filter(w => tum.some(ad => ad.split(' ').some(x => x.startsWith(w))))
-  if (!gecen.length) return []
-  const bulunan = [...urunler.entries()].filter(([, ad]) => gecen.every(w => ad.split(' ').some(x => x.startsWith(w)))).map(([k]) => k)
-  // Çok geniş eşleşme (ör. sadece "saksı") yanlış rapor verir: belirsizse yapay zekaya bırak
-  return bulunan.length > 0 && bulunan.length <= 12 && gecen.some(w => !/^(saksi\w*|sepet\w*|sandik\w*|set\w*)$/.test(w)) ? bulunan.sort() : []
+  // "cornet ve efes saksı": ürün serileri "ve"/"," ile ayrılırsa her seri ayrı eşleşir, kodlar birleşir
+  const gruplar = nrm(arama).split(/\s(?:ve|ile)\s|,/).map(g => g.trim()).filter(Boolean)
+  const ortak = gruplar.length > 1 ? (gruplar[gruplar.length - 1].match(/\b(saksi\w*|sepet\w*|sandik\w*)\b/g) || []) : []
+  const sonuc = new Set<string>()
+  for (const g of gruplar.length ? gruplar : [arama]) {
+    const kel = [...g.split(' '), ...(gruplar.length > 1 ? ortak : [])].filter(w => (w.length >= 3 || /^\d[a-z]$/.test(w)) && !URUN_AD_DURAK.test(w))
+    const gecen = kel.filter(w => tum.some(ad => ad.split(' ').some(x => x.startsWith(w))))
+    if (!gecen.length) continue
+    const bulunan = [...urunler.entries()].filter(([, ad]) => gecen.every(w => ad.split(' ').some(x => x.startsWith(w)))).map(([k]) => k)
+    // Çok geniş eşleşme (ör. sadece "saksı") yanlış rapor verir: belirsizse yapay zekaya bırak
+    if (bulunan.length > 0 && bulunan.length <= 40 && gecen.some(w => !/^(saksi\w*|sepet\w*|sandik\w*|set\w*)$/.test(w))) bulunan.forEach(k => sonuc.add(k))
+  }
+  return [...sonuc].sort()
 }
 
 async function sayfala(sb: SupabaseClient, tablo: string, kolon: string, f?: (q: any) => any): Promise<any[]> {
@@ -853,7 +867,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   let n = raporNiyeti(soru)
   if (!n) { try { n = await niyetSinifla(soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], boya_kg: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -874,6 +888,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
         return await hammadde(sb, n.mekan)
       }
       case 'hm_stok': return await hmStok(sb, n.grup, n.arama)
+      case 'boya_kg': { const b = n.kg * n.oran, yp = r2(n.oran * 100); return { yanit: `${AD(n.kg)} kg hammadde × %${yp} boya oranı = ${TL(b)} kg (${TL(b / 1000)} ton) boya.\nHesap: hammadde kg × oran. Tahmini hesaptır, gerçek boya kullanımı kayıtlı değildir. Dış mekanda boya kullanılmaz.`, araclar: ['rapor_boya_kg'] } }
       case 'boya_kullanim': return n.kaynak === 'stok' && n.mekan !== 'dis' ? await boyaStok(sb, n.oran) : await boyaKullanim(sb, n.mekan, n.oran)
       case 'stok_kg': return await stokKg(sb, n.mekan)
       case 'hm_alis': return await hmAlis(sb, n.arama, n.hareket)

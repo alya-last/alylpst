@@ -46,6 +46,8 @@ const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
     'ayl-101, aly-102, aly-132 ne kadar satmışım excel',
     '2026 dönemi ne kadar iç mekan satmışım',
     'iç mekan stoklarımın hepsini excel ver',
+    'cornet ve efes saksı satışlarım toplam ver',
+    '226.413 kg hammaddede ne kadar boya kullandım (%2)',
     'iç mekanda satışıma göre ne kadar boya kullandım (%2)',
     'iç mekan stoğumdaki ürünlerde ne kadar boya var (%2)',
     'iç mekan stoğumdaki ürünlerde kaç kg hammadde var',
