@@ -59,7 +59,7 @@ function cariEsle(cl: any[], kel: string[]): any[] {
 }
 /** Soru bu sabit raporlardan birine uyuyor mu? Emin değilse null (yapay zekaya bırakılır). */
 export function raporNiyeti(soru: string): RaporNiyet | null {
-  const t = nrm(soru)
+  const t = nrm(soru).replace(/\bham{1,2}[ae]dde/g, 'hammadde') // yazım hataları: hammedde, hamadde
   if (!t || t.split(' ').length > 40) return null
   if (/neden|niye|\byorum\w*|karsilastir|tahmin|oner|kar zarar|maliyet|senaryo|kur farki/.test(t)) return null
   const dis = /\bdis ?mekan/.test(t), ic = /\bic ?mekan/.test(t)
@@ -109,13 +109,13 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
 
 /** "moblen hammadde alışlarım", "granür alışları", "moblen stok hareketleri": hammaddenin giriş (alış) / hareket geçmişi. */
 function hmAlisNiyeti(t: string): RaporNiyet | null {
-  const alis = /\b(alis|alim|alisi|alislari\w*|alislarim\w*|aldigim\w*|aldik|aldim|satin ?alma\w*|satinalma\w*|giris\w*)\b|alislar|alisim/.test(t)
+  const alis = /\b(alim|alis|aldi|satin ?al|giris)\w*/.test(t)
   const hrk = /hareket/.test(t)
   if (!(alis || hrk)) return null
   if (!/hammadde|ham madde|moblen|granur|granul|copolimer|kopolimer|compakt|kompakt|kristal|rotasyon|\bpp\b|polipropilen|boya|\bkoli|etiket/.test(t)) return null
   if (/sat(mis|tim|ti|is|ilan|tik)|satis|ciro|musteri|tahsilat|bakiye|borc|kdv|fatura|recete|maliyet|teklif|ekstre|cari|ihracat|urun/.test(t) && !/hammadde/.test(t)) return null
   const GEN = /^(hammadde\w*|ham|madde\w*|alis\w*|alim\w*|aldi\w*|satin\w*|satinalma\w*|giris\w*|hareket\w*|stok\w*|stog\w*|liste\w*|excel\w*|ver|bana|goster\w*|tum\w*|neler|nelerim|ne|kadar|kac|icin|ile|ve|bir|bu|ay|aylik|2026|detay\w*|dokum\w*|bilgi\w*|olan|bizim|benim|ekim|bugune|kadar)$/
-  const ara = t.split(' ').filter(w => w.length >= 2 && !GEN.test(w)).join(' ')
+  const ara = t.split(' ').filter(w => (w.length >= 3 || w === 'pp') && !GEN.test(w) && !/^(misin|musun|musunuz|lutfen|rica|eder|edermisin|istiyorum|isterim)$/.test(w)).join(' ')
   return { tur: 'hm_alis', arama: ara, hareket: hrk && !alis }
 }
 
