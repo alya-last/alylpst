@@ -47,7 +47,7 @@ export async function gelirTablosuVeri(sb: SupabaseClient, yil: number, ay: numb
     const aktarim = /^\[Aylık tablo\][^-]*-\s*(.+)$/.exec(String(x.aciklama || '')), ad = (aktarim ? aktarim[1] : kat).trim()
     kayit++
     if (x.tip === 'gelir') { if (kat === 'Ürün Satışı') ekle(satislar, aktarim ? ad : 'ÜRÜN SATIŞLARI', t); else ekle(diger, ad, t) }
-    else if (x.tip === 'gider') { if (kat === 'Kullanılan Malzeme') ekle(uretim, ad, t); else ekle(masraflar, ad, t) }
+    else if (x.tip === 'gider') { if (kat === 'Kullanılan Malzeme' || /\[Üretim\]/.test(String(x.aciklama || ''))) ekle(uretim, ad, t); else ekle(masraflar, ad, t) }
   }
   const dizi = (m: Map<string, number>) => [...m.entries()].map(([ad, tutar]) => ({ ad, tutar }))
   const sat = dizi(satislar).sort((a, b) => (/^i[cç]/i.test(nrm(b.ad)) ? 1 : 0) - (/^i[cç]/i.test(nrm(a.ad)) ? 1 : 0) || b.tutar - a.tutar)
