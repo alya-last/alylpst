@@ -15,7 +15,7 @@ import { Plus, Printer, Save, Copy, Sparkles, Trash2, ShoppingCart, FileText, Cl
 
 const fmt = (n: number, pb = 'TRY') => `${new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)} ${pb}`
 const tarihTR = (t: string | null) => (t ? t.split('-').reverse().join('.') : '—')
-const KOSUL = { tr: 'Fiyatlarımıza KDV dahil değildir.', en: 'Prices exclude VAT.' }
+const KOSUL = { tr: '', en: 'Prices exclude VAT.' }
 type F = { cari_id: string; musteri_adi: string; musteri_email: string; musteri_tel: string; basvuru_id: string; tarih: string; gecerlilik: string; para_birimi: string; kur: string; kdv_orani: number; kdv_dahil: boolean; dil: Dil; kosullar: string; notlar: string }
 type Ed = { id: string | null; no: string; durum: string; siparisId: string | null; f: F; kalemler: TKalem[] }
 const bosF = (kur = ''): F => ({ cari_id: '', musteri_adi: '', musteri_email: '', musteri_tel: '', basvuru_id: '', tarih: bugunTR(), gecerlilik: gunEkle(bugunTR(), 15), para_birimi: 'TRY', kur, kdv_orani: 20, kdv_dahil: true, dil: 'tr', kosullar: KOSUL.tr, notlar: '' })
