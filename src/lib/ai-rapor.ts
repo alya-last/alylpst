@@ -153,8 +153,8 @@ async function tahsilat(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
 /* Muhasebe programındaki ürün adları (kod → ad). Panel/site adları farklı olabilir; raporlarda muhasebe adı esas. Listede olmayan kodda panel adı kalır. */
 const MUH_AD: Record<string, string> = {
   'ALY-101': '3D SAKSI NO:1 0.70 LT', 'ALY-131': 'SOMON SAKSI NO:1 0,70 LT', 'ALY-201': 'VENÜS SAKSI NO:1 0.75 LT', 'ALY-221': 'VENÜS MENEKŞE SAKSI NO:1 0.43 LT',
-  'ALY-311': 'SANDIK NO:2 EKO', 'ALY-333': 'DANTEL SEPET', 'ALY-334': 'MİNİ SEPET', 'ALY-341': 'ÖRGÜ SEPET', 'ALY-342': 'KAPAKLI SEPET', 'ALY-351': 'CASA NO:1',
-  'ALY-405': 'KOZALAK SAKSI NO:1 0,75 LT', 'ALY-421': 'LİNE SAKSI NO:1 1,1 LT', 'ALY-501': 'AHŞAP DESENLİ SAKSI NO:1 0,50 LT', 'ALY-502': 'AHŞAP DESENLİ SAKSI NO:2 1.20 LT',
+  'ALY-333': 'DANTEL SEPET', 'ALY-334': 'MİNİ SEPET', 'ALY-341': 'ÖRGÜ SEPET', 'ALY-342': 'KAPAKLI SEPET', 'ALY-351': 'CASA NO:1',
+  'ALY-405': 'KOZALAK SAKSI NO:1 0,75 LT', 'ALY-421': 'LİNE SAKSI NO:1 1,1 LT', 'ALY-501': 'AHŞAP DESENLİ SAKSI NO:1 0,50 LT',
   'ALY-511': 'KALE SAKSI NO:1 1,3 LT', 'ALY-601': 'UFO SAKSI NO:1 2 LT', 'ALY-641': 'TRİPOT SAKSI NO:1 0,70 LT', 'ALY-651': 'POLO SAKSI NO:1 2,2 LT',
   'ALY-700': 'MİNİ EFES SAKSI 28 LT', 'ALY-906': 'CORNET SAKSI NO:1 12 LT', 'ALY-955': "ÖRDEK SAKSI 4'LÜ SET",
   'ALYG-01': 'ÇEŞME (YUVARLAK) SAKSI NO:1 28 LT', 'ALYG-02': 'ÇEŞME (YUVARLAK) SAKSI NO:2 70 LT', 'ALYG-03': 'ÇEŞME (YUVARLAK) SAKSI NO:3 130 LT', 'ALYG-04': 'ÇEŞME (YUVARLAK) SAKSI NO:4 310 LT',
