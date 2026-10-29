@@ -40,6 +40,7 @@ export default function TekliflerPage() {
     setListe(t.data || []); setSite(s.data?.value || null); setYuk(false)
   }, []) // eslint-disable-line
   useEffect(() => { yukle() }, [yukle])
+  const listeKur = (+(ed?.f.kur || 0) > 0 && ed?.f.para_birimi === 'TRY' ? +(ed?.f.kur || 0) : +tcmbUsd) || 0 // fiyat listesi penceresindeki TL karşılık: açık teklifin kuru, yoksa TCMB USD
   useEffect(() => { fetch('/api/admin/kurlar').then(r => r.json()).then(j => { if (+j?.USD > 0) setTcmbUsd(String(+(+j.USD).toFixed(4))) }).catch(() => {}) }, [])
 
   const cari = useMemo(() => byId(d.cariTam), [d.cariTam])
@@ -317,8 +318,8 @@ export default function TekliflerPage() {
         <div style={{ fontSize: 12.5, color: 'var(--adm-tx3)', marginBottom: 8 }}>Tekliflerde ürün seçilince fiyat buradan gelir. Fiyatı değiştirmek yalnızca yeni teklifleri etkiler; kaydedilmiş teklifler değişmez. Koli, hacim ve ağırlık bilgileri “ALYA PLASTIK PRICE LIST USD 2026” dosyasından alınmıştır.</div>
         <input className="adm-inp" style={{ marginBottom: 8, width: '100%' }} placeholder="Kod veya ürün adı ara…" value={fyAra} onChange={e => setFyAra(e.target.value)} />
         <div style={{ maxHeight: '60vh', overflow: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-          <thead><tr>{['Kod', 'Ürün', 'Adet/koli', 'Koli m³', 'Koli kg', '40HC adet', 'USD fiyat'].map((h, i) => <th key={i} style={{ padding: '6px 8px', textAlign: i > 1 ? 'right' : 'left', fontSize: 11, color: 'var(--adm-tx3)', position: 'sticky', top: 0, background: 'var(--adm-bg, #fff)' }}>{h}</th>)}</tr></thead>
-          <tbody>{(d.fiyatUrunleri as ListeUrun[]).filter(u => !fyAra.trim() || `${u.kod} ${u.ad_tr} ${u.ad_en || ''}`.toLocaleLowerCase('tr').includes(fyAra.trim().toLocaleLowerCase('tr'))).map(u => <FiyatSatir key={u.id} u={u} kaydet={fiyatKaydet} />)}</tbody>
+          <thead><tr>{['Kod', 'Ürün', 'Adet/koli', 'Koli m³', 'Koli kg', '40HC adet', 'USD fiyat', `TL fiyat${listeKur > 0 ? ` (kur ${listeKur})` : ''}`].map((h, i) => <th key={i} style={{ padding: '6px 8px', textAlign: i > 1 ? 'right' : 'left', fontSize: 11, color: 'var(--adm-tx3)', position: 'sticky', top: 0, background: 'var(--adm-bg, #fff)' }}>{h}</th>)}</tr></thead>
+          <tbody>{(d.fiyatUrunleri as ListeUrun[]).filter(u => !fyAra.trim() || `${u.kod} ${u.ad_tr} ${u.ad_en || ''}`.toLocaleLowerCase('tr').includes(fyAra.trim().toLocaleLowerCase('tr'))).map(u => <FiyatSatir key={u.id} u={u} kaydet={fiyatKaydet} kur={listeKur} />)}</tbody>
         </table></div>
       </Modal>
       {toast.node}
@@ -326,7 +327,7 @@ export default function TekliflerPage() {
   )
 }
 
-function FiyatSatir({ u, kaydet }: { u: ListeUrun; kaydet: (u: ListeUrun, v: number) => void }) {
+function FiyatSatir({ u, kaydet, kur }: { u: ListeUrun; kaydet: (u: ListeUrun, v: number) => void; kur: number }) {
   const [v, setV] = useState(String(+u.usd_fiyat))
   useEffect(() => { setV(String(+u.usd_fiyat)) }, [u.usd_fiyat])
   const td = { padding: '4px 8px', borderTop: '1px solid var(--adm-bd, #ddd)' } as const
@@ -334,5 +335,6 @@ function FiyatSatir({ u, kaydet }: { u: ListeUrun; kaydet: (u: ListeUrun, v: num
     <td style={{ ...td, whiteSpace: 'nowrap' }}><b>{u.kod}</b></td><td style={td}>{u.ad_tr}</td>
     <td style={{ ...td, textAlign: 'right' }}>{u.koli_ici_adet ?? '—'}</td><td style={{ ...td, textAlign: 'right' }}>{u.koli_m3 ?? '—'}</td><td style={{ ...td, textAlign: 'right' }}>{u.koli_kg ?? '—'}</td><td style={{ ...td, textAlign: 'right' }}>{u.konteyner_40hc ?? '—'}</td>
     <td style={{ ...td, textAlign: 'right' }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 90, textAlign: 'right' }} value={v} onChange={e => setV(e.target.value)} onBlur={() => kaydet(u, +v)} onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} /></td>
+    <td style={{ ...td, textAlign: 'right', whiteSpace: 'nowrap' }}>{kur > 0 && +v > 0 ? `${(+v * kur).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺` : '—'}</td>
   </tr>
 }
