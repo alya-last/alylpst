@@ -9,7 +9,7 @@ import { Page, PageHead, Kpi, KpiGrid, Badge, Tabs, Modal, Field, FormGrid, Card
 import { DataGrid, type Col } from '@/components/admin/erp/DataGrid'
 import { topluSilCalistir } from '@/lib/toplu-sil'
 import TeklifGoruntu from '@/components/admin/teklif/TeklifGoruntu'
-import { DURUM, PARA, bosKalem, bugunTR, dogrula, epostaMetni, gecerlilikDurumu, gunEkle, iskontoBul, koliOzet, listeEtiket, listeFiyatiPara, satirNet, teklifHesapla, yuvarla, type Dil, type ListeUrun, type TKalem } from '@/lib/teklif'
+import { DURUM, PARA, adetSayisi, koliMi, bosKalem, bugunTR, dogrula, epostaMetni, gecerlilikDurumu, gunEkle, iskontoBul, koliOzet, listeEtiket, listeFiyatiPara, satirNet, teklifHesapla, yuvarla, type Dil, type ListeUrun, type TKalem } from '@/lib/teklif'
 import { erp } from '@/lib/erp-client'
 import { Plus, Printer, Save, Copy, Sparkles, Trash2, ShoppingCart, FileText, Clock, CheckCircle2, Percent, Tag } from 'lucide-react'
 
@@ -74,12 +74,14 @@ export default function TekliflerPage() {
   const listeKod = useMemo(() => Object.fromEntries(listeUrunleri.map(u => [u.kod, u])) as Record<string, ListeUrun>, [listeUrunleri])
   const listeEtk = useMemo(() => { const m: Record<string, ListeUrun> = {}; for (const u of listeUrunleri) { m[listeEtiket(u, 'tr')] = u; m[listeEtiket(u, 'en')] = u } return m }, [listeUrunleri])
   const sayi = (x: any) => (x == null ? null : +x)
-  function listeKalemi(u: ListeUrun, f: F, miktar: number): Partial<TKalem> {
-    const fiyat = listeFiyatiPara(+u.usd_fiyat, f.para_birimi, +f.kur, u.tl_fiyat)
-    return { variant_id: '', kod: u.kod, urun_adi: listeEtiket(u, f.dil), koli_ici_adet: sayi(u.koli_ici_adet), koli_m3: sayi(u.koli_m3), koli_kg: sayi(u.koli_kg),
-      ...(fiyat !== null ? { birim_fiyat: fiyat, iskonto_yuzde: iskontoBul(+cari[f.cari_id]?.iskonto_yuzde || 0, d.iskontolar, miktar) } : {}) }
+  // Sipariş koli adediyle verilir: birim 'koli' iken miktar = koli sayısı, birim fiyat = koli fiyatı (adet fiyatı × koli içi adet). Birim 'adet' seçilirse adet fiyatı.
+  function listeKalemi(u: ListeUrun, f: F, miktar: number, birim: string = 'koli'): Partial<TKalem> {
+    const adetFiyat = listeFiyatiPara(+u.usd_fiyat, f.para_birimi, +f.kur, u.tl_fiyat), kn = +(u.koli_ici_adet || 0), koli = birim === 'koli' && kn > 0
+    const fiyat = adetFiyat === null ? null : koli ? yuvarla(adetFiyat * kn, 2) : adetFiyat, adet = koli ? miktar * kn : miktar
+    return { variant_id: '', kod: u.kod, urun_adi: listeEtiket(u, f.dil), koli_ici_adet: sayi(u.koli_ici_adet), koli_m3: sayi(u.koli_m3), koli_kg: sayi(u.koli_kg), birim: kn > 0 ? (koli ? 'koli' : 'adet') : 'adet',
+      ...(fiyat !== null ? { birim_fiyat: fiyat, iskonto_yuzde: iskontoBul(+cari[f.cari_id]?.iskonto_yuzde || 0, d.iskontolar, adet) } : {}) }
   }
-  const yenidenFiyatla = (f: F, ks: TKalem[]) => ks.map(k => (k.kod && listeKod[k.kod] ? { ...k, ...listeKalemi(listeKod[k.kod], f, +k.miktar) } : k))
+  const yenidenFiyatla = (f: F, ks: TKalem[]) => ks.map(k => (k.kod && listeKod[k.kod] ? { ...k, ...listeKalemi(listeKod[k.kod], f, +k.miktar, k.birim === 'koli' ? 'koli' : 'adet') } : k))
   const listeTemizle = { kod: undefined, koli_ici_adet: null, koli_m3: null, koli_kg: null }
 
   /* ── Başvurudan gelen ?basvuru=ID ── */
@@ -132,7 +134,7 @@ export default function TekliflerPage() {
   function miktarDegis(i: number, m: number) {
     if (!ed) return
     const lu = ed.kalemler[i].kod ? listeKod[ed.kalemler[i].kod!] : undefined
-    if (lu) { const p = listeKalemi(lu, ed.f, m); return setK(i, { miktar: m, ...(p.birim_fiyat !== undefined ? { birim_fiyat: p.birim_fiyat, iskonto_yuzde: p.iskonto_yuzde } : {}) }) }
+    if (lu) { const p = listeKalemi(lu, ed.f, m, ed.kalemler[i].birim === 'koli' ? 'koli' : 'adet'); return setK(i, { miktar: m, ...(p.birim_fiyat !== undefined ? { birim_fiyat: p.birim_fiyat, iskonto_yuzde: p.iskonto_yuzde } : {}) }) }
     const k = ed.kalemler[i]; const fb =k.variant_id && ed.f.para_birimi === 'TRY' ? fiyatBul(k.variant_id, ed.f.cari_id, m) : null
     setK(i, { miktar: m, ...(fb ? { birim_fiyat: fb.fiyat, iskonto_yuzde: fb.isk } : {}) })
   }
@@ -303,9 +305,9 @@ export default function TekliflerPage() {
                 <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead><tr>{['Ürün / hizmet', 'Miktar', 'Birim', 'Birim fiyat', 'İskonto %', 'Tutar', ''].map((h, i) => <th key={i} style={{ padding: '6px 8px', textAlign: 'left', fontSize: 11, color: 'var(--adm-tx3)' }}>{h}</th>)}</tr></thead>
                   <tbody>{ed.kalemler.map((k, i) => <tr key={i}>
-                    <td style={{ padding: 4, minWidth: 240 }}><input className="adm-inp" list="teklif-urunler" value={k.urun_adi} onChange={e => urunSec(i, e.target.value)} placeholder="Fiyat listesinden seçin veya yazın" />{k.kod && listeKod[k.kod] && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>{ed.f.para_birimi === 'TRY' && +(listeKod[k.kod].tl_fiyat || 0) > 0 ? <>Liste {fmt(+(listeKod[k.kod].tl_fiyat || 0), 'TRY')} (elle girilen TL fiyat)</> : <>Liste {fmt(+listeKod[k.kod].usd_fiyat, 'USD')}{ed.f.para_birimi === 'TRY' ? ` × kur ${ed.f.kur || '?'}` : ''}</>}{+k.iskonto_yuzde ? ` · iskonto %${k.iskonto_yuzde}` : ''}{k.koli_ici_adet ? ` · ${k.koli_ici_adet} adet/koli` : ''}{k.koli_ici_adet && (+k.koli_m3 || +k.koli_kg) ? ` · koli: ${+k.koli_m3 || 0} m³ · ${+k.koli_kg || 0} kg` : ''}</div>}{k.koli_ici_adet && +k.miktar > 0 && (+k.koli_m3 || +k.koli_kg) ? (() => { const ko = koliOzet([k]); return <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>Bu kalem: <b>{ko.koli} koli · {ko.m3} m³ · {ko.kg} kg</b></div> })() : null}{k.kod && ed.f.para_birimi !== 'USD' && ed.f.para_birimi !== 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>bu para biriminde liste yok, fiyatı girin</div>}{k.variant_id && d.fiyatKalemleri.length > 0 && !fiyatBul(k.variant_id, ed.f.cari_id, k.miktar) && ed.f.para_birimi === 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>fiyat listesinde yok</div>}</td>
+                    <td style={{ padding: 4, minWidth: 240 }}><input className="adm-inp" list="teklif-urunler" value={k.urun_adi} onChange={e => urunSec(i, e.target.value)} placeholder="Fiyat listesinden seçin veya yazın" />{k.kod && listeKod[k.kod] && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>{ed.f.para_birimi === 'TRY' && +(listeKod[k.kod].tl_fiyat || 0) > 0 ? <>Liste {fmt(+(listeKod[k.kod].tl_fiyat || 0), 'TRY')} (elle girilen TL fiyat)/adet</> : <>Liste {fmt(+listeKod[k.kod].usd_fiyat, 'USD')}{ed.f.para_birimi === 'TRY' ? ` × kur ${ed.f.kur || '?'}` : ''}</>}{+k.iskonto_yuzde ? ` · iskonto %${k.iskonto_yuzde}` : ''}{k.koli_ici_adet ? ` · ${k.koli_ici_adet} adet/koli` : ''}{k.koli_ici_adet && (+k.koli_m3 || +k.koli_kg) ? ` · koli: ${+k.koli_m3 || 0} m³ · ${+k.koli_kg || 0} kg` : ''}</div>}{k.koli_ici_adet && +k.miktar > 0 && (+k.koli_m3 || +k.koli_kg) ? (() => { const ko = koliOzet([k]); return <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)' }}>Bu kalem: <b>{koliMi(k) ? `${k.miktar} koli = ${adetSayisi(k)} adet · ` : ''}{ko.koli} koli · {ko.m3} m³ · {ko.kg} kg</b></div> })() : null}{k.kod && ed.f.para_birimi !== 'USD' && ed.f.para_birimi !== 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>bu para biriminde liste yok, fiyatı girin</div>}{k.variant_id && d.fiyatKalemleri.length > 0 && !fiyatBul(k.variant_id, ed.f.cari_id, k.miktar) && ed.f.para_birimi === 'TRY' && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)' }}>fiyat listesinde yok</div>}</td>
                     <td style={{ padding: 4 }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 90 }} value={k.miktar} onChange={e => miktarDegis(i, +e.target.value)} /></td>
-                    <td style={{ padding: 4 }}><input className="adm-inp" style={{ width: 70 }} value={k.birim} maxLength={20} onChange={e => setK(i, { birim: e.target.value })} /></td>
+                    <td style={{ padding: 4 }}>{k.kod && listeKod[k.kod] && +(listeKod[k.kod].koli_ici_adet || 0) > 0 ? <select className="adm-inp" style={{ width: 78 }} value={k.birim === 'koli' ? 'koli' : 'adet'} onChange={e => { const lu = listeKod[k.kod!]; const p = listeKalemi(lu, ed.f, +k.miktar, e.target.value); setK(i, { birim: e.target.value, ...(p.birim_fiyat !== undefined ? { birim_fiyat: p.birim_fiyat, iskonto_yuzde: p.iskonto_yuzde } : {}) }) }}><option value="koli">koli</option><option value="adet">adet</option></select> : <input className="adm-inp" style={{ width: 70 }} value={k.birim} maxLength={20} onChange={e => setK(i, { birim: e.target.value })} />}</td>
                     <td style={{ padding: 4 }}><input type="number" min="0" step="any" className="adm-inp" style={{ width: 110 }} value={k.birim_fiyat} onChange={e => setK(i, { birim_fiyat: +e.target.value })} />{k.urun_adi.trim() && !(+k.birim_fiyat > 0) && <div style={{ fontSize: 10.5, color: 'var(--adm-amber)', maxWidth: 130 }}>{ed.f.para_birimi === 'TRY' && !ed.f.kur && k.kod ? 'Kur girin: fiyat kurdan hesaplanır' : k.kod ? 'Bu para biriminde liste fiyatı yok, elle girin' : 'Fiyat listesinde yok, elle girin'}</div>}</td>
                     <td style={{ padding: 4 }}><input type="number" min="0" max="100" step="any" className="adm-inp" style={{ width: 80 }} value={k.iskonto_yuzde} onChange={e => setK(i, { iskonto_yuzde: +e.target.value })} /></td>
                     <td style={{ padding: 4, textAlign: 'right', whiteSpace: 'nowrap' }}>{fmt(satirNet(k), ed.f.para_birimi)}</td>

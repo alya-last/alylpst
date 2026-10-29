@@ -19,13 +19,17 @@ export function iskontoBul(cariYuzde: number, kademeler: { min_miktar: number | 
   const kademe = Math.max(0, ...kademeler.filter(k => k.aktif !== false && +k.min_miktar <= miktar).map(k => +k.iskonto_yuzdesi))
   return Math.min(100, Math.max(+cariYuzde || 0, kademe))
 }
+/** Kalem koli birimiyle mi sipariş ediliyor? (miktar = koli sayısı, birim fiyat = koli fiyatı = adet fiyatı × koli içi adet) */
+export const koliMi = (k: TKalem) => k.birim === 'koli' && !!k.koli_ici_adet
+/** Kalemin toplam ADET karşılığı (koli biriminde miktar × koli içi adet). */
+export const adetSayisi = (k: TKalem) => (koliMi(k) ? (+k.miktar || 0) * (k.koli_ici_adet as number) : +k.miktar || 0)
 /** Kalem listeden geldiyse koli/m³/kg toplamı (koli adedi yukarı yuvarlanır). */
 export function koliOzet(kalemler: TKalem[]) {
   let koli = 0, m3 = 0, kg = 0, eksik = 0
   for (const k of kalemler) {
     if (!k.urun_adi.trim()) continue
     if (!k.koli_ici_adet || !(+k.miktar > 0)) { eksik++; continue }
-    const n = Math.ceil(+k.miktar / k.koli_ici_adet)
+    const n = koliMi(k) ? Math.ceil(+k.miktar) : Math.ceil(+k.miktar / k.koli_ici_adet)
     koli += n; m3 += n * (+k.koli_m3 || 0); kg += n * (+k.koli_kg || 0)
   }
   return { koli, m3: yuvarla(m3, 3), kg: yuvarla(kg, 1), eksik }
