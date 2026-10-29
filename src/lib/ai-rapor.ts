@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { excelKaydet, type Sayfa } from '@/lib/ai-excel'
 import { araciCalistir, hamCalistir, bugunISO } from '@/lib/ai-admin'
 import { aiJson, veriBlok } from '@/lib/ai'
+import { gelirTablosuVeri } from '@/lib/gelir-tablosu'
 
 type Mekan = 'ic' | 'dis' | 'hepsi'
 export type RaporNiyet =
@@ -22,6 +23,7 @@ export type RaporNiyet =
   | { tur: 'ihr_tahsilat' }
   | { tur: 'ihr_rakam'; yil: number }
   | { tur: 'pos' }
+  | { tur: 'gelir_tablosu'; yil: number; ay: number } // aylık gelir tablosu (satışlar/masraflar/üretim maliyeti/ciro/kar-zarar) görüntü + Excel
   | { tur: 'kdv'; yil: number; ay: number }
   | { tur: 'odeme' }
   | { tur: 'ekstre'; arama: string; kod: string }
@@ -64,6 +66,11 @@ function cariEsle(cl: any[], kel: string[]): any[] {
 export function raporNiyeti(soru: string): RaporNiyet | null {
   const t = nrm(soru).replace(/\bham{1,2}[ae]dde/g, 'hammadde') // yazım hataları: hammedde, hamadde
   if (!t || t.split(' ').length > 40) return null
+  if (/gelir tablo|gelir gider tablo|kar zarar tablo|yonetim rapor|aylik rapor/.test(t) && !/kdv|hesaplanan|indirilecek/.test(t)) {
+    const AYK = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik'], bg = bugunISO()
+    const ayI = AYK.findIndex(a => new RegExp(`\\b${a}`).test(t))
+    return { tur: 'gelir_tablosu', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: ayI >= 0 ? ayI + 1 : +bg.slice(5, 7) }
+  }
   if (/neden|niye|\byorum\w*|karsilastir|tahmin|oner|kar zarar|maliyet|senaryo|kur farki/.test(t)) return null
   const dis = /\bdis ?mekan/.test(t), ic = /\bic ?mekan/.test(t)
   const mekan: Mekan = dis && !ic ? 'dis' : ic && !dis ? 'ic' : 'hepsi'
@@ -867,7 +874,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   let n = raporNiyeti(soru)
   if (!n) { try { n = await niyetSinifla(soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
   if (!n) return null
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], boya_kg: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], boya_kg: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     switch (n.tur) {
@@ -888,6 +895,12 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
         return await hammadde(sb, n.mekan)
       }
       case 'hm_stok': return await hmStok(sb, n.grup, n.arama)
+      case 'gelir_tablosu': {
+        const v = await gelirTablosuVeri(sb, n.yil, n.ay), ayk = `${n.yil}-${String(n.ay).padStart(2, '0')}`
+        if (!v.kayit) return { yanit: `${AYLAR[n.ay - 1]} ${n.yil} için gelir/gider kaydı bulunamadı.`, araclar: ['rapor_gelir_tablosu'] }
+        const g = [`${AYLAR[n.ay - 1].toUpperCase()} ${n.yil} GELİR TABLOSU`, '', `Net satışlar (ciro): ${TL(v.netSatis)} TL`, `Masraflar: ${TL(v.masrafToplam)} TL`, `Üretim maliyeti: ${TL(v.uretimToplam)} TL`, `Satışların maliyeti: ${TL(v.satisMaliyeti)} TL`, `Diğer gelirler: ${TL(v.digerToplam)} TL`, `KAR-ZARAR: ${TL(v.karZarar)} TL`, '', 'Kar-zarar = Ciro + Diğer gelirler − (Masraflar + Üretim maliyeti).', '', `/api/admin/gelir-tablosu?ay=${ayk}`, '', `/api/admin/gelir-tablosu?ay=${ayk}&format=xlsx`]
+        return { yanit: g.join('\n'), araclar: ['rapor_gelir_tablosu'] }
+      }
       case 'boya_kg': { const b = n.kg * n.oran, yp = r2(n.oran * 100); return { yanit: `${AD(n.kg)} kg hammadde × %${yp} boya oranı = ${TL(b)} kg (${TL(b / 1000)} ton) boya.\nHesap: hammadde kg × oran. Tahmini hesaptır, gerçek boya kullanımı kayıtlı değildir. Dış mekanda boya kullanılmaz.`, araclar: ['rapor_boya_kg'] } }
       case 'boya_kullanim': return n.kaynak === 'stok' && n.mekan !== 'dis' ? await boyaStok(sb, n.oran) : await boyaKullanim(sb, n.mekan, n.oran)
       case 'stok_kg': return await stokKg(sb, n.mekan)

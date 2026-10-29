@@ -65,6 +65,7 @@ const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
     'ihracatta tahsil etmediğim müşterilerin listesi',
     '2026 ihracat rakamları usd, euro ve TL',
   ] },
+  { baslik: 'Gelir tablosu', sorular: ['ocak ayı gelir tablosu', 'ekim ayı gelir tablosu', 'şubat ayı yönetim raporu'] },
   { baslik: 'K. kartı', sorular: ['k.kartı tahsilatlarım'] },
   { baslik: 'KDV ve fatura', sorular: ['eylül ayı yüklenilen (indirilecek) KDV listesi', 'ekim ayı KDV listesi', 'eylül ayı alış faturaları listesi excel'] },
   { baslik: 'Cari ekstre', sorular: ['VTK cari excel ver', 'VTK ekstresi', '120.03.016 Yanko ekstresi excel'] },
