@@ -40,9 +40,12 @@ export const DURUM: Record<string, { l: string; tone: 'muted' | 'blue' | 'green'
 export const bosKalem = (): TKalem => ({ variant_id: '', urun_adi: '', aciklama: '', miktar: 1, birim: 'adet', birim_fiyat: 0, iskonto_yuzde: 0 })
 export const yuvarla = (x: number, d = 2) => Math.round((x + Number.EPSILON) * 10 ** d) / 10 ** d
 export const satirNet = (k: TKalem) => yuvarla((+k.miktar || 0) * (+k.birim_fiyat || 0) * (1 - (+k.iskonto_yuzde || 0) / 100))
-export function teklifHesapla(kalemler: TKalem[], kdvOrani: number) {
-  const ara = yuvarla(kalemler.reduce((t, k) => t + satirNet(k), 0)), kdv = yuvarla(ara * (+kdvOrani || 0) / 100)
-  return { ara, kdv, toplam: yuvarla(ara + kdv) }
+/** kdvDahil: satır fiyatları KDV DAHİL ise genel toplam = satırların toplamı; ara toplam ve KDV içinden ayrıştırılır. */
+export function teklifHesapla(kalemler: TKalem[], kdvOrani: number, kdvDahil = false) {
+  const top = yuvarla(kalemler.reduce((t, k) => t + satirNet(k), 0)), o = +kdvOrani || 0
+  if (kdvDahil) { const ara = yuvarla(top / (1 + o / 100)); return { ara, kdv: yuvarla(top - ara), toplam: top } }
+  const kdv = yuvarla(top * o / 100)
+  return { ara: top, kdv, toplam: yuvarla(top + kdv) }
 }
 export const gunEkle = (t: string, n: number) => new Date(Date.parse(t + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10)
 export const bugunTR = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10)
@@ -77,11 +80,11 @@ export const etiket = (d: Dil) => L[d]
 
 const paraStr = (n: number, pb: string) => `${new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)} ${pb}`
 /** E-posta gövdesi olarak kopyalanabilir düz metin. */
-export function epostaMetni(t: { no: string; musteri_adi: string; para_birimi: string; kdv_orani: number; gecerlilik: string | null; kosullar: string | null; dil: Dil }, kalemler: TKalem[], firma: string): string {
-  const s = teklifHesapla(kalemler, t.kdv_orani), tr = t.dil === 'tr'
+export function epostaMetni(t: { no: string; musteri_adi: string; para_birimi: string; kdv_orani: number; kdv_dahil?: boolean; gecerlilik: string | null; kosullar: string | null; dil: Dil }, kalemler: TKalem[], firma: string): string {
+  const s = teklifHesapla(kalemler, t.kdv_orani, !!t.kdv_dahil), tr = t.dil === 'tr'
   const tarih = (d: string) => d.split('-').reverse().join('.')
   const satirlar = kalemler.filter(k => k.urun_adi.trim()).map(k => `- ${k.urun_adi}: ${k.miktar} ${k.birim} × ${paraStr(k.birim_fiyat, t.para_birimi)}${k.iskonto_yuzde ? ` (${tr ? 'iskonto' : 'discount'} %${k.iskonto_yuzde})` : ''} = ${paraStr(satirNet(k), t.para_birimi)}`)
   return tr
-    ? `Sayın ${t.musteri_adi},\n\nTalebiniz doğrultusunda hazırladığımız ${t.no} numaralı fiyat teklifimiz aşağıdadır (PDF ektedir):\n\n${satirlar.join('\n')}\n\nAra toplam: ${paraStr(s.ara, t.para_birimi)}\nKDV (%${t.kdv_orani}): ${paraStr(s.kdv, t.para_birimi)}\nGenel toplam: ${paraStr(s.toplam, t.para_birimi)}\n${t.gecerlilik ? `\nTeklifimiz ${tarih(t.gecerlilik)} tarihine kadar geçerlidir.\n` : ''}${t.kosullar ? `\nKoşullar:\n${t.kosullar}\n` : ''}\nSorularınız için bize ulaşabilirsiniz.\n\nSaygılarımızla,\n${firma}`
+    ? `Sayın ${t.musteri_adi},\n\nTalebiniz doğrultusunda hazırladığımız ${t.no} numaralı fiyat teklifimiz aşağıdadır (PDF ektedir):\n\n${satirlar.join('\n')}\n\n${t.kdv_dahil ? '(Fiyatlara KDV dahildir)\n' : ''}Ara toplam: ${paraStr(s.ara, t.para_birimi)}\nKDV (%${t.kdv_orani}): ${paraStr(s.kdv, t.para_birimi)}\nGenel toplam: ${paraStr(s.toplam, t.para_birimi)}\n${t.gecerlilik ? `\nTeklifimiz ${tarih(t.gecerlilik)} tarihine kadar geçerlidir.\n` : ''}${t.kosullar ? `\nKoşullar:\n${t.kosullar}\n` : ''}\nSorularınız için bize ulaşabilirsiniz.\n\nSaygılarımızla,\n${firma}`
     : `Dear ${t.musteri_adi},\n\nPlease find our quotation ${t.no} below (PDF attached):\n\n${satirlar.join('\n')}\n\nSubtotal: ${paraStr(s.ara, t.para_birimi)}\nVAT (${t.kdv_orani}%): ${paraStr(s.kdv, t.para_birimi)}\nTotal: ${paraStr(s.toplam, t.para_birimi)}\n${t.gecerlilik ? `\nThis quotation is valid until ${tarih(t.gecerlilik)}.\n` : ''}${t.kosullar ? `\nTerms:\n${t.kosullar}\n` : ''}\nPlease do not hesitate to contact us.\n\nBest regards,\n${firma}`
 }
