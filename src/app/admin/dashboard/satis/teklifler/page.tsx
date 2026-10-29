@@ -16,9 +16,9 @@ import { Plus, Printer, Save, Copy, Sparkles, Trash2, ShoppingCart, FileText, Cl
 const fmt = (n: number, pb = 'TRY') => `${new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0)} ${pb}`
 const tarihTR = (t: string | null) => (t ? t.split('-').reverse().join('.') : '—')
 const KOSUL = { tr: 'Fiyatlarımıza KDV dahil değildir.', en: 'Prices exclude VAT.' }
-type F = { cari_id: string; musteri_adi: string; musteri_email: string; musteri_tel: string; basvuru_id: string; tarih: string; gecerlilik: string; para_birimi: string; kur: string; kdv_orani: number; dil: Dil; kosullar: string; notlar: string }
+type F = { cari_id: string; musteri_adi: string; musteri_email: string; musteri_tel: string; basvuru_id: string; tarih: string; gecerlilik: string; para_birimi: string; kur: string; kdv_orani: number; kdv_dahil: boolean; dil: Dil; kosullar: string; notlar: string }
 type Ed = { id: string | null; no: string; durum: string; siparisId: string | null; f: F; kalemler: TKalem[] }
-const bosF = (kur = ''): F => ({ cari_id: '', musteri_adi: '', musteri_email: '', musteri_tel: '', basvuru_id: '', tarih: bugunTR(), gecerlilik: gunEkle(bugunTR(), 15), para_birimi: 'TRY', kur, kdv_orani: 20, dil: 'tr', kosullar: KOSUL.tr, notlar: '' })
+const bosF = (kur = ''): F => ({ cari_id: '', musteri_adi: '', musteri_email: '', musteri_tel: '', basvuru_id: '', tarih: bugunTR(), gecerlilik: gunEkle(bugunTR(), 15), para_birimi: 'TRY', kur, kdv_orani: 20, kdv_dahil: true, dil: 'tr', kosullar: KOSUL.tr, notlar: '' })
 
 export default function TekliflerPage() {
   const toast = useToast()
@@ -120,7 +120,7 @@ export default function TekliflerPage() {
   async function ac(t: any) {
     const { data, error } = await web.from('teklif_kalemleri').select('*').eq('teklif_id', t.id).order('sira')
     if (error) return toast.show(error.message, true)
-    setEd({ id: t.id, no: t.no, durum: t.durum, siparisId: t.siparis_id, f: { cari_id: t.cari_id || '', musteri_adi: t.musteri_adi, musteri_email: t.musteri_email || '', musteri_tel: t.musteri_tel || '', basvuru_id: t.basvuru_id || '', tarih: t.tarih, gecerlilik: t.gecerlilik || '', para_birimi: t.para_birimi, kur: t.kur ? String(+t.kur) : '', kdv_orani: +t.kdv_orani, dil: t.dil, kosullar: t.kosullar || '', notlar: t.notlar || '' },
+    setEd({ id: t.id, no: t.no, durum: t.durum, siparisId: t.siparis_id, f: { cari_id: t.cari_id || '', musteri_adi: t.musteri_adi, musteri_email: t.musteri_email || '', musteri_tel: t.musteri_tel || '', basvuru_id: t.basvuru_id || '', tarih: t.tarih, gecerlilik: t.gecerlilik || '', para_birimi: t.para_birimi, kur: t.kur ? String(+t.kur) : '', kdv_orani: +t.kdv_orani, kdv_dahil: !!t.kdv_dahil, dil: t.dil, kosullar: t.kosullar || '', notlar: t.notlar || '' },
       kalemler: (data || []).map((k: any) => ({ variant_id: k.variant_id || '', urun_adi: k.urun_adi, aciklama: k.aciklama || '', miktar: +k.miktar, birim: k.birim, birim_fiyat: +k.birim_fiyat, iskonto_yuzde: +k.iskonto_yuzde, kod: k.kod || undefined, koli_ici_adet: sayi(k.koli_ici_adet), koli_m3: sayi(k.koli_m3), koli_kg: sayi(k.koli_kg) })) })
     setSekme('duzenle'); setAi({ metin: '', busy: false, sonuc: null, kapali: false })
   }
@@ -163,7 +163,7 @@ export default function TekliflerPage() {
   function dilDegis(dil: Dil) {
     if (!ed) return
     const f = ed.f, kos = f.kosullar.trim() === '' || f.kosullar === KOSUL[f.dil] ? { kosullar: KOSUL[dil] } : {}
-    const para = dil === 'en' && f.para_birimi === 'TRY' ? { para_birimi: 'USD', kur: '', kdv_orani: 0 } : dil === 'tr' && f.para_birimi === 'USD' ? { para_birimi: 'TRY', kur: tcmbUsd, kdv_orani: 20 } : {}
+    const para = dil === 'en' && f.para_birimi === 'TRY' ? { para_birimi: 'USD', kur: '', kdv_orani: 0, kdv_dahil: false } : dil === 'tr' && f.para_birimi === 'USD' ? { para_birimi: 'TRY', kur: tcmbUsd, kdv_orani: 20, kdv_dahil: true } : {}
     setF({ dil, ...para, ...kos })
   }
 
@@ -256,7 +256,7 @@ export default function TekliflerPage() {
     { key: 'du', label: 'Durum', width: 130, sort: t => t.durum, render: t => <Badge tone={DURUM[t.durum]?.tone}>{DURUM[t.durum]?.l}</Badge> },
     { key: 'act', label: '', width: 90, align: 'right', render: t => <span style={{ display: 'inline-flex', gap: 4 }} onClick={e => e.stopPropagation()}><button className="adm-btn-ghost" style={{ padding: '3px 7px' }} title="Kopyala" onClick={() => kopya(t)}><Copy size={12} /></button>{t.durum !== 'kabul' && <button className="adm-btn-danger" style={{ padding: '3px 7px' }} onClick={() => sil(t)}><Trash2 size={12} /></button>}</span> },
   ]
-  const s = ed ? teklifHesapla(ed.kalemler, ed.f.kdv_orani) : null
+  const s = ed ? teklifHesapla(ed.kalemler, ed.f.kdv_orani, ed.f.kdv_dahil) : null
 
   useAcParam(!yuk, async id => { let r = liste.find((x: any) => x.id === id); if (!r) r = (await web.from('teklifler').select('*').eq('id', id).maybeSingle()).data; if (r) ac(r) })
 
@@ -282,14 +282,14 @@ export default function TekliflerPage() {
             {ed.durum === 'gonderildi' && <><button type="button" className="adm-btn-ghost" onClick={() => durumDegis({ id: ed.id!, no: ed.no }, 'red')}>Reddedildi</button></>}
             <button type="button" className="adm-btn-ghost" style={{ marginRight: 'auto' }} onClick={() => durumDegis({ id: ed.id!, no: ed.no }, 'iptal')}>İptal et</button></>}
           <button type="button" className="adm-btn-ghost" onClick={() => setEd(null)}>Kapat</button>
-          <button type="button" className="adm-btn-ghost" onClick={async () => { try { await navigator.clipboard.writeText(epostaMetni({ no: ed.no || 'TASLAK', musteri_adi: ed.f.musteri_adi, para_birimi: ed.f.para_birimi, kdv_orani: ed.f.kdv_orani, gecerlilik: ed.f.gecerlilik || null, kosullar: ed.f.kosullar || null, dil: ed.f.dil }, ed.kalemler, site?.company || 'Alya Plastik')); toast.show('E-posta metni kopyalandı') } catch { toast.show('Kopyalanamadı', true) } }}><Copy size={13} />E-posta metni</button>
+          <button type="button" className="adm-btn-ghost" onClick={async () => { try { await navigator.clipboard.writeText(epostaMetni({ no: ed.no || 'TASLAK', musteri_adi: ed.f.musteri_adi, para_birimi: ed.f.para_birimi, kdv_orani: ed.f.kdv_orani, kdv_dahil: ed.f.kdv_dahil, gecerlilik: ed.f.gecerlilik || null, kosullar: ed.f.kosullar || null, dil: ed.f.dil }, ed.kalemler, site?.company || 'Alya Plastik')); toast.show('E-posta metni kopyalandı') } catch { toast.show('Kopyalanamadı', true) } }}><Copy size={13} />E-posta metni</button>
           <button type="button" className="adm-btn-ghost" onClick={yazdir}><Printer size={13} />Yazdır / PDF</button>
           {ed.id && !kilitli && ['taslak', 'gonderildi'].includes(ed.durum) && <button type="button" className="adm-btn-ghost" onClick={siparisCevir}><ShoppingCart size={13} />Kabul → siparişe çevir</button>}
           {!kilitli && <button type="button" className="adm-btn" disabled={busy} onClick={kaydet}><Save size={13} />{busy ? 'Kaydediliyor…' : 'Kaydet'}</button>}</>}>
         {ed && s && <>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}><Badge tone={DURUM[ed.durum]?.tone}>{DURUM[ed.durum]?.l}</Badge>{kilitli && <span style={{ fontSize: 12.5, color: 'var(--adm-tx3)' }}>Kabul edilmiş teklif değiştirilemez{ed.siparisId ? ' (siparişe bağlı)' : ''}. Değişiklik için “Kopyala” ile yeni teklif açın.</span>}</div>
           <Tabs value={sekme} onChange={setSekme} style={{ marginBottom: 12 }} tabs={[{ v: 'duzenle', l: 'Düzenle' }, { v: 'onizleme', l: 'Önizleme' }]} />
-          {sekme === 'onizleme' ? <div style={{ overflow: 'auto', background: '#888', padding: 12 }}><TeklifGoruntu no={ed.no} dil={ed.f.dil} firma={firma} musteri={[ed.f.musteri_adi, ed.f.musteri_email, ed.f.musteri_tel].filter(Boolean).join('\n')} tarihi={ed.f.tarih} gecerlilik={ed.f.gecerlilik} paraBirimi={ed.f.para_birimi} kdvOrani={ed.f.kdv_orani} kalemler={ed.kalemler} kosullar={ed.f.kosullar} gorseller={gorseller} /></div> : (
+          {sekme === 'onizleme' ? <div style={{ overflow: 'auto', background: '#888', padding: 12 }}><TeklifGoruntu no={ed.no} dil={ed.f.dil} firma={firma} musteri={[ed.f.musteri_adi, ed.f.musteri_email, ed.f.musteri_tel].filter(Boolean).join('\n')} tarihi={ed.f.tarih} gecerlilik={ed.f.gecerlilik} paraBirimi={ed.f.para_birimi} kdvOrani={ed.f.kdv_orani} kdvDahil={ed.f.kdv_dahil} kalemler={ed.kalemler} kosullar={ed.f.kosullar} gorseller={gorseller} /></div> : (
             <fieldset disabled={kilitli} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gap: 12 }}>
               <FormGrid cols={4}>
                 <Field label="Kayıtlı cari (isteğe bağlı)" span={2}><select className="adm-inp" value={ed.f.cari_id} onChange={e => cariSec(e.target.value)}><option value="">— Yeni müşteri / potansiyel —</option>{d.cariTam.filter((c: any) => c.tip !== 'tedarikci').map((c: any) => <option key={c.id} value={c.id}>{c.ad}</option>)}</select></Field>
@@ -302,6 +302,7 @@ export default function TekliflerPage() {
                 <Field label="Para birimi" hint={ed.f.para_birimi === 'USD' ? 'Liste fiyatı USD: otomatik gelir' : ed.f.para_birimi === 'TRY' ? 'Liste fiyatı USD × kur ile TL’ye çevrilir' : 'Bu para biriminde liste yok; fiyatları elle girin'}><select className="adm-inp" value={ed.f.para_birimi} onChange={e => setF({ para_birimi: e.target.value })}>{PARA.map(p => <option key={p}>{p}</option>)}</select></Field>
                 {ed.f.para_birimi === 'TRY' && <Field label="Kur (1 USD = ? TL)" hint={ed.kalemler.some(k => k.kod) && !(+ed.f.kur > 0) ? 'Kur girilmeden liste fiyatı TL’ye çevrilemez' : undefined}><input type="number" min="0" step="any" className="adm-inp" value={ed.f.kur} onChange={e => setF({ kur: e.target.value })} placeholder="örn. 44,50" /></Field>}
                 <Field label="KDV %"><input type="number" min="0" max="100" step="any" className="adm-inp" value={ed.f.kdv_orani} onChange={e => setF({ kdv_orani: +e.target.value })} /></Field>
+                <Field label="Fiyatlar" hint={ed.f.kdv_dahil ? 'Birim fiyatlar KDV DAHİL: KDV toplamın içinden ayrılır' : 'Birim fiyatlar KDV HARİÇ: KDV üstüne eklenir'}><select className="adm-inp" value={ed.f.kdv_dahil ? '1' : '0'} onChange={e => setF({ kdv_dahil: e.target.value === '1' })}><option value="1">KDV dahil</option><option value="0">KDV hariç</option></select></Field>
               </FormGrid>
 
               {!kilitli && <Card title={<span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Sparkles size={14} />AI ile kalem öner</span>} pad={12}>
@@ -333,7 +334,7 @@ export default function TekliflerPage() {
                 </table></div>
                 <div style={{ padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                   <button type="button" className="adm-btn-ghost" onClick={() => setEd(e => e && ({ ...e, kalemler: [...e.kalemler, bosKalem()] }))}><Plus size={12} />Kalem ekle</button>
-                  <span style={{ fontSize: 13, textAlign: 'right' }}>{(() => { const ko = koliOzet(ed.kalemler); return ko.koli > 0 ? <span style={{ display: 'block', fontSize: 11.5, color: 'var(--adm-tx3)' }}>{ko.koli} koli · {ko.m3} m³ · {ko.kg} kg{ko.eksik ? ` (${ko.eksik} kalemin koli bilgisi yok)` : ''}</span> : null })()}Ara {fmt(s.ara, ed.f.para_birimi)} · KDV {fmt(s.kdv, ed.f.para_birimi)} · <b>Toplam {fmt(s.toplam, ed.f.para_birimi)}</b></span>
+                  <span style={{ fontSize: 13, textAlign: 'right' }}>{(() => { const ko = koliOzet(ed.kalemler); return ko.koli > 0 ? <span style={{ display: 'block', fontSize: 11.5, color: 'var(--adm-tx3)' }}>{ko.koli} koli · {ko.m3} m³ · {ko.kg} kg{ko.eksik ? ` (${ko.eksik} kalemin koli bilgisi yok)` : ''}</span> : null })()}Ara {fmt(s.ara, ed.f.para_birimi)}{ed.f.kdv_dahil ? ' (KDV hariç)' : ''} · KDV {fmt(s.kdv, ed.f.para_birimi)} · <b>Toplam {fmt(s.toplam, ed.f.para_birimi)}</b></span>
                 </div>
               </Card>
               <Field label="Koşullar (teklifte görünür)"><textarea className="adm-inp" rows={3} maxLength={2000} value={ed.f.kosullar} onChange={e => setF({ kosullar: e.target.value })} placeholder="Ödeme, teslim süresi, teslim yeri…" /></Field>

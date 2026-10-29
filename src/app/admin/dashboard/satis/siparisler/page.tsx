@@ -72,13 +72,14 @@ export default function SatisSiparisleriPage() {
     const kur = +(sp.get('kur') || '1') || 1
     window.history.replaceState(null, '', window.location.pathname)
     ;(async () => {
-      const [t, k] = await Promise.all([web.from('teklifler').select('id,no,cari_id,musteri_adi,durum,siparis_id').eq('id', tid).maybeSingle(), web.from('teklif_kalemleri').select('*').eq('teklif_id', tid).order('sira')])
+      const [t, k] = await Promise.all([web.from('teklifler').select('id,no,cari_id,musteri_adi,durum,siparis_id,kdv_orani,kdv_dahil').eq('id', tid).maybeSingle(), web.from('teklif_kalemleri').select('*').eq('teklif_id', tid).order('sira')])
       const tk: any = t.data
       if (!tk || k.error) return toast.show('Teklif okunamadı', true)
       if (tk.durum === 'kabul' || tk.siparis_id) return toast.show(`${tk.no} zaten siparişe çevrilmiş`, true)
       setEditing(null); setTeklifRef(tid)
       setForm({ no: sonrakiNo(), cari_id: tk.cari_id || '', tarih: todayISO(), teslim_tarihi: '', notlar: `Teklif ${tk.no}${tk.cari_id ? '' : ` — müşteri: ${tk.musteri_adi} (cari seçin)`}${kur !== 1 ? ` · fiyatlar ${kur} kuruyla TL'ye çevrildi` : ''}` })
-      setKalemler((k.data || []).map((x: any) => { const kn = x.birim === 'koli' && +x.koli_ici_adet > 0 ? +x.koli_ici_adet : 1 /* koli satırı: sipariş ADET olarak açılır (miktar × koli içi adet, fiyat ÷ koli içi adet) */; return { variant_id: x.variant_id || '', urun_adi: x.urun_adi, miktar: +x.miktar * kn, birim_fiyat: +(((+x.birim_fiyat / kn) * (1 - (+x.iskonto_yuzde || 0) / 100)) * kur).toFixed(4) } }))
+      const kdvBol = tk.kdv_dahil ? 1 + (+tk.kdv_orani || 0) / 100 /* sipariş KDV hariç tutulur */ : 1
+      setKalemler((k.data || []).map((x: any) => { const kn = x.birim === 'koli' && +x.koli_ici_adet > 0 ? +x.koli_ici_adet : 1 /* koli satırı: sipariş ADET olarak açılır (miktar × koli içi adet, fiyat ÷ koli içi adet) */; return { variant_id: x.variant_id || '', urun_adi: x.urun_adi, miktar: +x.miktar * kn, birim_fiyat: +(((+x.birim_fiyat / kn) * (1 - (+x.iskonto_yuzde || 0) / 100)) * kur / kdvBol).toFixed(4) } }))
       setModal(true); toast.show('Teklif kalemleri forma aktarıldı; cariyi seçip kaydedin')
     })()
   }, [loading]) // eslint-disable-line
