@@ -19,6 +19,7 @@ type Niyet =
   | { tur: 'hm_stok'; grup: HmGrup; arama: string } // hammadde / boya / koli / etiket DEPO STOĞU ("hammaddelerim neler", "boya stoğu", "koli stokları")
   | { tur: 'boya_kg'; kg: number; oran: number } // verilen hammadde kg × boya oranı
   | { tur: 'boya_kullanim'; mekan: Mekan; oran: number; kaynak?: 'stok'; donem?: Donem } // satılan iç mekan ürünlerin hammaddesi × boya oranı (varsayılan %2); dış mekanda boya yok
+  | { tur: 'gramaj_kontrol'; mekan: Mekan } // satışı olan ürünlerden gramajı (reçete) tanımsız olanlar
   | { tur: 'stok_kg'; mekan: Mekan } // eldeki MAMUL stoğun içindeki hammadde ağırlığı (stok adedi × ürün gramajı)
   | { tur: 'hm_alis'; arama: string; hareket: boolean; donem?: Donem } // hammadde ALIŞLARI / stok hareketleri (stok_hareketleri tablosu): "moblen hammadde alışlarım"
   | { tur: 'ihr_tahsilat' }
@@ -104,9 +105,10 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     return { tur: 'gelir_tablosu', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: ayI >= 0 ? ayI + 1 : +bg.slice(5, 7) }
   }
   if (/neden|niye|\byorum\w*|karsilastir|tahmin|oner|kar zarar|maliyet|senaryo|kur farki/.test(t)) return null
-  const dis = /\bdis ?mekan/.test(t), ic = /\bic ?mekan/.test(t)
+  const dis = /\bdis ?mek[a]?n/.test(t), ic = /\bic ?mek[a]?n/.test(t)
   const mekan: Mekan = dis && !ic ? 'dis' : ic && !dis ? 'ic' : 'hepsi'
   const mekanVar = dis || ic
+  if (/gramaj/.test(t) && /olmayan|yok\b|tanimsiz|tanimli|eksik|bos\b|girilmemis|bulunmayan|var mi|varmi|hangi/.test(t) && !/hammadde.*\bkg\b/.test(t)) return { tur: 'gramaj_kontrol', mekan }
   if (/ihracat/.test(t)) {
     if (/tahsil|alacak|bakiye|borc|odeme/.test(t)) return { tur: 'ihr_tahsilat' }
     if (/rakam|ne kadar|usd|dolar|euro|\btl\b|satis|ciro|toplam|donem|kac/.test(t)) return { tur: 'ihr_rakam', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bugunISO().slice(0, 4) }
@@ -135,7 +137,7 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     return { tur: 'fiyat', kod: kodlar0[0], arama }
   }
   const kodlar = kodlariBul(soru)
-  if (kodlar.length && /sat|adet|ne kadar|rakam|kac|ciro/.test(t) && !/stok|recete|maliyet/.test(t)) return { tur: 'urun', kodlar }
+  if (kodlar.length && /sat|adet|ne kadar|rakam|kac|ciro/.test(t) && !/stok|recete|maliyet|gramaj/.test(t)) return { tur: 'urun', kodlar }
   const bkg = /(\d[\d.,]*)\s*(kg|kilo|ton)\b/.exec(soru.toLowerCase().replace(/ı/g, 'i'))
   if (bkg && /boya|masterbatch/.test(t) && !/stok|stog|depo\w*|satis|satil|alis|alim|fiyat|maliyet/.test(t)) {
     const sayi = +bkg[1].replace(/\./g, '').replace(',', '.'), kg = bkg[2] === 'ton' ? sayi * 1000 : sayi
@@ -181,7 +183,7 @@ function hmStokNiyeti(t: string, kodlar: string[]): RaporNiyet | null {
   const varKoli = /\bkoli|karton/.test(t)
   const varEtiket = /etiket|ambalaj|strec|poset|bant\b/.test(t)
   if (!(varHm || varBoya || varKoli || varEtiket)) return null
-  const mk = /\bdis ?mekan/.test(t) && !/\bic ?mekan/.test(t) ? 'dis' : /\bic ?mekan/.test(t) && !/\bdis ?mekan/.test(t) ? 'ic' : 'hepsi'
+  const mk = /\bdis ?mek[a]?n/.test(t) && !/\bic ?mek[a]?n/.test(t) ? 'dis' : /\bic ?mek[a]?n/.test(t) && !/\bdis ?mek[a]?n/.test(t) ? 'ic' : 'hepsi'
   if (varHm && /\bkg\b|kilo|agirlik|ton\b|kac|ne kadar/.test(t) && (/mekan/.test(t) || /urun|mamul|saksi/.test(t)) && /stok|stog|elimde|kalan|depoda/.test(t) && !/kullan|tuket|sarf|sat(mis|tim|ti|is|ilan|tik)|satis/.test(t)) return { tur: 'stok_kg', mekan: mk as Mekan }
   if (/sat(mis|tim|ti|is|ilan|tik)|satis|ciro|musteri|tahsilat|bakiye|borc|kdv|fatura|recete|maliyet|fiyat|teklif|alis|alin|siparis|tedarik|firma|ihracat|uretim|kullan|tuket|sarf/.test(t)) return null
   if (/koli ?(ici|m3|hacim|olcu|agirlik|kg\b)|konteyner|adet ?\/ ?koli|kolide/.test(t)) return null
@@ -574,6 +576,30 @@ async function hmAlis(sb: SupabaseClient, arama: string, hareketMi: boolean, dn?
   return bitir(sb, `${tek ? adlar[0] : 'Hammadde'} ${hareketMi ? 'stok hareketleri' : 'alışları'}`, sayfalar, govde, ['rapor_hammadde_alis'])
 }
 
+/* ─────────────── Gramaj kontrolü: satışı olan ürünlerin reçete gramajı tanımlı mı? ─────────────── */
+async function gramajKontrol(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
+  const [ps, rs, rk, ge, sat] = await Promise.all([sayfala(sb, 'products', 'id,code'), sayfala(sb, 'urun_receteleri', 'id,urun_id,aktif,notlar'), sayfala(sb, 'recete_kalemleri', 'recete_id,miktar'), sayfala(sb, 'gramaj_ek', 'kod,kg'),
+    sayfala(sb, 'satis_adetleri', 'kod,ad,mekan,recete_kodu,adet', q => (mekan !== 'hepsi' ? q.eq('mekan', mekan) : q))])
+  const kod = new Map<string, string>(ps.map((p: any) => [p.id, p.code])), kgR = new Map<string, number>()
+  for (const k of rk) kgR.set(k.recete_id, (kgR.get(k.recete_id) || 0) + (+k.miktar || 0))
+  const gl = new Map<string, number[]>()
+  for (const r of rs.filter((x: any) => x.aktif !== false)) { const kg = kgR.get(r.id) || 0; if (kg <= 0) continue; const k = /\[([^\]]+)\]/.exec(r.notlar || '')?.[1] || kod.get(r.urun_id); if (k) gl.set(k, [...(gl.get(k) || []), kg]) }
+  const gr = new Map<string, number>(); for (const [k, v] of gl) gr.set(k, v.reduce((a, b) => a + b, 0) / v.length)
+  for (const g of ge) if (!gr.has(g.kod) && +g.kg > 0) gr.set(g.kod, +g.kg)
+  const u = new Map<string, { kod: string; ad: string; mekan: string; rk: string; adet: number; g: number }>()
+  for (const x of sat) { const k = `${x.kod}|${x.mekan}`, o = u.get(k) || { kod: x.kod, ad: String(x.ad || '').replace(/\s+/g, ' ').trim(), mekan: x.mekan, rk: x.recete_kodu || '', adet: 0, g: 0 }; o.adet += +x.adet || 0; o.g = (x.recete_kodu && gr.get(x.recete_kodu)) || gr.get(x.kod) || 0; u.set(k, o) }
+  const liste = [...u.values()], yok = liste.filter(x => !x.g).sort((a, b) => b.adet - a.adet), var_ = liste.filter(x => x.g)
+  const ad = mekan === 'hepsi' ? 'İç + dış mekan' : mekanAd(mekan), topA = liste.reduce((t, x) => t + x.adet, 0), yokA = yok.reduce((t, x) => t + x.adet, 0)
+  const sayfalar: Sayfa[] = [
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', ad], ['Satışı olan ürün/kod sayısı', liste.length], ['Gramajı tanımlı', var_.length], ['Gramajı tanımsız', yok.length], ['Toplam satış (adet)', topA], ['Gramajı tanımsız satış (adet)', yokA], ['Kaynak', 'ürün reçeteleri + ek gramaj tablosu'], ['Rapor tarihi', bugunISO()]] },
+    { ad: 'Gramaj Listesi', sutunlar: ['Kod', 'Ürün', 'Mekan', 'Reçete kodu', 'Gramaj (kg/adet)', 'Satış adedi'], satirlar: liste.sort((a, b) => b.adet - a.adet).map(x => [x.kod, x.ad, mekanAd(x.mekan), x.rk, x.g ? Math.round(x.g * 10000) / 10000 : 'TANIMSIZ', r2(x.adet)]) },
+  ]
+  const govde = [yok.length ? `${ad.toUpperCase()} SATIŞLARINDA GRAMAJI TANIMSIZ ÜRÜN VAR: ${yok.length} kod, ${AD(yokA)} adet` : `${ad.toUpperCase()} — satışı olan ${liste.length} ürün kodunun TAMAMININ gramajı tanımlı (gramajı olmayan ürün yok).`, `Gramajı tanımlı: ${var_.length} kod · toplam satış ${AD(topA)} adet (2026 satış dosyası).`]
+  if (yok.length) { govde.push('', 'Gramajı tanımsız olanlar:'); yok.slice(0, 15).forEach((x, i) => govde.push(`${i + 1}. ${x.kod} ${x.ad} (${mekanAd(x.mekan)}): ${AD(x.adet)} adet`)) }
+  govde.push('', 'Gramaj = ürün reçetesindeki hammadde toplamı (kg/adet); reçetesi olmayanlar ek gramaj tablosundan alınır. Tam liste Excel\'de.')
+  return bitir(sb, `${ad} gramaj kontrolü`, sayfalar, govde, ['rapor_gramaj'])
+}
+
 /* ─────────────── Boya kullanımı (iç mekan, satılan ürünlerin hammaddesi × oran) ─────────────── */
 async function boyaStok(sb: SupabaseClient, oran: number): Promise<Sonuc> {
   const [ps, rs, rk, ge, st] = await Promise.all([sayfala(sb, 'products', 'id,code'), sayfala(sb, 'urun_receteleri', 'id,urun_id,aktif,notlar'), sayfala(sb, 'recete_kalemleri', 'recete_id,miktar'), sayfala(sb, 'gramaj_ek', 'kod,kg'), sayfala(sb, 'satis_kod_stok', 'kod,ad,stok,mekan')])
@@ -912,7 +938,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   if (!n0) { try { n0 = donemUygula(await niyetSinifla(soru), soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
   if (!n0) return null
   const n: RaporNiyet = n0
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], boya_kg: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], boya_kg: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     const r0 = await (async (): Promise<Sonuc | null> => {
@@ -942,6 +968,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       }
       case 'boya_kg': { const b = n.kg * n.oran, yp = r2(n.oran * 100); return { yanit: `${AD(n.kg)} kg hammadde × %${yp} boya oranı = ${TL(b)} kg (${TL(b / 1000)} ton) boya.\nHesap: hammadde kg × oran. Tahmini hesaptır, gerçek boya kullanımı kayıtlı değildir. Dış mekanda boya kullanılmaz.`, araclar: ['rapor_boya_kg'] } }
       case 'boya_kullanim': return n.kaynak === 'stok' && n.mekan !== 'dis' ? await boyaStok(sb, n.oran) : await boyaKullanim(sb, n.mekan, n.oran, n.donem)
+      case 'gramaj_kontrol': return await gramajKontrol(sb, n.mekan)
       case 'stok_kg': return await stokKg(sb, n.mekan)
       case 'hm_alis': return await hmAlis(sb, n.arama, n.hareket, n.donem)
       case 'ihr_tahsilat': return await ihracatTahsilat(sb)
