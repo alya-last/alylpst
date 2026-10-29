@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { aiCagir, AiHata, veriBlok } from '@/lib/ai'
 import { veriTutarlilik, nakitTahmini, karlilikAnaliz } from '@/lib/ai-yonetim'
+import { gelirTablosuVeri, gelirTablosuSatirlar } from '@/lib/gelir-tablosu'
 
 // Muhasebe raporları: veri kullanıcının kendi oturumuyla (rpc_* içinde has_module kontrolü) okunur,
 // tüm aritmetik burada deterministik yapılır; AI yalnızca hazır rakamları yorumlar.
@@ -80,9 +81,9 @@ export async function raporUret(sb: SupabaseClient, tip: string, donem: string):
 
   if (tip === 'aylik') {
     const [f, yas]: any[] = await Promise.all([rpc(sb, 'rpc_finans_ozet', { p_from: bas, p_to: bit, p_pfrom: pbas, p_pto: pbit }), rpc(sb, 'rpc_yaslandirma')])
-    const gelir = r2(f.donem?.gelir), gider = r2(f.donem?.gider), net = r2(gelir - gider)
-    const pg = r2(f.onceki?.gelir), pgi = r2(f.onceki?.gider), pnet = r2(pg - pgi)
-    const kat = (a: any[]) => (a || []).map(x => [x.k, r2(x.c), r2(x.p), pct(Number(x.c), Number(x.p))])
+    const [gy, ga] = [+donem.slice(0, 4), +donem.slice(5, 7)], [py, pa] = ga === 1 ? [gy - 1, 12] : [gy, ga - 1]
+    const gt = await gelirTablosuVeri(sb, gy, ga), pgt = await gelirTablosuVeri(sb, py, pa)
+    const kk = (a: number, b: number) => [r2(a), r2(b), pct(a, b)]
     const ag = f.aging_alacak || {}
     const cariYas = ((yas || []) as any[]).map(x => ({ ...x, toplam: r2(x.guncel + x.d30 + x.d60 + x.d90 + x.d90p) })).sort((a, b) => b.toplam - a.toplam).slice(0, 15)
     // Yönetim ekleri: her biri bağımsız; biri okunamazsa rapor yine üretilir ve eksik bölüm notta belirtilir.
@@ -113,10 +114,9 @@ export async function raporUret(sb: SupabaseClient, tip: string, donem: string):
     return {
       tip: 'aylik', baslik: `Aylık Yönetim Raporu — ${donem}`, donem, bas, bit, olusturma,
       bolumler: [
-        { baslik: 'Gelir – Gider özeti', kolonlar: ['Kalem', 'Bu dönem (₺)', 'Önceki dönem (₺)', 'Değişim %'], sayisalKolonlar: [1, 2, 3],
-          satirlar: [['Gelir', gelir, pg, pct(gelir, pg)], ['Gider', gider, pgi, pct(gider, pgi)], ['Net', net, pnet, pct(net, pnet)]] },
-        { baslik: 'Gelir kategorileri', kolonlar: ['Kategori', 'Bu dönem (₺)', 'Önceki dönem (₺)', 'Değişim %'], sayisalKolonlar: [1, 2, 3], satirlar: kat(f.kat_gelir) },
-        { baslik: 'Gider kategorileri', kolonlar: ['Kategori', 'Bu dönem (₺)', 'Önceki dönem (₺)', 'Değişim %'], sayisalKolonlar: [1, 2, 3], satirlar: kat(f.kat_gider) },
+        { baslik: 'Gelir tablosu (SATIŞLAR / MASRAFLAR / ÜRETİM MALİYETİ / CİRO / KAR-ZARAR)', kolonlar: ['Kalem', 'Tutar (₺)'], sayisalKolonlar: [1], satirlar: gelirTablosuSatirlar(gt) },
+        { baslik: 'Önceki aya göre', kolonlar: ['Kalem', 'Bu dönem (₺)', 'Önceki dönem (₺)', 'Değişim %'], sayisalKolonlar: [1, 2, 3],
+          satirlar: [['Ciro (net satışlar)', ...kk(gt.ciro, pgt.ciro)], ['Masraflar', ...kk(gt.masrafToplam, pgt.masrafToplam)], ['Üretim maliyeti', ...kk(gt.uretimToplam, pgt.uretimToplam)], ['Satışların maliyeti', ...kk(gt.satisMaliyeti, pgt.satisMaliyeti)], ['Diğer gelirler', ...kk(gt.digerToplam, pgt.digerToplam)], ['Kar-zarar', ...kk(gt.karZarar, pgt.karZarar)]] },
         { baslik: 'Nakit, cari ve fatura durumu (rapor tarihi itibarıyla)', kolonlar: ['Kalem', 'Tutar (₺)'], sayisalKolonlar: [1], satirlar: [
           ['Kasa/banka toplamı', r2(f.kasa?.toplam)], ['Cari alacak', r2(f.cari?.alacak)], ['Cari borç', r2(f.cari?.borc)],
           ['Açık alacak faturaları', r2(f.fatura?.acik_alacak)], ['Açık borç faturaları', r2(f.fatura?.acik_borc)],
@@ -127,7 +127,7 @@ export async function raporUret(sb: SupabaseClient, tip: string, donem: string):
         ...ekler,
       ],
       notlar: [
-        'Gelir/gider rakamları virman, fatura kapama, bakiye düzeltme, açılış bakiyesi ve kur farkı gibi özel kategoriler hariç işlemlerdendir.',
+        'Gelir tablosu: Kar-zarar = Ciro + Diğer gelirler − Satışların maliyeti (Masraflar + Üretim maliyeti). Virman, fatura kapama, bakiye düzeltme, açılış bakiyesi ve kur farkı kayıtları hariçtir.',
         'Nakit, cari ve yaşlandırma bölümleri seçilen dönemin sonu değil, raporun oluşturulduğu tarih itibarıyladır.',
         'Bu rapor yönetim amaçlıdır; resmî mali tablo veya beyanname yerine geçmez.',
         ...ekNot,
