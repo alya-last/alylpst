@@ -168,7 +168,20 @@ const muhAd = (kod: string, ad: string) => MUH_AD[String(kod || '').toUpperCase(
 /* ─────────────── Mamul stok (iç / dış mekan) ─────────────── */
 async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   const j = json(await hamCalistir(() => araciCalistir(sb, 'stok_durumu', { tur: 'mamul', ...(mekan !== 'hepsi' ? { mekan } : {}) })))
-  const urunler: any[] = (j.mamul?.urunler || []).map((u: any) => ({ ...u, urun: muhAd(u.kod, u.urun) }))
+  const SANDIK: Record<string, [string, string]> = { 'sandik no 1': ['ALY-300', 'SANDIK NO:1'], 'sandik no 2': ['ALY-301', 'SANDIK NO:2'], 'sandik no 3': ['ALY-302', 'SANDIK NO:3'], 'sandik 3 lu set': ['ALY-303', 'SANDIK 3 LÜ SET'], 'sandik no 1 eko': ['ALY-310', 'SANDIK NO:1 EKO'], 'sandik no 2 eko': ['ALY-311', 'SANDIK NO:2 EKO'], 'sandik no 3 eko': ['ALY-312', 'SANDIK NO:3 EKO'], 'sandik 3 lu set eko': ['ALY-313', 'SANDIK 3 LÜ SET EKO'] }
+  const urunler: any[] = []
+  for (const u0 of (j.mamul?.urunler || []) as any[]) {
+    const u = { ...u0, urun: muhAd(u0.kod, u0.urun) }
+    if (String(u.kod).toUpperCase() !== 'ALY-502') { urunler.push(u); continue }
+    // Panelde sandıklar ALY-502 altında varyant; muhasebede kendi kodlarıyla (ALY-300…313) ayrı ürün
+    const kalan: any[] = []
+    for (const v of (u.varyantlar || [])) {
+      const e = SANDIK[nrm(String(v.ad))]
+      if (e) urunler.push({ ...u, kod: e[0], urun: e[1], toplam_adet: +v.adet || 0, varyantlar: [{ ad: e[1], adet: +v.adet || 0 }] })
+      else kalan.push(v)
+    }
+    if (kalan.length) urunler.push({ ...u, toplam_adet: kalan.reduce((t, x) => t + (+x.adet || 0), 0), varyantlar: kalan })
+  }
   const sirali = [...urunler].sort((a, b) => b.toplam_adet - a.toplam_adet)
   const toplam = sirali.reduce((t, x) => t + (+x.toplam_adet || 0), 0)
   const stoklu = sirali.filter(x => x.toplam_adet > 0), eksi = sirali.filter(x => x.toplam_adet < 0)
