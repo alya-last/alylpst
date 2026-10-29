@@ -97,7 +97,7 @@ export function raporNiyeti(soru: string): RaporNiyet | null {
   const kodlar = kodlariBul(soru)
   if (kodlar.length && /sat|adet|ne kadar|rakam|kac|ciro/.test(t) && !/stok|recete|maliyet/.test(t)) return { tur: 'urun', kodlar }
   if (/boya|masterbatch/.test(t) && /kullan|tuket|sarf|harca|gitti|gider/.test(t) && !/stok|stog|alis|alim|fiyat|maliyet/.test(t)) {
-    const om = /%\s*(\d+(?:[.,]\d+)?)|oran\w*\s*(?:%\s*)?(\d+(?:[.,]\d+)?)|\b0 (\d+)\b/.exec(t), o = om ? (om[3] ? +('0.' + om[3]) : +(om[1] || om[2]).replace(',', '.')) : 2
+    const om = /%\s*(\d+(?:[.,]\d+)?)|\b0 (\d+)\b|oran\w*\s*(\d+(?:[.,]\d+)?)/.exec(t), o = om ? (om[2] ? +('0.' + om[2]) : +(om[1] || om[3]).replace(',', '.')) : 2
     return { tur: 'boya_kullanim', mekan, oran: (o < 1 ? o * 100 : o) / 100 }
   }
   const hma = hmAlisNiyeti(t)
