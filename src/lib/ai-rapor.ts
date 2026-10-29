@@ -396,12 +396,12 @@ function hmGrupu(h: { kod: string; ad: string }): HmGrup | 'diger' {
   return 'diger' // streç, poşet, koli bandı
 }
 const HM_NOT: Record<string, string> = {
-  'HM-PP': 'Toplam göstergesi (aylık tabloda kullanılan ham madde), gerçek depo stoğu DEĞİL — toplama katılmadı',
+  'HM-PP': 'Moblen (PP) — muhasebe stok kartı kalan miktarı (29.10.2026: 91.400 kg)',
   'HM-ROTASYON': 'Eksi bakiye: giriş (alış) kaydı eksik, sayım gerekir',
   '730 04': 'Etiket alış toplamı (genel), tek tek etiket stoğu değil — toplama katılmadı',
   'AM-ETIKET': 'Genel etiket sayacı, ürün bazında stok değil — toplama katılmadı',
 }
-const HM_TOPLAMA_DISI = new Set(['HM-PP', '730 04', 'AM-ETIKET'])
+const HM_TOPLAMA_DISI = new Set(['730 04', 'AM-ETIKET'])
 async function hmStok(sb: SupabaseClient, grup: HmGrup, arama: string): Promise<Sonuc | null> {
   const rows = (await sayfala(sb, 'hammaddeler', 'kod,ad,birim,mevcut_stok,min_stok,aktif,kullanim,ortalama_maliyet')) as any[]
   const kel = nrm(arama).split(' ').filter(Boolean)
