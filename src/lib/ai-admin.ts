@@ -230,7 +230,7 @@ export async function araciCalistir(sb: SupabaseClient, ad: string, a: Record<st
           const [ps, vs] = await Promise.all([sel(sb.from('products').select('id,name,code,mekan').limit(1000)), sel(sb.from('product_variants').select('product_id,name,color,size,stock').limit(6000))])
           const gr = (ps as any[]).filter(p => (!mk || p.mekan === mk) && (!ar || esles(p.name + ' ' + p.code, ar))).map(p => {
             const v = (vs as any[]).filter(x => x.product_id === p.id)
-            return { urun: p.name, kod: p.code, mekan: p.mekan, toplam_adet: v.reduce((t, x) => t + (+x.stock || 0), 0), varyantlar: v.filter(x => +x.stock !== 0).slice(0, kes(25)).map(x => ({ ad: [x.size, x.color].filter(Boolean).join(' / ') || x.name, adet: +x.stock })) }
+            return { urun: p.name, kod: p.code, mekan: p.mekan, toplam_adet: v.reduce((t, x) => t + (+x.stock || 0), 0), varyantlar: v.filter(x => HAM.getStore() || +x.stock !== 0).sort((x, y) => String(x.size || '').localeCompare(String(y.size || ''), 'tr') || String(x.color || x.name || '').localeCompare(String(y.color || y.name || ''), 'tr')).slice(0, kes(25)).map(x => ({ ad: [x.size, x.color].filter(Boolean).join(' / ') || x.name, adet: +x.stock })) }
           }).sort((x, y) => y.toplam_adet - x.toplam_adet)
           out.mamul = { urun_sayisi: gr.length, toplam_adet: gr.reduce((t, x) => t + x.toplam_adet, 0), urunler: gr.slice(0, kes(30)) }
         }
