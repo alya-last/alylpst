@@ -53,7 +53,7 @@ const RAPOR_GRUPLARI: { baslik: string; sorular: string[] }[] = [
     'iç mekan stoğumdaki ürünlerde ne kadar boya var (%2)',
     'iç mekan stoğumdaki ürünlerde kaç kg hammadde var',
   ] },
-  { baslik: 'Hammadde, boya, koli', sorular: [
+  { baslik: 'Hammadde, boya, koli', sorular: ['gramajı olmayan ürün var mı', 
     'hammaddelerim neler stokları ile',
     'boya stoklarımı ver',
     'koli ve etiket stoklarımı ver',
