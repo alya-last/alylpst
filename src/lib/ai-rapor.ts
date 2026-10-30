@@ -157,7 +157,8 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
   if (hmn) return hmn
   if (/hammadde/.test(t)) return /stok|stog|depo|kalan/.test(t) ? null : { tur: 'hammadde', mekan }
   if (/tahsilat|alacak listesi|alacaklar[iı]m|bakiyesi olan|kimden ne tahsil/.test(t) && !/\bcek\b|\bsenet\b/.test(t)) return { tur: 'tahsilat', mekan }
-  if (/\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && mekanVar && !/hammadde|boya|koli|ambalaj|kritik|minimum/.test(t)) return { tur: 'stok', mekan }
+  if (/\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && mekanVar && !/hammadde|boya|ambalaj|kritik|minimum/.test(t)) return { tur: 'stok', mekan }
+  if (/\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && !mekanVar && !kodlar.length && /\b(ver|goster|listele|getir|dok|rapor\w*|excel\w*|kac|ne kadar|yan yana)\b/.test(t) && !/hammadde|boya|ambalaj|kritik|minimum|\bkg\b|kilo|\bton\b|maliyet|recete|fiyat|musteri|cari|satis|satti|siparis|tedarik|alis|alim|urun\b/.test(t)) return { tur: 'stok', mekan: 'hepsi' }
   if (/sat(mis|tim|ti|is|ilan|tik)|satis|ciro/.test(t) && mekanVar) return { tur: 'satis', mekan }
   // Ürün ADI ile satış/müşteri sorusu (kod yok): "line saksı satışlarımı müşteri detaylı excel ver"
   if (!kodlar.length && /sat(mis|tim|ti|is|ilan|tik)|satis|adet|ne kadar|ciro|musteri/.test(t) && !/stok|stog|recete|maliyet|hammadde|fiyat|tahsilat|bakiye|borc|kdv|fatura/.test(t) && /saksi|sepet|sandik|casa|selesi|kova|firca|deterjanlik|banyo seti|camasir|set\b|\b(line|polo|cornet|efes|venus|tripot|ufo|kozalak|somon|kale|ordek|kordon|guvec|ahsap|dantel|orgu|kapakli|kaktus|3d|cesme|kemer|milas|datca|kosk|arajman|gondol|armut|vitrin|turuva|cit|lotte)\b/.test(t)) return { tur: 'urun_ad', arama: t }
@@ -294,39 +295,36 @@ const muhAd = (kod: string, ad: string) => MUH_AD[String(kod || '').toUpperCase(
 
 /* ─────────────── Mamul stok (iç / dış mekan) ─────────────── */
 async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
-  const j = json(await hamCalistir(() => araciCalistir(sb, 'stok_durumu', { tur: 'mamul', ...(mekan !== 'hepsi' ? { mekan } : {}) })))
-  const SANDIK: Record<string, [string, string]> = { 'sandik no 1': ['ALY-300', 'SANDIK NO:1'], 'sandik no 2': ['ALY-301', 'SANDIK NO:2'], 'sandik no 3': ['ALY-302', 'SANDIK NO:3'], 'sandik 3 lu set': ['ALY-303', 'SANDIK 3 LÜ SET'], 'sandik no 1 eko': ['ALY-310', 'SANDIK NO:1 EKO'], 'sandik no 2 eko': ['ALY-311', 'SANDIK NO:2 EKO'], 'sandik no 3 eko': ['ALY-312', 'SANDIK NO:3 EKO'], 'sandik 3 lu set eko': ['ALY-313', 'SANDIK 3 LÜ SET EKO'] }
-  const urunler: any[] = []
-  for (const u0 of (j.mamul?.urunler || []) as any[]) {
-    const u = { ...u0, urun: muhAd(u0.kod, u0.urun) }
-    if (String(u.kod).toUpperCase() !== 'ALY-502') { urunler.push(u); continue }
-    // Panelde sandıklar ALY-502 altında varyant; muhasebede kendi kodlarıyla (ALY-300…313) ayrı ürün
-    const kalan: any[] = []
-    for (const v of (u.varyantlar || [])) {
-      const e = SANDIK[nrm(String(v.ad))]
-      if (e) urunler.push({ ...u, kod: e[0], urun: e[1], toplam_adet: +v.adet || 0, varyantlar: [{ ad: e[1], adet: +v.adet || 0 }] })
-      else kalan.push(v)
-    }
-    if (kalan.length) urunler.push({ ...u, toplam_adet: kalan.reduce((t, x) => t + (+x.adet || 0), 0), varyantlar: kalan })
+  // Muhasebe stok kodlarına göre (satis_kod_stok): iç mekan koli içi adetle koli + ürün adedi, dış mekan ürün adedi; yan yana
+  const rows = (await sayfala(sb, 'satis_kod_stok', 'kod,ad,stok,mekan,koli_ici')).map((r: any) => ({ kod: String(r.kod || '').trim(), ad: String(r.ad || '').trim(), stok: +r.stok || 0, mekan: String(r.mekan), koli: +r.koli_ici > 0 ? +r.koli_ici : 0 }))
+  const ic = rows.filter(r => r.mekan === 'ic').sort((a, b) => a.kod.localeCompare(b.kod, 'tr', { numeric: true }))
+  const dis = rows.filter(r => r.mekan === 'dis').sort((a, b) => a.kod.localeCompare(b.kod, 'tr', { numeric: true }))
+  const koliBol = (r: { stok: number; koli: number }) => (r.koli > 0 && r.stok > 0 ? { koli: Math.floor(r.stok / r.koli), artik: r.stok % r.koli } : null)
+  const topla = (l: typeof rows) => ({ adet: l.reduce((t, x) => t + x.stok, 0), stoklu: l.filter(x => x.stok > 0).length, eksi: l.filter(x => x.stok < 0), koli: l.reduce((t, x) => t + (koliBol(x)?.koli || 0), 0), artik: l.reduce((t, x) => t + (koliBol(x)?.artik || 0), 0), koliYok: l.filter(x => x.stok > 0 && !x.koli) })
+  const ti = topla(ic), td = topla(dis)
+  const icSat = (l: typeof rows): Hucre[][] => l.map(x => { const k = koliBol(x); return [x.kod, x.ad, x.koli || null, k ? k.koli : null, k ? k.artik : null, x.stok] })
+  const disSat = (l: typeof rows): Hucre[][] => l.map(x => [x.kod, x.ad, x.stok])
+  const icS = icSat(ic), disS = disSat(dis)
+  const icTop: Hucre[] = ['', 'TOPLAM', null, ti.koli, ti.artik, ti.adet], disTop: Hucre[] = ['', 'TOPLAM', td.adet]
+  const sayfalar: Sayfa[] = []
+  if (mekan !== 'dis') sayfalar.push({ ad: 'İç Mekan', sutunlar: ['Stok Kodu', 'Ürün', 'Koli İçi Adet', 'Koli Adedi', 'Artık Adet', 'Ürün Adedi'], satirlar: [...icS, icTop] })
+  if (mekan !== 'ic') sayfalar.push({ ad: 'Dış Mekan', sutunlar: ['Stok Kodu', 'Ürün', 'Ürün Adedi'], satirlar: [...disS, disTop] })
+  if (mekan === 'hepsi') {
+    const n = Math.max(icS.length, disS.length) + 1, ik = [...icS, icTop], dk = [...disS, disTop], yan: Hucre[][] = []
+    for (let i = 0; i < n; i++) yan.push([...(ik[i] || ['', '', null, null, null, null]), null, ...(dk[i] || ['', '', null])])
+    sayfalar.unshift({ ad: 'İç - Dış Yan Yana', sutunlar: ['İÇ Kod', 'İÇ Ürün', 'İÇ Koli İçi', 'İÇ Koli Adedi', 'İÇ Artık Adet', 'İÇ Ürün Adedi', '', 'DIŞ Kod', 'DIŞ Ürün', 'DIŞ Ürün Adedi'], satirlar: yan })
   }
-  const sirali = [...urunler].sort((a, b) => b.toplam_adet - a.toplam_adet)
-  const toplam = sirali.reduce((t, x) => t + (+x.toplam_adet || 0), 0)
-  const stoklu = sirali.filter(x => x.toplam_adet > 0), eksi = sirali.filter(x => x.toplam_adet < 0)
-  const varSat: Hucre[][] = []
-  for (const u of sirali) for (const v of (u.varyantlar || [])) varSat.push([u.kod, u.urun, mekanAd(u.mekan), v.ad, +v.adet || 0])
-  varSat.push(['', 'TOPLAM', '', '', r2(varSat.reduce((t, x) => t + (+(x[4] as number) || 0), 0))])
-  const urunSat: Hucre[][] = sirali.map((u, i) => [i + 1, u.kod, u.urun, mekanAd(u.mekan), (u.varyantlar || []).length, +u.toplam_adet || 0, toplam ? r2((+u.toplam_adet || 0) / toplam * 100) : 0])
-  if (urunSat.length) urunSat.push(['', '', 'TOPLAM', '', null, toplam, null])
-  const sayfalar: Sayfa[] = [
-    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', mekan === 'hepsi' ? 'İç + dış mekan' : mekanAd(mekan)], ['Ürün sayısı', sirali.length], ['Stoklu ürün sayısı', stoklu.length], ['Stoksuz (0) ürün sayısı', sirali.length - stoklu.length - eksi.length], ['Eksi stoklu ürün sayısı', eksi.length], ['Toplam mamul stok (adet)', toplam], ['Rapor tarihi', bugunISO()]] },
-    { ad: 'Ürün Stok', sutunlar: ['Sıra', 'Ürün Kodu', 'Ürün', 'Mekan', 'Varyant sayısı', 'Toplam Adet', 'Pay %'], satirlar: urunSat },
-    { ad: 'Renk Ebat Detay', sutunlar: ['Ürün Kodu', 'Ürün', 'Mekan', 'Renk / Ebat', 'Adet'], satirlar: varSat },
-  ]
-  const govde = [`${mekan === 'hepsi' ? 'İÇ + DIŞ MEKAN' : mekanAd(mekan).toUpperCase()} MAMUL STOK (${bugunISO()}) — toplam ${AD(toplam)} adet, ${stoklu.length} üründe stok var (${sirali.length} üründen)`, '']
-  stoklu.slice(0, 15).forEach((x, i) => govde.push(`${i + 1}. ${x.kod} ${x.urun}: ${AD(x.toplam_adet)} adet`))
-  if (stoklu.length > 15) govde.push(`… ${stoklu.length - 15} ürün daha (Excel'de renk/ebat kırılımıyla)`)
-  if (eksi.length) govde.push('', `Dikkat: ${eksi.length} üründe eksi stok var (${eksi.slice(0, 5).map(x => `${x.kod}: ${AD(x.toplam_adet)}`).join(', ')}) — sayım/giriş eksik olabilir.`)
-  return bitir(sb, `${mekan === 'hepsi' ? 'İç ve dış mekan' : mekanAd(mekan)} mamul stok`, sayfalar, govde, ['rapor_stok'])
+  const govde: string[] = [`MAMUL DEPO STOKLARI (${bugunISO()})`, '']
+  if (mekan === 'hepsi') {
+    govde.push('| | İÇ MEKAN | DIŞ MEKAN |', '|---|---:|---:|', `| Ürün adedi | ${AD(ti.adet)} | ${AD(td.adet)} |`, `| Koli adedi | ${AD(ti.koli)} koli${ti.artik ? ` + ${AD(ti.artik)} adet açık` : ''} | — |`, `| Stoklu kod | ${ti.stoklu} | ${td.stoklu} |`)
+  } else if (mekan === 'ic') {
+    govde.push(`İç mekan: ${AD(ti.adet)} ürün adedi = ${AD(ti.koli)} koli${ti.artik ? ` + ${AD(ti.artik)} adet açık` : ''} (${ti.stoklu} kodda stok var)`)
+  } else govde.push(`Dış mekan: ${AD(td.adet)} ürün adedi (${td.stoklu} kodda stok var)`)
+  govde.push('', 'Not: koli adedi = ürün adedi ÷ koli içi adet (tam koli); tam bölünmeyenler "açık adet" olarak ayrıca gösterilir.')
+  if (mekan !== 'dis' && ti.koliYok.length) govde.push(`Koli içi adedi tanımlı olmayan stoklu iç mekan kodları: ${ti.koliYok.slice(0, 8).map(x => `${x.kod} (${AD(x.stok)})`).join(', ')}${ti.koliYok.length > 8 ? '…' : ''}`)
+  const eksi = [...(mekan !== 'dis' ? ti.eksi : []), ...(mekan !== 'ic' ? td.eksi : [])]
+  if (eksi.length) govde.push(`Dikkat: ${eksi.length} kodda eksi stok var (${eksi.slice(0, 5).map(x => `${x.kod}: ${AD(x.stok)}`).join(', ')}) — sayım/giriş eksik olabilir.`)
+  return bitir(sb, `${mekan === 'hepsi' ? 'İç ve dış mekan' : mekanAd(mekan)} depo stokları`, sayfalar, govde, ['rapor_stok'])
 }
 
 /* ─────────────── Satış (yıl başından bu yana; iç / dış mekan) ─────────────── */
@@ -920,7 +918,7 @@ Emin değilsen "yok". Alanlar bilinmiyorsa mekan="hepsi", metinler "", sayılar 
   const kod = kodlariBul(r.urun_kodu || soru)
   switch (r.tur) {
     case 'tahsilat': return { tur: 'tahsilat', mekan: mk }
-    case 'stok': return mk === 'hepsi' ? null : { tur: 'stok', mekan: mk }
+    case 'stok': return { tur: 'stok', mekan: mk }
     case 'satis': return mk === 'hepsi' ? null : { tur: 'satis', mekan: mk }
     case 'urun_satis': return kod.length ? { tur: 'urun', kodlar: kod } : { tur: 'urun_ad', arama: nrm(soru) }
     case 'hammadde': return { tur: 'hammadde', mekan: mk }
