@@ -320,6 +320,10 @@ async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   } else if (mekan === 'ic') {
     govde.push(`İç mekan: ${AD(ti.adet)} ürün adedi = ${AD(ti.koli)} koli${ti.artik ? ` + ${AD(ti.artik)} adet açık` : ''} (${ti.stoklu} kodda stok var)`)
   } else govde.push(`Dış mekan: ${AD(td.adet)} ürün adedi (${td.stoklu} kodda stok var)`)
+  const icTab = ic.filter(x => x.stok !== 0).map(x => { const k = koliBol(x); return `| ${x.kod} | ${x.ad} | ${x.koli || '—'} | ${k ? AD(k.koli) + (k.artik ? ` (+${k.artik} adet)` : '') : '—'} | ${AD(x.stok)} |` })
+  const disTab = dis.filter(x => x.stok !== 0).map(x => `| ${x.kod} | ${x.ad} | ${AD(x.stok)} |`)
+  if (mekan !== 'dis' && icTab.length) govde.push('', '**İÇ MEKAN** (kod bazında)', '| Kod | Ürün | Koli içi adet | Koli adedi | Ürün adedi |', '|---|---|---:|---:|---:|', ...icTab, `| | **TOPLAM** | | **${AD(ti.koli)}${ti.artik ? ` (+${AD(ti.artik)} adet)` : ''}** | **${AD(ti.adet)}** |`)
+  if (mekan !== 'ic' && disTab.length) govde.push('', '**DIŞ MEKAN** (kod bazında)', '| Kod | Ürün | Ürün adedi |', '|---|---|---:|', ...disTab, `| | **TOPLAM** | **${AD(td.adet)}** |`)
   govde.push('', 'Not: koli adedi = ürün adedi ÷ koli içi adet (tam koli); tam bölünmeyenler "açık adet" olarak ayrıca gösterilir.')
   if (mekan !== 'dis' && ti.koliYok.length) govde.push(`Koli içi adedi tanımlı olmayan stoklu iç mekan kodları: ${ti.koliYok.slice(0, 8).map(x => `${x.kod} (${AD(x.stok)})`).join(', ')}${ti.koliYok.length > 8 ? '…' : ''}`)
   const eksi = [...(mekan !== 'dis' ? ti.eksi : []), ...(mekan !== 'ic' ? td.eksi : [])]
