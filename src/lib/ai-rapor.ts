@@ -161,6 +161,8 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
   if (/sat(mis|tim|ti|is|ilan|tik)|satis|ciro/.test(t) && mekanVar) return { tur: 'satis', mekan }
   // Ürün ADI ile satış/müşteri sorusu (kod yok): "line saksı satışlarımı müşteri detaylı excel ver"
   if (!kodlar.length && /sat(mis|tim|ti|is|ilan|tik)|satis|adet|ne kadar|ciro|musteri/.test(t) && !/stok|stog|recete|maliyet|hammadde|fiyat|tahsilat|bakiye|borc|kdv|fatura/.test(t) && /saksi|sepet|sandik|casa|selesi|kova|firca|deterjanlik|banyo seti|camasir|set\b|\b(line|polo|cornet|efes|venus|tripot|ufo|kozalak|somon|kale|ordek|kordon|guvec|ahsap|dantel|orgu|kapakli|kaktus|3d|cesme|kemer|milas|datca|kosk|arajman|gondol|armut|vitrin|turuva|cit|lotte)\b/.test(t)) return { tur: 'urun_ad', arama: t }
+  // Genel satış sorusu (iç/dış belirtilmemiş): "mart nisan mayıs satışları", "toplam satış ne kadar" → iç+dış birlikte
+  if (!kodlar.length && /sat(mis|tim|ti|is|ilan|tik)|satis|ciro/.test(t) && !/stok|stog|recete|maliyet|hammadde|boya|fiyat|tahsilat|bakiye|borc|kdv|fatura|teklif|siparis|musteri|cari|ihracat|urun|gelir|kar |zarar|ekstre|alis|alim/.test(t) && (donemBul(soru) || /\b(toplam|genel|butun|tum)\b/.test(t))) return { tur: 'satis', mekan: 'hepsi' }
   return null
 }
 
