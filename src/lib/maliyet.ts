@@ -1,5 +1,5 @@
 // Ürün maliyet hesabı — tek yerde. Panel sayfası ve yapay zekâ aynı fonksiyonu kullanır.
-// Formül özeti (Excel "ÜRÜN MALİYET 2027" ile birebir uyumlu):
+// Formül özeti (Excel "ÜRÜN MALİYET 2026 Ocak–Eylül" ile birebir uyumlu):
 //   hammadde = Σ (parça gramı × hammadde TL/kg ÷ 1000) + ek
 //   baskı    = Σ katsayı × makine saat ücreti ÷ (3600 ÷ çevrim sn) ÷ kalıp göz
 //   maliyet  = hammadde + baskı + koli + etiket

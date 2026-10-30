@@ -145,7 +145,7 @@ export default function MaliyetPage() {
         </>}
 
         {tab === 'ayarlar' && <div style={{ display: 'grid', gap: 16 }}>
-          <div id="kart-genel"></div><Card title="Genel ayarlar" right={<button className="adm-btn" onClick={ayarKaydet} disabled={busy}><Save size={13} />Kaydet</button>}>
+          <div id="kart-genel"></div><Card title="Genel ayarlar" pad="14px 16px" right={<button className="adm-btn" onClick={ayarKaydet} disabled={busy}><Save size={13} />Kaydet</button>}>
             <FormGrid cols={3}>
               <Field label="USD kuru (₺)" hint="Hammadde USD fiyatını TL'ye ve ürün maliyetini USD'ye çevirirken kullanılır. İstediğin zaman elle değiştir.">
                 <input className="adm-inp" type="number" step="0.01" value={ayar.kur_usd} onChange={e => setAyar({ ...ayar, kur_usd: +e.target.value })} /></Field>
@@ -159,7 +159,7 @@ export default function MaliyetPage() {
                 <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, paddingTop: 6 }}><input type="checkbox" checked={ayar.kdv_dahil} onChange={e => setAyar({ ...ayar, kdv_dahil: e.target.checked })} />KDV dahil hesapla</label></Field>
             </FormGrid>
           </Card>
-          <div id="kart-hm"></div><Card title="Hammadde fiyatları" right={<span style={{ fontSize: 12, color: 'var(--adm-tx3)' }}>TL/kg = USD/kg × kur + ek</span>}>
+          <div id="kart-hm"></div><Card title="Hammadde fiyatları" pad="14px 16px" right={<span style={{ fontSize: 12, color: 'var(--adm-tx3)' }}>TL/kg = USD/kg × kur + ek</span>}>
             <table className="adm-tbl" style={{ width: '100%' }}><thead><tr><th>Hammadde</th><th style={{ textAlign: 'right' }}>USD / kg</th><th style={{ textAlign: 'right' }}>Ek TL/kg</th><th style={{ textAlign: 'right' }}>Sabit TL/kg</th><th style={{ textAlign: 'right' }}>Güncel TL/kg</th><th /></tr></thead><tbody>
               {hms.map((h, i) => <tr key={h.kod}><td><b>{h.ad}</b></td>
                 <td style={{ textAlign: 'right' }}><input className="adm-inp" style={{ width: 90, textAlign: 'right' }} type="number" step="0.01" value={h.usd_kg ?? ''} placeholder="—" onChange={e => setHms(hms.map((x, j) => j === i ? { ...x, usd_kg: e.target.value === '' ? null : +e.target.value } : x))} /></td>
@@ -170,7 +170,7 @@ export default function MaliyetPage() {
             </tbody></table>
             <p style={{ fontSize: 11.5, color: 'var(--adm-tx3)', margin: '10px 0 0' }}>USD/kg doluysa TL fiyat kurdan hesaplanır, boşsa "Sabit TL/kg" kullanılır (ör. geri dönüşüm granür). Fiyatı değiştirip Kaydet'e basınca tüm ürünler güncellenir.</p>
           </Card>
-          <div id="kart-mk"></div><Card title="Makine saat ücretleri">
+          <div id="kart-mk"></div><Card title="Makine saat ücretleri" pad="14px 16px">
             <table className="adm-tbl" style={{ width: '100%' }}><thead><tr><th>Makine</th><th style={{ textAlign: 'right' }}>Saat ücreti (₺/saat)</th><th /></tr></thead><tbody>
               {mks.map((m, i) => <tr key={m.ton}><td><b>{m.ton}</b></td>
                 <td style={{ textAlign: 'right' }}><input className="adm-inp" style={{ width: 110, textAlign: 'right' }} type="number" step="50" value={m.saat_ucreti} onChange={e => setMks(mks.map((x, j) => j === i ? { ...x, saat_ucreti: +e.target.value } : x))} /></td>
@@ -239,10 +239,10 @@ export default function MaliyetPage() {
         </div>}
 
         {tab === 'rehber' && <div style={{ display: 'grid', gap: 16, maxWidth: 980 }}>
-          <Card title="Bu sayfa ne işe yarar?">
-            <p style={P}>Bir ürünü <b>1 adet</b> üretip kutulayana kadar şirkete kaç liraya mal olduğunu hesaplar. Sonra bunu USD ve EUR'a çevirir ve <b>USD liste fiyatıyla</b> karşılaştırıp kârı gösterir. Excel'deki "ÜRÜN MALİYET 2027" tablosunun aynı hesabıdır; 50 üründen 49'u Excel ile kuruşu kuruşuna aynı çıkar (ALY-512'de Excel'deki gram girişi 1 gr farklıdır).</p>
+          <Card title="Bu sayfa ne işe yarar?" pad="14px 16px">
+            <p style={P}>Bir ürünü <b>1 adet</b> üretip kutulayana kadar şirkete kaç liraya mal olduğunu hesaplar. Sonra bunu USD ve EUR'a çevirir ve <b>USD liste fiyatıyla</b> karşılaştırıp kârı gösterir. Excel'deki "ÜRÜN MALİYET 2026 Ocak–Eylül" tablosunun aynı hesabıdır; 92 üründen 88'i Excel ile kuruşu kuruşuna aynı çıkar. Kalan 4 ürün (ALY-20/01–04) Excel'in %10 genel gideri iki kez eklemesinden farklıdır; panel doğrusunu hesaplar.</p>
           </Card>
-          <Card title="Maliyet 4 kalemden oluşur">
+          <Card title="Maliyet 4 kalemden oluşur" pad="14px 16px">
             <div style={{ display: 'grid', gap: 12 }}>
               <Adim n="1" t="Hammadde" f="gram × hammadde TL/kg ÷ 1000">Ürünün plastik ağırlığı (gram) ile kullanılan hammaddenin kilo fiyatı çarpılır. Birden çok parça varsa (dış, iç, ayak, tabak, kapak) her parça kendi hammaddesiyle ayrı hesaplanıp toplanır. Hammadde USD ile alınıyorsa TL/kg = USD/kg × kur + ek (nakliye/vergi).</Adim>
               <Adim n="2" t="Baskı (enjeksiyon)" f="makine saat ücreti × çevrim sn ÷ 3600 ÷ kalıp göz sayısı">Plastik makinede basılır. Makinenin saatlik ücreti, tek baskının süresiyle (çevrim, saniye) çarpılır; bir baskıda kalıptan kaç parça çıkıyorsa (göz sayısı) o kadara bölünür. Örn. 2000 ₺/saat makine, 17 sn çevrim, 2 gözlü kalıp → 2000 × 17 ÷ 3600 ÷ 2 = 4,72 ₺/adet. Ayak gibi küçük parçalar bir ürüne birden çok kez girer: <b>katsayı</b> bunu belirtir (4 ayak → katsayı 4).</Adim>
@@ -250,7 +250,7 @@ export default function MaliyetPage() {
               <Adim n="4" t="Genel gider" f="(hammadde + baskı + ambalaj) × genel gider %">Şirket masrafları (kira, ofis, yönetim vb.) için üretim maliyetinin üzerine yüzde olarak eklenir (Ayarlar'da, şu an %{fmtN(ayar.genel_gider_pct, 0)}).</Adim>
             </div>
           </Card>
-          <Card title="Sonra: USD, EUR ve kâr">
+          <Card title="Sonra: USD, EUR ve kâr" pad="14px 16px">
             <ul style={{ ...P, paddingLeft: 18, margin: 0 }}>
               <li><b>Toplam maliyet (TL)</b> = üretim maliyeti + genel gider. KDV ayarı kapalıysa KDV eklenmez (önerilen).</li>
               <li><b>USD maliyet</b> = toplam TL ÷ USD kuru. <b>EUR maliyet</b> = USD ÷ EUR paritesi.</li>
@@ -259,10 +259,10 @@ export default function MaliyetPage() {
               <li>Kâr rengi: <b style={{ color: 'var(--adm-red)' }}>%30'un altı kırmızı</b>, <b style={{ color: 'var(--adm-amber)' }}>%30–60 sarı</b>, <b style={{ color: 'var(--adm-green)' }}>%60 üstü yeşil</b>.</li>
             </ul>
           </Card>
-          <Card title="Canlı örnek" right={<select className="adm-inp" style={{ width: 260 }} value={ornek?.kod || ''} onChange={e => setRehberKod(e.target.value)}>{urunler.map(u => <option key={u.id} value={u.kod}>{u.kod} · {u.ad}</option>)}</select>}>
+          <Card title="Canlı örnek" pad="14px 16px" right={<select className="adm-inp" style={{ width: 260 }} value={ornek?.kod || ''} onChange={e => setRehberKod(e.target.value)}>{urunler.map(u => <option key={u.id} value={u.kod}>{u.kod} · {u.ad}</option>)}</select>}>
             {ornek && oc ? <Dokum u={ornek} c={oc} ayar={ayar} /> : <p style={P}>Ürün yok.</p>}
           </Card>
-          <Card title="Neyi nerede değiştiririm?">
+          <Card title="Neyi nerede değiştiririm?" pad="14px 16px">
             <ul style={{ ...P, paddingLeft: 18, margin: 0 }}>
               <li><b>Kur, genel gider, KDV:</b> Kur · Hammadde · Makine sekmesi → Genel ayarlar.</li>
               <li><b>Hammadde fiyatı değişti:</b> aynı sekmede Hammadde fiyatları → Kaydet. Tüm ürünler güncellenir.</li>
