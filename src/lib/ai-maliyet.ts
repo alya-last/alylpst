@@ -33,7 +33,7 @@ export async function maliyetHesapla(sb: SupabaseClient, a: Record<string, any>)
   if (!ar) throw new Error('urun boş')
   const terimler = ar.split(/\s+/).filter(Boolean)
   const bulunan = urunler.filter(u => { const m = nrm(`${u.kod} ${u.ad} ${u.litre || ''} ${u.seri || ''}`); return terimler.every(t => m.includes(t)) })
-  if (!bulunan.length) return { sonuc: 'Maliyet tablosunda eşleşen ürün yok', not: 'Maliyet tablosunda şu an 92 ürün var (yalnızca Kordon saksı henüz eklenmedi). Ürün adı/kodunu farklı yazarak dene.' }
+  if (!bulunan.length) return { sonuc: 'Maliyet tablosunda eşleşen ürün yok', not: 'Maliyet tablosunda Kordon/Güveç dahil tüm ürünler var (Excel 2026 Ocak–Eylül maliyet dosyasına göre). Ürün adı/kodunu farklı yazarak dene.' }
   const secilen = bulunan.slice(0, 6)
 
   // Senaryo: geçici değişiklikler (kaydedilmez)
