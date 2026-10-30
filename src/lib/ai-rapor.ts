@@ -795,21 +795,31 @@ async function kdvRapor(sb: SupabaseClient, yil: number, ay: number): Promise<So
 async function odemeRapor(sb: SupabaseClient): Promise<Sonuc> {
   const cl = (await sayfala(sb, 'cari_hesaplar', 'id,ad,muhasebe_kodu,tip,bakiye,bakiye_usd,bakiye_eur')).filter((c: any) => c.tip === 'tedarikci' || String(c.muhasebe_kodu || '').startsWith('320'))
   const ids = new Set(cl.map((c: any) => c.id)), top: Record<string, { b: number; a: number }> = {}
+  const dvh: Record<string, { ub: number; ua: number; eb: number; ea: number; n: number }> = {}
+  for (const h of await sayfala(sb, 'cari_eski_hareketler', 'cari_id,grup,usd_borc,usd_alacak,eur_borc,eur_alacak', q => q.in('grup', ['USD', 'EUR']))) if (ids.has(h.cari_id)) { const k = dvh[h.cari_id] = dvh[h.cari_id] || { ub: 0, ua: 0, eb: 0, ea: 0, n: 0 }; k.ub += +h.usd_borc || 0; k.ua += +h.usd_alacak || 0; k.eb += +h.eur_borc || 0; k.ea += +h.eur_alacak || 0; k.n++ }
   for (const h of await sayfala(sb, 'cari_eski_hareketler', 'cari_id,grup,tl_borc,tl_alacak', q => q.eq('grup', 'TL'))) if (ids.has(h.cari_id)) { const k = top[h.cari_id] = top[h.cari_id] || { b: 0, a: 0 }; k.b += +h.tl_borc || 0; k.a += +h.tl_alacak || 0 }
   const borclu = cl.filter((c: any) => (+c.bakiye || 0) < -0.5).sort((a: any, b: any) => (+a.bakiye) - (+b.bakiye))
-  const alacakli = cl.filter((c: any) => (+c.bakiye || 0) > 0.5).sort((a: any, b: any) => (+b.bakiye) - (+a.bakiye))
   const satir = (c: any): Hucre[] => { const b = +c.bakiye || 0, h = top[c.id] || { b: 0, a: 0 }; return [c.muhasebe_kodu || '', c.ad, r2(Math.abs(b)), r2(h.b), r2(h.a), b > 0 ? r2(b) : 0, b < 0 ? r2(-b) : 0] }
   const tab = (l: any[]): Hucre[][] => { const r = l.map(satir); if (r.length) r.push(topSat(r, [2, 3, 4, 5, 6], [1, 'TOPLAM'])); return r }
   const sut = ['Cari kodu', 'Unvan', 'Ödenecek TL', 'Borç', 'Alacak', 'Borç bakiye', 'Alacak bakiye']
   const dv = cl.filter((c: any) => Math.abs(+c.bakiye_usd || 0) > 0.5 || Math.abs(+c.bakiye_eur || 0) > 0.5)
   const toplam = r2(borclu.reduce((t: number, c: any) => t - (+c.bakiye || 0), 0))
   const sayfalar: Sayfa[] = [
-    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Şirketin borçlu olduğu tedarikçi sayısı', borclu.length], ['Toplam ödenecek (TL)', toplam], ['Tedarikçiden alacağımız olan sayısı', alacakli.length], ['Tedarikçilerden alacağımız toplam (TL)', r2(alacakli.reduce((t: number, c: any) => t + (+c.bakiye || 0), 0))], ['Döviz bakiyeli tedarikçi sayısı', dv.length], ['Rapor tarihi', bugunISO()]] },
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Şirketin borçlu olduğu tedarikçi sayısı', borclu.length], ['Toplam ödenecek (TL)', toplam], ['Döviz bakiyeli tedarikçi sayısı', dv.length], ['Rapor tarihi', bugunISO()]] },
     { ad: 'Ödenecekler', sutunlar: sut, satirlar: tab(borclu), sari: 3 },
-    { ad: 'Bizim Alacağımız', sutunlar: sut, satirlar: tab(alacakli), sari: 3 },
   ]
-  if (dv.length) sayfalar.push({ ad: 'Döviz Bakiyeler', sutunlar: ['Cari kodu', 'Unvan', 'USD bakiye', 'EUR bakiye'], satirlar: dv.map((c: any) => [c.muhasebe_kodu || '', c.ad, r2(+c.bakiye_usd || 0), r2(+c.bakiye_eur || 0)]) })
-  const govde = [`TEDARİKÇİ BORÇLARI (ödenecekler) — ${borclu.length} tedarikçi, toplam ${TL(toplam)} TL`, '', ...borclu.slice(0, 12).map((c: any, i: number) => `${i + 1}. ${c.ad} — ${TL(-(+c.bakiye))} TL`), borclu.length > 12 ? `… ve ${borclu.length - 12} tedarikçi daha (tamamı Excel'de)` : '', alacakli.length ? `Ayrıca ${alacakli.length} tedarikçide bizim alacağımız var (Excel'de ayrı sayfa).` : '', 'Not: Bakiye < 0 = şirket tedarikçiye borçlu. USD/EUR TL ile toplanmaz.'].filter((x, i, a) => x !== '' || a[i - 1] !== '')
+  const dvSat = (cur: 'usd' | 'eur'): Hucre[][] => {
+    const r = cl.filter((c: any) => (+c[`bakiye_${cur}`] || 0) < -0.5).sort((x: any, y: any) => (+x[`bakiye_${cur}`]) - (+y[`bakiye_${cur}`])).map((c: any): Hucre[] => {
+      const h = dvh[c.id], net = -(+c[`bakiye_${cur}`]), var_ = !!h && h.n > 0, bo = h ? (cur === 'usd' ? h.ub : h.eb) : 0, al = h ? (cur === 'usd' ? h.ua : h.ea) : 0
+      return [c.muhasebe_kodu || '', c.ad, var_ ? r2(bo) : null, var_ ? r2(al) : null, 0, r2(net)]
+    })
+    if (r.length) r.push(topSat(r, [2, 3, 4, 5], [1, 'TOPLAM']))
+    return r
+  }
+  const usdS = dvSat('usd'), eurS = dvSat('eur'), CUR = (c: string) => ['Cari kodu', 'Cari hesap adı', `${c} Borç`, `${c} Alacak`, `${c} Borç Bakiye`, `${c} Alacak Bakiye`]
+  if (usdS.length) sayfalar.push({ ad: 'USD Borçlar', sutunlar: CUR('USD'), satirlar: usdS, sari: 5 })
+  if (eurS.length) sayfalar.push({ ad: 'EUR Borçlar', sutunlar: CUR('EUR'), satirlar: eurS, sari: 5 })
+  const govde = [`TEDARİKÇİ BORÇLARI (ödenecekler) — ${borclu.length} tedarikçi, toplam ${TL(toplam)} TL`, '', ...borclu.slice(0, 12).map((c: any, i: number) => `${i + 1}. ${c.ad} — ${TL(-(+c.bakiye))} TL`), borclu.length > 12 ? `… ve ${borclu.length - 12} tedarikçi daha (tamamı Excel'de)` : '', ...(usdS.length ? ['', `USD BORÇLAR — ${usdS.length - 1} tedarikçi, toplam ${TL(usdS[usdS.length - 1][5] as number)} USD`, ...usdS.slice(0, -1).map(x => `• ${x[1]} — Borç ${x[2] === null ? '—' : TL(x[2] as number)} / Alacak ${x[3] === null ? '—' : TL(x[3] as number)} → ödenecek bakiye ${TL(x[5] as number)} USD`)] : []), ...(eurS.length ? ['', `EUR BORÇLAR — ${eurS.length - 1} tedarikçi, toplam ${TL(eurS[eurS.length - 1][5] as number)} EUR`, ...eurS.slice(0, -1).map(x => `• ${x[1]} — ödenecek bakiye ${TL(x[5] as number)} EUR`)] : []), 'Not: Yalnızca ödenmesi gereken (borçlu olduğumuz) bakiyeler listelenir. USD/EUR TL ile toplanmaz.'].filter((x, i, a) => x !== '' || a[i - 1] !== '')
   return bitir(sb, 'Tedarikçi borçları (ödenecekler)', sayfalar, govde, ['rapor_odeme'])
 }
 
