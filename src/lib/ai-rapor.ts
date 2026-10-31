@@ -19,6 +19,7 @@ type Niyet =
   | { tur: 'hm_stok'; grup: HmGrup; arama: string } // hammadde / boya / koli / etiket DEPO STOĞU ("hammaddelerim neler", "boya stoğu", "koli stokları")
   | { tur: 'boya_kg'; kg: number; oran: number } // verilen hammadde kg × boya oranı
   | { tur: 'boya_kullanim'; mekan: Mekan; oran: number; kaynak?: 'stok'; donem?: Donem } // satılan iç mekan ürünlerin hammaddesi × boya oranı (varsayılan %2); dış mekanda boya yok
+  | { tur: 'gramaj_liste'; mekan: Mekan } // tüm ürünlerin gramaj listesi (gr/adet, reçeteden)
   | { tur: 'gramaj_kontrol'; mekan: Mekan } // satışı olan ürünlerden gramajı (reçete) tanımsız olanlar
   | { tur: 'stok_kg'; mekan: Mekan } // eldeki MAMUL stoğun içindeki hammadde ağırlığı (stok adedi × ürün gramajı)
   | { tur: 'hm_alis'; arama: string; hareket: boolean; donem?: Donem } // hammadde ALIŞLARI / stok hareketleri (stok_hareketleri tablosu): "moblen hammadde alışlarım"
@@ -108,6 +109,7 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
   const dis = /\bdis ?mek[a]?n/.test(t), ic = /\bic ?mek[a]?n/.test(t)
   const mekan: Mekan = dis && !ic ? 'dis' : ic && !dis ? 'ic' : 'hepsi'
   const mekanVar = dis || ic
+  if (/gramaj\w*|kac gram|agirlik\w*/.test(t) && !kodlariBul(soru).length && /\b(neler\w*|nedir|listele\w*|goster\w*|ver|tum\w*|hepsi\w*|liste\w*|excel\w*|kac|ne kadar|dok)\b/.test(t) && !/olmayan|\byok\b|tanimsiz|eksik|girilmemis|hammadde|boya|stok|stog|satis|satti|maliyet|fiyat|kdv|recete|kullan|tuket|sarf|\bkg\b|kilo|ton\b/.test(t)) return { tur: 'gramaj_liste', mekan }
   if (/gramaj/.test(t) && /olmayan|yok\b|tanimsiz|tanimli|eksik|bos\b|girilmemis|bulunmayan|var mi|varmi|hangi/.test(t) && !/hammadde.*\bkg\b/.test(t)) return { tur: 'gramaj_kontrol', mekan }
   if (/ihracat/.test(t)) {
     if (/tahsil|alacak|bakiye|borc|odeme/.test(t)) return { tur: 'ihr_tahsilat' }
@@ -604,6 +606,32 @@ async function gramajKontrol(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   return bitir(sb, `${ad} gramaj kontrolü`, sayfalar, govde, ['rapor_gramaj'])
 }
 
+/* ─────────────── Ürün gramaj listesi (tüm ürünler, gr/adet; reçete + ek gramaj tablosu) ─────────────── */
+async function gramajListe(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
+  const [ps, rs, rk, ge, st, sa] = await Promise.all([sayfala(sb, 'products', 'id,code'), sayfala(sb, 'urun_receteleri', 'id,urun_id,aktif,notlar'), sayfala(sb, 'recete_kalemleri', 'recete_id,miktar'), sayfala(sb, 'gramaj_ek', 'kod,kg'), sayfala(sb, 'satis_kod_stok', 'kod,ad,stok,mekan'), sayfala(sb, 'satis_adetleri', 'kod,recete_kodu')])
+  const kod = new Map<string, string>(ps.map((p: any) => [p.id, p.code])), kgR = new Map<string, number>()
+  for (const k of rk) kgR.set(k.recete_id, (kgR.get(k.recete_id) || 0) + (+k.miktar || 0))
+  const gl = new Map<string, number[]>()
+  for (const r of rs.filter((x: any) => x.aktif !== false)) { const kg = kgR.get(r.id) || 0; if (kg <= 0) continue; const k = /\[([^\]]+)\]/.exec(r.notlar || '')?.[1] || kod.get(r.urun_id); if (k) gl.set(k, [...(gl.get(k) || []), kg]) }
+  const gr = new Map<string, number>(); for (const [k, v] of gl) gr.set(k, v.reduce((a, b) => a + b, 0) / v.length)
+  for (const g of ge) if (!gr.has(g.kod) && +g.kg > 0) gr.set(g.kod, +g.kg)
+  const rkod = new Map<string, string>(); for (const x of sa) if (x.recete_kodu && !rkod.has(String(x.kod).trim())) rkod.set(String(x.kod).trim(), x.recete_kodu)
+  const satirlar = st.filter((x: any) => mekan === 'hepsi' || x.mekan === mekan).map((x: any) => { const k = String(x.kod).trim(), g = (rkod.get(k) && gr.get(rkod.get(k) as string)) || gr.get(k) || 0; return { kod: k, ad: String(x.ad || '').replace(/\s+/g, ' ').trim(), mekan: String(x.mekan), g: g * 1000, rk: rkod.get(k) || '', stok: +x.stok || 0 } }).sort((a, b) => a.mekan.localeCompare(b.mekan) || a.kod.localeCompare(b.kod, 'tr', { numeric: true }))
+  const var_ = satirlar.filter(x => x.g > 0), yok = satirlar.filter(x => !(x.g > 0))
+  const ad = mekan === 'hepsi' ? 'İç + dış mekan' : mekanAd(mekan)
+  const sayfalar: Sayfa[] = [
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', ad], ['Ürün/kod sayısı', satirlar.length], ['Gramajı tanımlı', var_.length], ['Gramajı tanımsız', yok.length], ['Kaynak', 'ürün reçeteleri + ek gramaj tablosu (gr/adet)'], ['Rapor tarihi', bugunISO()]] },
+    { ad: 'Gramaj Listesi', sutunlar: ['Kod', 'Ürün', 'Mekan', 'Reçete kodu', 'Gramaj (gr/adet)', 'Stok adedi', 'Stoktaki toplam kg'], satirlar: satirlar.map(x => [x.kod, x.ad, mekanAd(x.mekan), x.rk, x.g > 0 ? r2(x.g) : 'TANIMSIZ', x.stok, x.g > 0 ? r2(x.g * x.stok / 1000) : null]) },
+  ]
+  const gor = new Set<string>(), govde = [`ÜRÜN GRAMAJLARI — ${ad} (${bugunISO()})`, '', `${var_.length} üründe gramaj tanımlı${yok.length ? `, ${yok.length} kodda tanımsız` : ''}.`, '']
+  const tablo = (m: string) => { const sat = var_.filter(x => x.mekan === m).filter(x => { const k = (x.rk || x.kod) + '|' + Math.round(x.g); if (gor.has(m + k)) return false; gor.add(m + k); return true }); if (!sat.length) return; govde.push(`**${mekanAd(m).toUpperCase()}**`, '| Kod | Ürün | Gramaj (gr/adet) |', '|---|---|---:|', ...sat.map(x => `| ${x.kod} | ${x.ad} | ${AD(x.g)} |`), '') }
+  if (mekan !== 'dis') tablo('ic')
+  if (mekan !== 'ic') tablo('dis')
+  if (yok.length) govde.push(`Gramajı tanımsız: ${yok.filter(x => x.stok !== 0).slice(0, 10).map(x => x.kod).join(', ') || '(stoklu olan yok)'}${yok.length > 10 ? ' …' : ''}`)
+  govde.push('', "Gramaj = ürün reçetesindeki hammadde toplamı. Renk varyantları (A/G/K/Y…) aynı gramajı paylaştığı için sohbette bir kez gösterilir; tam liste ve stoktaki toplam kg Excel'de.")
+  return bitir(sb, `${ad} ürün gramajları`, sayfalar, govde, ['rapor_gramaj'])
+}
+
 /* ─────────────── Boya kullanımı (iç mekan, satılan ürünlerin hammaddesi × oran) ─────────────── */
 async function boyaStok(sb: SupabaseClient, oran: number): Promise<Sonuc> {
   const [ps, rs, rk, ge, st] = await Promise.all([sayfala(sb, 'products', 'id,code'), sayfala(sb, 'urun_receteleri', 'id,urun_id,aktif,notlar'), sayfala(sb, 'recete_kalemleri', 'recete_id,miktar'), sayfala(sb, 'gramaj_ek', 'kod,kg'), sayfala(sb, 'satis_kod_stok', 'kod,ad,stok,mekan')])
@@ -952,7 +980,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   if (!n0) { try { n0 = donemUygula(await niyetSinifla(soru), soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
   if (!n0) return null
   const n: RaporNiyet = n0
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], boya_kg: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], boya_kg: [], gramaj_liste: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     const r0 = await (async (): Promise<Sonuc | null> => {
@@ -982,6 +1010,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       }
       case 'boya_kg': { const b = n.kg * n.oran, yp = r2(n.oran * 100); return { yanit: `${AD(n.kg)} kg hammadde × %${yp} boya oranı = ${TL(b)} kg (${TL(b / 1000)} ton) boya.\nHesap: hammadde kg × oran. Tahmini hesaptır, gerçek boya kullanımı kayıtlı değildir. Dış mekanda boya kullanılmaz.`, araclar: ['rapor_boya_kg'] } }
       case 'boya_kullanim': return n.kaynak === 'stok' && n.mekan !== 'dis' ? await boyaStok(sb, n.oran) : await boyaKullanim(sb, n.mekan, n.oran, n.donem)
+      case 'gramaj_liste': return await gramajListe(sb, n.mekan)
       case 'gramaj_kontrol': return await gramajKontrol(sb, n.mekan)
       case 'stok_kg': return await stokKg(sb, n.mekan)
       case 'hm_alis': return await hmAlis(sb, n.arama, n.hareket, n.donem)
