@@ -606,30 +606,21 @@ async function gramajKontrol(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   return bitir(sb, `${ad} gramaj kontrolü`, sayfalar, govde, ['rapor_gramaj'])
 }
 
-/* ─────────────── Ürün gramaj listesi (tüm ürünler, gr/adet; reçete + ek gramaj tablosu) ─────────────── */
-async function gramajListe(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
-  const [ps, rs, rk, ge, st, sa] = await Promise.all([sayfala(sb, 'products', 'id,code'), sayfala(sb, 'urun_receteleri', 'id,urun_id,aktif,notlar'), sayfala(sb, 'recete_kalemleri', 'recete_id,miktar'), sayfala(sb, 'gramaj_ek', 'kod,kg'), sayfala(sb, 'satis_kod_stok', 'kod,ad,stok,mekan'), sayfala(sb, 'satis_adetleri', 'kod,recete_kodu')])
-  const kod = new Map<string, string>(ps.map((p: any) => [p.id, p.code])), kgR = new Map<string, number>()
-  for (const k of rk) kgR.set(k.recete_id, (kgR.get(k.recete_id) || 0) + (+k.miktar || 0))
-  const gl = new Map<string, number[]>()
-  for (const r of rs.filter((x: any) => x.aktif !== false)) { const kg = kgR.get(r.id) || 0; if (kg <= 0) continue; const k = /\[([^\]]+)\]/.exec(r.notlar || '')?.[1] || kod.get(r.urun_id); if (k) gl.set(k, [...(gl.get(k) || []), kg]) }
-  const gr = new Map<string, number>(); for (const [k, v] of gl) gr.set(k, v.reduce((a, b) => a + b, 0) / v.length)
-  for (const g of ge) if (!gr.has(g.kod) && +g.kg > 0) gr.set(g.kod, +g.kg)
-  const rkod = new Map<string, string>(); for (const x of sa) if (x.recete_kodu && !rkod.has(String(x.kod).trim())) rkod.set(String(x.kod).trim(), x.recete_kodu)
-  const satirlar = st.filter((x: any) => mekan === 'hepsi' || x.mekan === mekan).map((x: any) => { const k = String(x.kod).trim(), g = (rkod.get(k) && gr.get(rkod.get(k) as string)) || gr.get(k) || 0; return { kod: k, ad: String(x.ad || '').replace(/\s+/g, ' ').trim(), mekan: String(x.mekan), g: g * 1000, rk: rkod.get(k) || '', stok: +x.stok || 0 } }).sort((a, b) => a.mekan.localeCompare(b.mekan) || a.kod.localeCompare(b.kod, 'tr', { numeric: true }))
-  const var_ = satirlar.filter(x => x.g > 0), yok = satirlar.filter(x => !(x.g > 0))
-  const ad = mekan === 'hepsi' ? 'İç + dış mekan' : mekanAd(mekan)
+/* ─────────────── Ürün gramaj listesi: panel maliyet tablosundan (parça kırılımıyla); Excel biçimi sabit ─────────────── */
+async function gramajListe(sb: SupabaseClient, _mekan: Mekan): Promise<Sonuc> {
+  const urunler = (await sayfala(sb, 'maliyet_urun', 'kod,ad,litre,parcalar,aktif,sira', q => q.eq('aktif', true).order('sira', { ascending: true }).order('kod', { ascending: true })))
+  const satir = urunler.map((u: any): Hucre[] => {
+    const parca: { ad: string; gram: number }[] = (Array.isArray(u.parcalar) ? u.parcalar : []).map((p: any) => ({ ad: String(p.ad || ''), gram: +p.gram || 0 })).filter((p: any) => p.gram > 0)
+    const toplam = parca.reduce((t, p) => t + p.gram, 0), lt = parseFloat(String(u.litre ?? '').replace(',', '.'))
+    return [String(u.kod), String(u.ad || '').replace(/\s+/g, ' ').trim(), Number.isFinite(lt) ? lt : null, toplam > 0 ? Math.round(toplam) : 'TANIMSIZ', parca.map(p => `${p.ad} ${Math.round(p.gram)}`).join(' + ')]
+  })
+  const yok = satir.filter(x => x[3] === 'TANIMSIZ')
   const sayfalar: Sayfa[] = [
-    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', ad], ['Ürün/kod sayısı', satirlar.length], ['Gramajı tanımlı', var_.length], ['Gramajı tanımsız', yok.length], ['Kaynak', 'ürün reçeteleri + ek gramaj tablosu (gr/adet)'], ['Rapor tarihi', bugunISO()]] },
-    { ad: 'Gramaj Listesi', sutunlar: ['Kod', 'Ürün', 'Mekan', 'Reçete kodu', 'Gramaj (gr/adet)', 'Stok adedi', 'Stoktaki toplam kg'], satirlar: satirlar.map(x => [x.kod, x.ad, mekanAd(x.mekan), x.rk, x.g > 0 ? r2(x.g) : 'TANIMSIZ', x.stok, x.g > 0 ? r2(x.g * x.stok / 1000) : null]) },
+    { ad: 'Ürün Gramajları', sutunlar: ['Ürün Kodu', 'Ürün', 'Litre', 'Toplam Gramaj (gr/adet)', 'Parça Kırılımı (gr)'], satirlar: satir },
+    { ad: 'Not', sutunlar: ['Not'], satirlar: [['Kaynak: panel maliyet tablosu (Excel ÜRÜN MALİYET 2026 Ocak–Eylül). Gramaj = parçaların toplamı. Efes gövdeleri (şişirme) hazır/fason parçadır, hammadde olarak düşülmez. İç mekan ürünleridir; dış mekan (ALYG) gramajı bu listede yok.']] },
   ]
-  const gor = new Set<string>(), govde = [`ÜRÜN GRAMAJLARI — ${ad} (${bugunISO()})`, '', `${var_.length} üründe gramaj tanımlı${yok.length ? `, ${yok.length} kodda tanımsız` : ''}.`, '']
-  const tablo = (m: string) => { const sat = var_.filter(x => x.mekan === m).filter(x => { const k = (x.rk || x.kod) + '|' + Math.round(x.g); if (gor.has(m + k)) return false; gor.add(m + k); return true }); if (!sat.length) return; govde.push(`**${mekanAd(m).toUpperCase()}**`, '| Kod | Ürün | Gramaj (gr/adet) |', '|---|---|---:|', ...sat.map(x => `| ${x.kod} | ${x.ad} | ${AD(x.g)} |`), '') }
-  if (mekan !== 'dis') tablo('ic')
-  if (mekan !== 'ic') tablo('dis')
-  if (yok.length) govde.push(`Gramajı tanımsız: ${yok.filter(x => x.stok !== 0).slice(0, 10).map(x => x.kod).join(', ') || '(stoklu olan yok)'}${yok.length > 10 ? ' …' : ''}`)
-  govde.push('', "Gramaj = ürün reçetesindeki hammadde toplamı. Renk varyantları (A/G/K/Y…) aynı gramajı paylaştığı için sohbette bir kez gösterilir; tam liste ve stoktaki toplam kg Excel'de.")
-  return bitir(sb, `${ad} ürün gramajları`, sayfalar, govde, ['rapor_gramaj'])
+  const govde = [`ÜRÜN GRAMAJLARI (${bugunISO()}) — ${satir.length} ürün${yok.length ? `, ${yok.length} tanesinde gramaj tanımsız` : ''}`, '', 'Toplam gramaj (gr/adet) ve parça kırılımı (gövde, tabak, kapak, ayak…) Excel dosyasındadır. Kaynak: panel maliyet tablosu; iç mekan ürünleridir, dış mekan (ALYG) gramajı bu listede yok.']
+  return bitir(sb, 'Ürün gramajları', sayfalar, govde, ['rapor_gramaj'])
 }
 
 /* ─────────────── Boya kullanımı (iç mekan, satılan ürünlerin hammaddesi × oran) ─────────────── */
