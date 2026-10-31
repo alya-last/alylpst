@@ -21,7 +21,7 @@
     "nodemailer": "^10.0.10",
     "pdfjs-dist": "^4.10.38",
     "qrcode": "^1.5.4",
-    "react": "19.2.8",
+    "react": "19.3.1",
     "react-dom": "19.2.8",
     "react-pageflip": "^2.0.3",
     "sharp": "^0.35.4",
