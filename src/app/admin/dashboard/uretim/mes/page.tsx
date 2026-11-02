@@ -30,8 +30,9 @@ export default function MesPage() {
     ;(async () => {
       try {
         const [a, b, c, d, e, f] = await Promise.all([
-          erp.all('mes_makine'), erp.all('mes_urun'), erp.all('mes_uretim_gunluk'), erp.all('mes_durum_gunluk'),
-          erp.all('mes_is_emri_satir'), erp.all('mes_senkron', '*', (q: any) => q.eq('basarili', true).order('calisma_zamani', { ascending: false }).limit(1)),
+          erp.all('mes_makine', '*', (q: any) => q.order('id', { ascending: true })), erp.all('mes_urun', '*', (q: any) => q.order('id', { ascending: true })),
+          erp.all('mes_uretim_gunluk', '*', (q: any) => q.order('anahtar', { ascending: true })), erp.all('mes_durum_gunluk', '*', (q: any) => q.order('anahtar', { ascending: true })),
+          erp.all('mes_is_emri_satir', '*', (q: any) => q.order('id', { ascending: true })), erp.all('mes_senkron', '*', (q: any) => q.eq('basarili', true).order('calisma_zamani', { ascending: false }).limit(1)),
         ])
         if (iptal) return
         setMk(a); setUr(b); setGn(c); setDr(d); setEm(e); setSk(f[0] || null)
@@ -85,7 +86,7 @@ export default function MesPage() {
   const yuzde = calSn + durSn ? (calSn / (calSn + durSn)) * 100 : 0
 
   return (
-    <div>
+    <div style={{ flex: 1, overflow: 'auto' }}>
       <AdminTopBar title="Makine Verisi (MES)" />
       <Page>
         <PageHead title="Makine Takip Sistemi Verisi" sub="Fabrikadaki makine sayaçlarından gelen üretim ve çalışma verisi — yalnızca okunur, her 3 dakikada güncellenir"
@@ -113,7 +114,7 @@ export default function MesPage() {
           <>
             <KpiGrid>
               <Kpi label="Üretim (adet)" value={fmtInt(toplam)} sub="sayaç tabanlı" Icon={Factory} color="var(--adm-green)" />
-              <Kpi label="Üretim (kg)" value={fmtInt(kg)} sub="adet × ürün gramajı" Icon={Weight} />
+              <Kpi label="Üretim (kg)" value={kg > 0 ? fmtInt(kg) : '—'} sub={kg > 0 ? 'adet × ürün gramajı' : 'makine sisteminde ürün gramajı girilmemiş'} Icon={Weight} />
               <Kpi label="Çalışma süresi" value={`${fmtInt(calSn / 3600)} sa`} sub={`duruş ${fmtInt(durSn / 3600)} sa`} Icon={Timer} />
               <Kpi label="Çalışma oranı" value={`%${fmtN(yuzde, 1)}`} sub="çalışma / (çalışma + duruş)" Icon={Gauge} color="var(--adm-blue)" />
               <Kpi label="İş emri" value={fmtInt(emirSatir.length)} sub="farklı emir numarası" Icon={Cog} />
