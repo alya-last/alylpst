@@ -19,6 +19,7 @@ type Niyet =
   | { tur: 'hm_stok'; grup: HmGrup; arama: string } // hammadde / boya / koli / etiket DEPO STOĞU ("hammaddelerim neler", "boya stoğu", "koli stokları")
   | { tur: 'boya_kg'; kg: number; oran: number } // verilen hammadde kg × boya oranı
   | { tur: 'boya_kullanim'; mekan: Mekan; oran: number; kaynak?: 'stok'; donem?: Donem } // satılan iç mekan ürünlerin hammaddesi × boya oranı (varsayılan %2); dış mekanda boya yok
+  | { tur: 'koli_kullanim'; donem?: Donem } // iç mekan satış adedi ÷ koli içi adet = kod bazında koli kullanımı
   | { tur: 'gramaj_liste'; mekan: Mekan } // tüm ürünlerin gramaj listesi (gr/adet, reçeteden)
   | { tur: 'gramaj_kontrol'; mekan: Mekan } // satışı olan ürünlerden gramajı (reçete) tanımsız olanlar
   | { tur: 'stok_kg'; mekan: Mekan } // eldeki MAMUL stoğun içindeki hammadde ağırlığı (stok adedi × ürün gramajı)
@@ -93,6 +94,7 @@ function donemUygula(n: RaporNiyet | null, soru: string): RaporNiyet | null {
   if (yil && +yil !== +bugunISO().slice(0, 4)) return null // satış/stok verisi yalnız bu yıl; başka yıl için serbest yapay zekaya (araçlara) bırak
   if (n.tur === 'satis' || n.tur === 'urun' || n.tur === 'urun_ad' || n.tur === 'hammadde' || n.tur === 'hm_alis') return { ...n, donem: d }
   if (n.tur === 'boya_kullanim' && n.kaynak !== 'stok') return { ...n, donem: d }
+  if (n.tur === 'koli_kullanim') return { ...n, donem: d }
   if (n.tur === 'ihr_rakam' || n.tur === 'ekstre' || n.tur === 'fiyat') return null // tarih süzmeli sorgu: serbest yapay zekaya (araçlara) bırak
   return { ...n, notAy: true } // tahsilat, stok, hammadde stoğu, POS, ödeme…: anlık durum
 }
@@ -149,6 +151,8 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     const om = /%\s*(\d+(?:[.,]\d+)?)|\b0 (\d+)\b/.exec(t), o = om ? (om[2] ? +('0.' + om[2]) : +om[1].replace(',', '.')) : 2
     if (kg > 0) return { tur: 'boya_kg', kg, oran: (o < 1 ? o * 100 : o) / 100 }
   }
+  // "ekim satışlarına göre ne kadar koli kullandım": iç mekan satış adedi ÷ koli içi adet (stok sorusu değil)
+  if (/\bkoli/.test(t) && /kullan|tuket|sarf|harca|gitti|lazim|gerek/.test(t) && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|maliyet|hacim|m3|olcu|agirlik/.test(t)) return { tur: 'koli_kullanim' }
   const boyaOran = () => { const om = /%\s*(\d+(?:[.,]\d+)?)|\b0 (\d+)\b|oran\w*\s*(\d+(?:[.,]\d+)?)(?! \d)/.exec(t), o = om ? (om[2] ? +('0.' + om[2]) : +(om[1] || om[3]).replace(',', '.')) : 2; return (o < 1 ? o * 100 : o) / 100 }
   // Stoktaki (depodaki) ürünlerin boyası: stok adedi × gramaj × oran
   if (/boya|masterbatch/.test(t) && /\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && /kullan|tuket|sarf|harca|gitti|hesapla|icer|icinde|ne kadar boya|kac kg boya/.test(t) && !/alis|alim|fiyat|maliyet|minimum|kritik/.test(t)) return { tur: 'boya_kullanim', mekan: mekan === 'dis' ? 'dis' : 'ic', oran: boyaOran(), kaynak: 'stok' }
@@ -655,6 +659,29 @@ async function boyaStok(sb: SupabaseClient, oran: number): Promise<Sonuc> {
   return bitir(sb, `İç mekan stok boyası %${yp}`, sayfalar, govde, ['rapor_boya_stok'])
 }
 
+async function koliKullanim(sb: SupabaseClient, dn?: Donem): Promise<Sonuc> {
+  // İç mekan satış adedi ÷ ürünün koli içi adedi = kullanılan koli. Dış mekanda koli içi adet tanımlı değildir, dahil edilmez.
+  const [sat, kk] = await Promise.all([
+    sayfala(sb, 'satis_adetleri', 'ay,kod,ad,mekan,adet', q => { const a = q.eq('mekan', 'ic'); return dn ? a.gte('ay', dn.bas).lte('ay', dn.bit) : a }),
+    sayfala(sb, 'satis_kod_stok', 'kod,mekan,koli_ici', q => q.eq('mekan', 'ic'))])
+  const ki = new Map<string, number>(kk.filter((x: any) => +x.koli_ici > 0).map((x: any) => [String(x.kod).trim(), +x.koli_ici]))
+  const m = new Map<string, { kod: string; ad: string; adet: number }>()
+  for (const r of sat) { const kod = String(r.kod || '').trim(); const o = m.get(kod) || { kod, ad: String(r.ad || '').trim(), adet: 0 }; o.adet += +r.adet || 0; m.set(kod, o) }
+  const l = [...m.values()].filter(x => x.adet !== 0).map(x => { const k = ki.get(x.kod) || 0; return { ...x, k, tam: k ? Math.floor(x.adet / k) : 0, acik: k ? x.adet % k : 0, koli: k ? x.adet / k : 0 } }).sort((a, b) => b.koli - a.koli || b.adet - a.adet)
+  const yok = l.filter(x => !x.k), var_ = l.filter(x => x.k)
+  const adet = var_.reduce((t, x) => t + x.adet, 0), tam = var_.reduce((t, x) => t + x.tam, 0), acik = var_.reduce((t, x) => t + x.acik, 0), koli = var_.reduce((t, x) => t + x.koli, 0)
+  const donemYazi = dn ? `${donemAd(dn)} ${bugunISO().slice(0, 4)}` : `${bugunISO().slice(0, 4)} yılı (yıl başından bugüne)`
+  if (!l.length) return { yanit: `${donemYazi} için iç mekan satış kaydı bulunamadı.`, araclar: ['rapor_koli_kullanim'] }
+  const yokAdet = yok.reduce((t, x) => t + x.adet, 0)
+  const sayfalar: Sayfa[] = [
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', `İç mekan satışları — ${donemYazi}`], ['Hesap', 'satış adedi ÷ ürünün koli içi adedi = koli (tam koli + açık adet)'], ['Hesaba giren ürün kodu', var_.length], ['Hesaba giren satış (adet)', adet], ['Tam koli', tam], ['Açık adet (tam koliye bölünmeyen)', acik], ['Toplam koli (kesirli)', r2(koli)], ['Koli içi adedi tanımsız kod', yok.length], ['Koli içi adedi tanımsız satış (adet)', yokAdet], ['Not', 'Dış mekan ürünlerinde koli içi adet tanımlı değildir, dahil değildir. Gerçek koli kullanımı (sayım) ile farklı olabilir.']] },
+    { ad: 'Ürün Detay', sutunlar: ['Sıra', 'Kod', 'Ürün', 'Satış adedi', 'Koli içi adet', 'Tam koli', 'Açık adet', 'Koli (kesirli)'], satirlar: [...var_.map((x, i): Hucre[] => [i + 1, x.kod, x.ad, x.adet, x.k, x.tam, x.acik, r2(x.koli)]), ['', '', 'TOPLAM', adet, null, tam, acik, r2(koli)] as Hucre[]] },
+    ...(yok.length ? [{ ad: 'Koli İçi Tanımsız', sutunlar: ['Kod', 'Ürün', 'Satış adedi'], satirlar: yok.map((x): Hucre[] => [x.kod, x.ad, x.adet]) } as Sayfa] : []),
+  ]
+  const govde = [`İÇ MEKAN SATIŞLARINA GÖRE KOLİ KULLANIMI — ${donemYazi}`, '', `${AD(adet)} adet satış (${var_.length} ürün kodu) → **${AD(tam)} koli${acik ? ` + ${AD(acik)} adet açık` : ''}** (toplam ${TL(koli)} koli)`, '', '| Ürün | Satış adedi | Koli içi | Koli |', '|---|---:|---:|---:|', ...var_.slice(0, 10).map(x => `| ${x.kod} ${x.ad} | ${AD(x.adet)} | ${AD(x.k)} | ${AD(x.tam)}${x.acik ? ` (+${AD(x.acik)})` : ''} |`), ...(var_.length > 10 ? [`… ve ${var_.length - 10} ürün daha (Excel'de).`] : []), '', ...(yok.length ? [`Dikkat: ${yok.length} kodun koli içi adedi tanımsız (${AD(yokAdet)} adet), hesaba girmedi.`] : []), 'Hesap: satış adedi ÷ koli içi adet. Dış mekan dahil değildir; gerçek koli kullanımı sayımdan farklı çıkabilir.']
+  return bitir(sb, `İç mekan koli kullanımı ${donemYazi}`, sayfalar, govde, ['rapor_koli_kullanim'])
+}
+
 async function boyaKullanim(sb: SupabaseClient, mekan: Mekan, oran: number, dn?: Donem): Promise<Sonuc> {
   if (mekan === 'dis') return { yanit: 'Dış mekan ürünlerinde boya kullanılmıyor, bu yüzden dış mekan için boya hesabı yapmıyorum. İç mekan boya kullanımını sorabilirsiniz.', araclar: ['rapor_boya'] }
   const j = json(await hamCalistir(() => araciCalistir(sb, 'satis_hammadde', { mekan: 'ic', ...(dn ? { ay_bas: dn.bas, ay_bit: dn.bit } : {}) })))
@@ -1038,7 +1065,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   if (!n0) { try { n0 = donemUygula(await niyetSinifla(soru), soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
   if (!n0) return null
   const n: RaporNiyet = n0
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], boya_kg: [], gramaj_liste: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], koli_kullanim: [], boya_kg: [], gramaj_liste: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     const r0 = await (async (): Promise<Sonuc | null> => {
@@ -1067,6 +1094,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
         return { yanit: g.join('\n'), araclar: ['rapor_gelir_tablosu'] }
       }
       case 'boya_kg': { const b = n.kg * n.oran, yp = r2(n.oran * 100); return { yanit: `${AD(n.kg)} kg hammadde × %${yp} boya oranı = ${TL(b)} kg (${TL(b / 1000)} ton) boya.\nHesap: hammadde kg × oran. Tahmini hesaptır, gerçek boya kullanımı kayıtlı değildir. Dış mekanda boya kullanılmaz.`, araclar: ['rapor_boya_kg'] } }
+      case 'koli_kullanim': return await koliKullanim(sb, n.donem)
       case 'boya_kullanim': return n.kaynak === 'stok' && n.mekan !== 'dis' ? await boyaStok(sb, n.oran) : await boyaKullanim(sb, n.mekan, n.oran, n.donem)
       case 'gramaj_liste': return await gramajListe(sb, n.mekan)
       case 'gramaj_kontrol': return await gramajKontrol(sb, n.mekan)
