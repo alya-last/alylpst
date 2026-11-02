@@ -238,10 +238,12 @@ async function urunAdindanKodlar(sb: SupabaseClient, arama: string): Promise<str
 
 async function sayfala(sb: SupabaseClient, tablo: string, kolon: string, f?: (q: any) => any): Promise<any[]> {
   const out: any[] = []
+  // Sayfalama için kararlı sıra: varsayılan 'id'; tabloda id kolonu yoksa (satis_kod_stok, gramaj_ek…) seçilen kolonlarla sıralanır
+  let sira: string[] = ['id']
   for (let bas = 0; bas < 30000; bas += 1000) {
-    let q: any = sb.from(tablo).select(kolon).order('id').range(bas, bas + 999)
-    if (f) q = f(q)
-    const r = await q
+    const kur = () => { let q: any = sb.from(tablo).select(kolon); for (const o of sira) q = q.order(o); q = q.range(bas, bas + 999); return f ? f(q) : q }
+    let r = await kur()
+    if (r.error && sira[0] === 'id' && /id does not exist/i.test(r.error.message || '')) { sira = kolon.split(',').map(x => x.trim()).filter(Boolean); r = await kur() }
     if (r.error) throw new Error(r.error.message)
     out.push(...(r.data || []))
     if ((r.data || []).length < 1000) break
