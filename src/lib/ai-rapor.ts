@@ -673,12 +673,23 @@ async function koliKullanim(sb: SupabaseClient, dn?: Donem): Promise<Sonuc> {
   const donemYazi = dn ? `${donemAd(dn)} ${bugunISO().slice(0, 4)}` : `${bugunISO().slice(0, 4)} yılı (yıl başından bugüne)`
   if (!l.length) return { yanit: `${donemYazi} için iç mekan satış kaydı bulunamadı.`, araclar: ['rapor_koli_kullanim'] }
   const yokAdet = yok.reduce((t, x) => t + x.adet, 0)
+  // Kayıtlı (gelir tablosuna girilen) koli kullanımı: "[Aylık tablo] Ocak 2026 - KOLİ (4.298*16,50)" satırlarından adet çıkarılır
+  const yil = +bugunISO().slice(0, 4), b0 = dn ? dn.bas : 1, b1 = dn ? dn.bit : 12
+  let kayitAdet = 0, kayitTl = 0, kayitSatir = 0
+  try {
+    const kr = await sayfala(sb, 'islemler', 'tutar,aciklama,tarih', q => q.eq('tip', 'gider').ilike('aciklama', '%KOLİ%').gte('tarih', `${yil}-${String(b0).padStart(2, '0')}-01`).lte('tarih', `${yil}-${String(b1).padStart(2, '0')}-31`).order('tarih').order('id'))
+    for (const r of kr) {
+      const a = String(r.aciklama || ''); if (!/^\[Aylık tablo\]/.test(a) || /BANT|ETİKET/i.test(a)) continue
+      const mm = /\(\s*([\d.]+)\s*(?:ADET)?\s*\*/i.exec(a); if (!mm) continue
+      kayitAdet += parseInt(mm[1].replace(/\./g, ''), 10) || 0; kayitTl += +r.tutar || 0; kayitSatir++
+    }
+  } catch { /* kayıtlı değer okunamazsa rapor yalnız satış hesabıyla verilir */ }
   const sayfalar: Sayfa[] = [
-    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', `İç mekan satışları — ${donemYazi}`], ['Hesap', 'satış adedi ÷ ürünün koli içi adedi = koli (tam koli + açık adet)'], ['Hesaba giren ürün kodu', var_.length], ['Hesaba giren satış (adet)', adet], ['Tam koli', tam], ['Açık adet (tam koliye bölünmeyen)', acik], ['Toplam koli (kesirli)', r2(koli)], ['Koli içi adedi tanımsız kod', yok.length], ['Koli içi adedi tanımsız satış (adet)', yokAdet], ['Not', 'Dış mekan ürünlerinde koli içi adet tanımlı değildir, dahil değildir. Gerçek koli kullanımı (sayım) ile farklı olabilir.']] },
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', `İç mekan satışları — ${donemYazi}`], ...(kayitSatir ? [['Gelir tablosunda kayıtlı koli kullanımı (adet)', kayitAdet], ['Kayıtlı koli tutarı (TL)', r2(kayitTl)], ['Satış hesabı − kayıtlı (koli)', r2(koli - kayitAdet)]] as Hucre[][] : []), ['Hesap', 'satış adedi ÷ ürünün koli içi adedi = koli (tam koli + açık adet)'], ['Hesaba giren ürün kodu', var_.length], ['Hesaba giren satış (adet)', adet], ['Tam koli', tam], ['Açık adet (tam koliye bölünmeyen)', acik], ['Toplam koli (kesirli)', r2(koli)], ['Koli içi adedi tanımsız kod', yok.length], ['Koli içi adedi tanımsız satış (adet)', yokAdet], ['Not', 'Dış mekan ürünlerinde koli içi adet tanımlı değildir, dahil değildir. Gerçek koli kullanımı (sayım) ile farklı olabilir.']] },
     { ad: 'Ürün Detay', sutunlar: ['Sıra', 'Kod', 'Ürün', 'Satış adedi', 'Koli içi adet', 'Tam koli', 'Açık adet', 'Koli (kesirli)'], satirlar: [...var_.map((x, i): Hucre[] => [i + 1, x.kod, x.ad, x.adet, x.k, x.tam, x.acik, r2(x.koli)]), ['', '', 'TOPLAM', adet, null, tam, acik, r2(koli)] as Hucre[]] },
     ...(yok.length ? [{ ad: 'Koli İçi Tanımsız', sutunlar: ['Kod', 'Ürün', 'Satış adedi'], satirlar: yok.map((x): Hucre[] => [x.kod, x.ad, x.adet]) } as Sayfa] : []),
   ]
-  const govde = [`İÇ MEKAN SATIŞLARINA GÖRE KOLİ KULLANIMI — ${donemYazi}`, '', `${AD(adet)} adet satış (${var_.length} ürün kodu) → **${AD(tam)} koli${acik ? ` + ${AD(acik)} adet açık` : ''}** (toplam ${TL(koli)} koli)`, '', '| Ürün | Satış adedi | Koli içi | Koli |', '|---|---:|---:|---:|', ...var_.slice(0, 10).map(x => `| ${x.kod} ${x.ad} | ${AD(x.adet)} | ${AD(x.k)} | ${AD(x.tam)}${x.acik ? ` (+${AD(x.acik)})` : ''} |`), ...(var_.length > 10 ? [`… ve ${var_.length - 10} ürün daha (Excel'de).`] : []), '', ...(yok.length ? [`Dikkat: ${yok.length} kodun koli içi adedi tanımsız (${AD(yokAdet)} adet), hesaba girmedi.`] : []), 'Hesap: satış adedi ÷ koli içi adet. Dış mekan dahil değildir; gerçek koli kullanımı sayımdan farklı çıkabilir.']
+  const govde = [`İÇ MEKAN SATIŞLARINA GÖRE KOLİ KULLANIMI — ${donemYazi}`, '', `${AD(adet)} adet satış (${var_.length} ürün kodu) → **${AD(tam)} koli${acik ? ` + ${AD(acik)} adet açık` : ''}** (toplam ${TL(koli)} koli)`, ...(kayitSatir ? [`Gelir tablonuzdaki kayıtlı koli kullanımı: **${AD(kayitAdet)} koli** (${TL(kayitTl)} TL). Satış hesabı ile fark: ${TL(koli - kayitAdet)} koli.`] : []), '', '| Ürün | Satış adedi | Koli içi | Koli |', '|---|---:|---:|---:|', ...var_.slice(0, 10).map(x => `| ${x.kod} ${x.ad} | ${AD(x.adet)} | ${AD(x.k)} | ${AD(x.tam)}${x.acik ? ` (+${AD(x.acik)})` : ''} |`), ...(var_.length > 10 ? [`… ve ${var_.length - 10} ürün daha (Excel'de).`] : []), '', ...(yok.length ? [`Dikkat: ${yok.length} kodun koli içi adedi tanımsız (${AD(yokAdet)} adet), hesaba girmedi.`] : []), 'Hesap: satış adedi ÷ koli içi adet. Dış mekan dahil değildir; gerçek koli kullanımı sayımdan farklı çıkabilir.']
   return bitir(sb, `İç mekan koli kullanımı ${donemYazi}`, sayfalar, govde, ['rapor_koli_kullanim'])
 }
 
