@@ -683,13 +683,22 @@ async function hammadde(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<S
     if (k && !rec.has(k)) rec.set(k, kal.get(r.id) as { hm: string; gr: number }[])
   }
   const ek = new Map<string, number>(ge.filter((g: any) => +g.kg > 0).map((g: any) => [g.kod, +g.kg * 1000]))
+  // Reçetesi olmayan ürünlerde panel maliyet kartındaki parça gramajları (gövde/tabak/kapak… hammadde türüne göre) kullanılır
+  const mal = new Map<string, { hm: string; gr: number }[]>()
+  try {
+    for (const m of await sayfala(sb, 'maliyet_urun', 'kod,parcalar,aktif', q => q.eq('aktif', true))) {
+      const t = new Map<string, number>()
+      for (const pc of Array.isArray(m.parcalar) ? m.parcalar : []) { const g = +pc?.gram || 0; if (g > 0) { const ad = String(pc?.hm || 'hammadde').trim(); const h = ad.charAt(0).toLocaleUpperCase('tr') + ad.slice(1).toLocaleLowerCase('tr') + ' (maliyet kartı)'; t.set(h, (t.get(h) || 0) + g) } }
+      if (t.size) mal.set(String(m.kod), [...t].map(([hm, gr]) => ({ hm, gr })))
+    }
+  } catch (e: any) { console.error('[ai-rapor] maliyet_urun', e?.message) }
   const u = new Map<string, { kod: string; ad: string; rk: string; mekan: string; adet: number }>()
   for (const x of sat) { const key = `${x.kod}|${x.recete_kodu || ''}|${x.mekan}`, o = u.get(key) || { kod: String(x.kod), ad: String(x.ad || '').replace(/\s+/g, ' ').trim(), rk: String(x.recete_kodu || x.kod), mekan: String(x.mekan), adet: 0 }; o.adet += +x.adet || 0; u.set(key, o) }
   const liste = [...u.values()].sort((x, y) => y.adet - x.adet || x.kod.localeCompare(y.kod, 'tr', { numeric: true }))
   const hepsiMk = mekan === 'hepsi', mk = (x: { mekan: string }): Hucre[] => (hepsiMk ? [mekanAd(x.mekan)] : [])
   const detay: Hucre[][] = [], urunSat: { x: (typeof liste)[number]; gr: number; kg: number }[] = [], yok: typeof liste = [], hmTop = new Map<string, { kg: number; urun: Set<string> }>()
   for (const x of liste) {
-    const k = rec.get(x.rk) || rec.get(x.kod) || (ek.has(x.rk) ? [{ hm: 'Gramaj (ek tablo, hammadde ayrımı yok)', gr: ek.get(x.rk) as number }] : ek.has(x.kod) ? [{ hm: 'Gramaj (ek tablo, hammadde ayrımı yok)', gr: ek.get(x.kod) as number }] : null)
+    const k = rec.get(x.rk) || rec.get(x.kod) || mal.get(x.rk) || mal.get(x.kod) || (ek.has(x.rk) ? [{ hm: 'Gramaj (ek tablo, hammadde ayrımı yok)', gr: ek.get(x.rk) as number }] : ek.has(x.kod) ? [{ hm: 'Gramaj (ek tablo, hammadde ayrımı yok)', gr: ek.get(x.kod) as number }] : null)
     if (!k) { yok.push(x); continue }
     let gt = 0, kt = 0
     for (const p of [...k].sort((a, b) => b.gr - a.gr)) { const kg = x.adet * p.gr / 1000; gt += p.gr; kt += kg; detay.push([x.kod, x.ad, ...mk(x), x.rk, x.adet, p.hm, r2(p.gr), r2(kg)]); const h = hmTop.get(p.hm) || { kg: 0, urun: new Set<string>() }; h.kg += kg; h.urun.add(`${x.kod}|${x.mekan}`); hmTop.set(p.hm, h) }
