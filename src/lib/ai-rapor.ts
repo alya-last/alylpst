@@ -156,11 +156,13 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     const om = /%\s*(\d+(?:[.,]\d+)?)|\b0 (\d+)\b|oran\w*\s*(\d+(?:[.,]\d+)?)(?! \d)/.exec(t), o = om ? (om[2] ? +('0.' + om[2]) : +(om[1] || om[3]).replace(',', '.')) : 2
     return { tur: 'boya_kullanim', mekan, oran: (o < 1 ? o * 100 : o) / 100 }
   }
+  // "ekim hammadde excel çıktısı ver": ay adı + hammadde, stok/alış sözü yoksa → o ayın SATIŞLARINA göre hammadde kullanımı
+  if (/hammadde/.test(t) && /\b(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\b/.test(t) && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|boya|koli|etiket/.test(t)) return { tur: 'hammadde', mekan }
   const hma = hmAlisNiyeti(t)
   if (hma) return hma
   const hmn = hmStokNiyeti(t, kodlar)
   if (hmn) return hmn
-  if (/hammadde/.test(t)) return /stok|stog|depo|kalan/.test(t) ? null : { tur: 'hammadde', mekan }
+  if (/hammadde/.test(t)) return /stok|stog|depo|kalan|fiyat/.test(t) ? null : { tur: 'hammadde', mekan }
   if (/tahsilat|alacak listesi|alacaklar[iı]m|bakiyesi olan|kimden ne tahsil/.test(t) && !/\bcek\b|\bsenet\b/.test(t)) return { tur: 'tahsilat', mekan }
   if (/\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && mekanVar && !/hammadde|boya|ambalaj|kritik|minimum/.test(t)) return { tur: 'stok', mekan }
   if (/\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && !mekanVar && !kodlar.length && /\b(ver|goster|listele|getir|dok|rapor\w*|excel\w*|kac|ne kadar|yan yana)\b/.test(t) && !/hammadde|boya|ambalaj|kritik|minimum|\bkg\b|kilo|\bton\b|maliyet|recete|fiyat|musteri|cari|satis|satti|siparis|tedarik|alis|alim|urun\b/.test(t)) return { tur: 'stok', mekan: 'hepsi' }
