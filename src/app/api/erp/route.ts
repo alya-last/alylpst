@@ -19,7 +19,7 @@ const TABLES = new Set([
 const READONLY_VIEWS = new Set([
   'v_uretim_emirleri','v_urun_maliyet','v_kalip_bakim_durumu',
   'v_kritik_hammaddeler','v_kritik_urunler','v_uretim_fire_orani',
-  'v_stok_defteri','v_cari_ozet','v_rezerve','v_sevk_edilen','v_hammadde_tuketim','v_kalip_baski','v_depo_ozet',
+  'mes_makine','mes_urun','mes_is_emri_satir','mes_uretim_gunluk','mes_durum_gunluk','mes_senkron','v_stok_defteri','v_cari_ozet','v_rezerve','v_sevk_edilen','v_hammadde_tuketim','v_kalip_baski','v_depo_ozet',
 ])
 
 async function requireSession() {

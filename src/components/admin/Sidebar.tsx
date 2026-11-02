@@ -61,6 +61,7 @@ const NAV = [
     { href:'/admin/dashboard/uretim/maliyet', label:'Ürün Maliyeti',    Icon:Calculator,   mod:['uretim'] },
     { href:'/admin/dashboard/uretim/emirler', label:'Üretim Emirleri',  Icon:Factory,      mod:['uretim'] },
     { href:'/admin/dashboard/uretim/canli',   label:'Canlı Üretim',     Icon:Zap,          mod:['uretim'] },
+    { href:'/admin/dashboard/uretim/mes',     label:'Makine Verisi (MES)', Icon:Cog,       mod:['uretim'] },
   ]},
   { g:'Satış / Lojistik', mod:['satis','satinalma','sevkiyat'], items:[
     { href:'/admin/dashboard/satis/siparisler',       label:'Satış Siparişleri',    Icon:ClipboardList, mod:['satis'] },
