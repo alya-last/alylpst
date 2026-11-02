@@ -37,7 +37,7 @@ type HmGrup = 'hepsi' | 'hammadde' | 'boya' | 'koli' | 'etiket'
 type Hucre = string | number | null
 type Sonuc = { yanit: string; araclar: string[] }
 
-const nrm = (v: unknown) => String(v ?? '').toLocaleLowerCase('tr').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i').replace(/[?!.,;:()"']/g, ' ').replace(/\s+/g, ' ').trim()
+const nrm = (v: unknown) => String(v ?? '').toLocaleLowerCase('tr').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i').replace(/[?!.,;:()"']/g, ' ').replace(/\s+/g, ' ').trim().replace(/\beksi?m/g, 'ekim').replace(/\bkas[ıi]m\b/g, 'kasim')
 const r2 = (n: number) => Math.round(n * 100) / 100
 const TL = (n: number) => r2(n).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const AD = (n: number) => Math.round(n).toLocaleString('tr-TR')
@@ -98,7 +98,7 @@ function donemUygula(n: RaporNiyet | null, soru: string): RaporNiyet | null {
 }
 export function raporNiyeti(soru: string): RaporNiyet | null { return donemUygula(raporNiyetiHam(soru), soru) }
 function raporNiyetiHam(soru: string): RaporNiyet | null {
-  const t = nrm(soru).replace(/\bham{1,2}[ae]dde/g, 'hammadde') // yazım hataları: hammedde, hamadde
+  const t = nrm(soru).replace(/\bham{1,2}[ae]dde/g, 'hammadde').replace(/\bham ?madde\w*/g, 'hammadde') // yazım hataları: hammedde, hamadde, ham madde
   if (!t || t.split(' ').length > 40) return null
   // "nisan ayı gider tablosu / nisan giderleri / nisan masrafları" da aynı çıktıyı ister: ALYA PLASTİK <YIL> <AY> GELİR TABLOSU (SATIŞLAR | MASRAFLAR | ÜRETİM MALİYETİ | CİRO | KAR-ZARAR). Ayrı, eksik bir gider listesi üretilmez.
   const AY_RE = /\b(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\b/
@@ -109,7 +109,7 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     return { tur: 'gelir_tablosu', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: ayI >= 0 ? ayI + 1 : +bg.slice(5, 7) }
   }
   if (/neden|niye|\byorum\w*|karsilastir|tahmin|oner|kar zarar|maliyet|senaryo|kur farki/.test(t)) return null
-  const dis = /\bdis ?mek[a]?n/.test(t), ic = /\bic ?mek[a]?n/.test(t)
+  const dis = /\bdis ?mek[ae]?[nm]/.test(t), ic = /\bic ?mek[ae]?[nm]/.test(t) || /\bic (ve|ile|\+|ya da|veya) dis ?mek[ae]?[nm]/.test(t) || /\bic ?(ve|ile) ?dis\b/.test(t) // mekan / mekam / mekn; "iç ve dış mekan" = ikisi
   const mekan: Mekan = dis && !ic ? 'dis' : ic && !dis ? 'ic' : 'hepsi'
   const mekanVar = dis || ic
   if (/gramaj\w*|kac gram|agirlik\w*/.test(t) && !kodlariBul(soru).length && /\b(neler\w*|nedir|listele\w*|goster\w*|ver|tum\w*|hepsi\w*|liste\w*|excel\w*|kac|ne kadar|dok)\b/.test(t) && !/olmayan|\byok\b|tanimsiz|eksik|girilmemis|hammadde|boya|stok|stog|satis|satti|maliyet|fiyat|kdv|recete|kullan|tuket|sarf|\bkg\b|kilo|ton\b/.test(t)) return { tur: 'gramaj_liste', mekan }
