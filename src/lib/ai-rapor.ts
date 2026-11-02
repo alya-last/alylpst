@@ -698,13 +698,14 @@ async function boyaKullanim(sb: SupabaseClient, mekan: Mekan, oran: number, dn?:
   const j = json(await hamCalistir(() => araciCalistir(sb, 'satis_hammadde', { mekan: 'ic', ...(dn ? { ay_bas: dn.bas, ay_bit: dn.bit } : {}) })))
   const ur = ((j.urunler || []) as any[]).filter(x => x.mekan === 'iç mekan').sort((a, b) => b.hammadde_kg - a.hammadde_kg), yok = ((j.gramaji_olmayan_urunler || []) as any[]).filter(x => x.mekan === 'iç mekan')
   const kg = ur.reduce((t, x) => t + x.hammadde_kg, 0), adet = ur.reduce((t, x) => t + x.adet, 0), boya = kg * oran, yp = r2(oran * 100)
+  const dYazi = dn ? `${donemAd(dn)} ${bugunISO().slice(0, 4)}` : String(j.donem || '')
   const sat: Hucre[][] = ur.map((x, i) => [i + 1, x.urun, x.adet, x.gramaj_kg, r2(x.hammadde_kg), r2(x.hammadde_kg * oran), kg ? r2(x.hammadde_kg / kg * 100) : 0])
   sat.push(['', 'TOPLAM', adet, null, r2(kg), r2(boya), 100])
   const sayfalar: Sayfa[] = [
-    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', 'İç mekan (dış mekanda boya kullanılmaz)'], ['Dönem', String(j.donem || '')], ['Boya oranı', `%${yp} (hammadde ağırlığının)`], ['Hesap', 'satış adedi × ürün gramajı = hammadde kg; hammadde kg × oran = boya kg'], ['Gramajı olan satış (adet)', adet], ['Toplam hammadde (kg)', r2(kg)], ['Hesaplanan boya (kg)', r2(boya)], ['Boya (ton)', r2(boya / 1000)], ['Gramajı tanımsız satış (adet)', r2(yok.reduce((t, x) => t + (+x.adet || 0), 0))], ['Not', 'Tahmini hesaptır: gerçek boya kullanımı kayıtlı değil. Renk dağılımı satış kaydındaki ürün adından çıkarılamaz.']] },
+    { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: [['Kapsam', 'İç mekan (dış mekanda boya kullanılmaz)'], ['Dönem', dYazi], ['Boya oranı', `%${yp} (hammadde ağırlığının)`], ['Hesap', 'satış adedi × ürün gramajı = hammadde kg; hammadde kg × oran = boya kg'], ['Gramajı olan satış (adet)', adet], ['Toplam hammadde (kg)', r2(kg)], ['Hesaplanan boya (kg)', r2(boya)], ['Boya (ton)', r2(boya / 1000)], ['Gramajı tanımsız satış (adet)', r2(yok.reduce((t, x) => t + (+x.adet || 0), 0))], ['Not', 'Tahmini hesaptır: gerçek boya kullanımı kayıtlı değil. Renk dağılımı satış kaydındaki ürün adından çıkarılamaz.']] },
     { ad: 'Ürün Detay', sutunlar: ['Sıra', 'Ürün', 'Satış adedi', 'Gramaj (kg/adet)', 'Hammadde (kg)', `Boya kg (%${yp})`, 'Hammadde payı %'], satirlar: sat },
   ]
-  const govde = [`İÇ MEKAN BOYA KULLANIMI (tahmini, %${yp}) — ${j.donem}`, '', `${AD(adet)} adet satış → ${TL(kg)} kg hammadde → ${TL(boya)} kg (${TL(boya / 1000)} ton) boya`, 'Hesap: satış adedi × ürün gramajı × boya oranı. Dış mekanda boya kullanılmaz, dahil değildir.']
+  const govde = [`İÇ MEKAN BOYA KULLANIMI (tahmini, %${yp}) — ${dYazi}`, '', `${AD(adet)} adet satış → ${TL(kg)} kg hammadde → ${TL(boya)} kg (${TL(boya / 1000)} ton) boya`, 'Hesap: satış adedi × ürün gramajı × boya oranı. Dış mekanda boya kullanılmaz, dahil değildir.']
   ur.slice(0, 8).forEach((x, i) => govde.push(`${i + 1}. ${x.urun}: ${AD(x.adet)} adet → ${TL(x.hammadde_kg * oran)} kg boya`))
   if (yok.length) govde.push('', `Dikkat: ${yok.length} üründe gramaj tanımsız (${AD(yok.reduce((t, x) => t + (+x.adet || 0), 0))} adet), hesaba girmedi.`)
   govde.push('', 'Not: Tahmini hesaptır; gerçek boya kullanımı kayıtlı değildir.')
