@@ -412,7 +412,10 @@ async function satis(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<Sonu
     `${ad.toUpperCase()} SATIŞ — ${bugunISO().slice(0, 4)} ${dn ? donemAd(dn) : `Ocak–${AYLAR[sonAy - 1]}`} (satış dosyası): ${AD(toplamAdet)} adet, ${TL(toplamTutar)} TL (KDV hariç)`,
     ciro ? `Muhasebe ciro (Ürün Satışı, ${ad}): ${TL(ciroTop())} TL — satış dosyasından farklı olabilir (tahakkuk/zamanlama).` : '',
     '', ...(dn && dn.bas === dn.bit ? [] : ['AYLIK:', ...gosterAy.map(n => `• ${AYLAR[n - 1]}: ${AD(ay[n]?.a || 0)} adet — ${TL(ay[n]?.t || 0)} TL`), ''] ),
-    'EN ÇOK SATAN 10 ÜRÜN (tutara göre):', ...anaL.slice(0, 10).map((g, i) => `${i + 1}. ${g.kod} ${g.ad}: ${AD(g.adet)} adet — ${TL(g.tutar)} TL`),
+    ...(mekan === 'hepsi'
+      ? ['İÇ / DIŞ MEKAN AYRIMI:', ...(['ic', 'dis'] as const).flatMap(m => { const rm = rows.filter(x => x.mekan === m), am = rm.reduce((t, x) => t + (+x.adet || 0), 0), tm = rm.reduce((t, x) => t + (+x.tutar || 0), 0); return [`• ${mekanAd(m)}: ${AD(am)} adet — ${TL(tm)} TL`] }), '',
+        ...(['ic', 'dis'] as const).flatMap(m => { const l = anaL.filter(g => g.mekan === m).slice(0, 5); return l.length ? [`${mekanAd(m).toUpperCase()} — EN ÇOK SATAN ${l.length} ÜRÜN (tutara göre):`, ...l.map((g, i) => `${i + 1}. ${g.kod} ${g.ad}: ${AD(g.adet)} adet — ${TL(g.tutar)} TL`), ''] : [] })]
+      : ['EN ÇOK SATAN 10 ÜRÜN (tutara göre):', ...anaL.slice(0, 10).map((g, i) => `${i + 1}. ${g.kod} ${g.ad}: ${AD(g.adet)} adet — ${TL(g.tutar)} TL`)]),
     ...(must?.musteriler?.length ? ['', 'EN BÜYÜK 5 MÜŞTERİ (net):', ...must.musteriler.slice(0, 5).map((m: any, i: number) => `${i + 1}. ${m.musteri}: ${TL(m.net_tl)} TL`)] : []),
   ].filter((x, i, a) => x !== '' || a[i - 1] !== '')
   return bitir(sb, `${ad} satış ${dn ? donemAd(dn) + ' ' : ''}${bugunISO().slice(0, 4)}`, sayfalar, govde, ['rapor_satis'])
@@ -721,7 +724,7 @@ async function hammadde(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<S
     { ad: 'Ürün x Hammadde Detay', sutunlar: ['Ürün Kodu', 'Ürün', ...(hepsiMk ? ['Mekan'] : []), 'Reçete', 'Satış Adedi', 'Hammadde', 'Gramaj (gr/adet)', 'Kullanılan Hammadde (kg)'], satirlar: detay },
     ...(yok.length ? [{ ad: 'Gramajı Tanımsız', sutunlar: ['Ürün Kodu', 'Ürün', ...(hepsiMk ? ['Mekan'] : []), 'Satış Adedi'], satirlar: yok.map((x): Hucre[] => [x.kod, x.ad, ...mk(x), x.adet]) }] : []),
   ]
-  const govde = [`${mkYazi.toUpperCase()} SATIŞLARINA GÖRE HAMMADDE KULLANIMI — ${donemYazi}`, '', `${AD(topAdet)} adet satış (${urunSat.length} ürün kodu) → **${TL(topKg)} kg (${TL(topKg / 1000)} ton)** hammadde`, '', '| Hammadde | Kullanım (kg) | Pay |', '|---|---:|---:|', ...hmSat.slice(0, -1).map(h => `| ${h[0]} | ${TL(h[1] as number)} | %${TL(h[3] as number)} |`), '', ...(yok.length ? [`Dikkat: ${yok.length} kodun gramajı tanımsız, hesaba katılmadı.`] : []), 'Not: Bu, SATILAN ürünlerin hammaddesidir (adet × reçete gramajı); fire, boya, koli ve etiket dahil değildir. Ürün ve hammadde detayı Excel\'dedir.']
+  const govde = [`${mkYazi.toUpperCase()} SATIŞLARINA GÖRE HAMMADDE KULLANIMI — ${donemYazi}`, '', `${AD(topAdet)} adet satış (${urunSat.length} ürün kodu) → **${TL(topKg)} kg (${TL(topKg / 1000)} ton)** hammadde`, '', ...(hepsiMk ? (['ic', 'dis'] as const).map(m => { const l = urunSat.filter(o => o.x.mekan === m); return `• ${mekanAd(m)}: ${AD(l.reduce((t, o) => t + o.x.adet, 0))} adet → ${TL(l.reduce((t, o) => t + o.kg, 0))} kg (${TL(l.reduce((t, o) => t + o.kg, 0) / 1000)} ton)` }).concat(['']) : []), '| Hammadde | Kullanım (kg) | Pay |', '|---|---:|---:|', ...hmSat.slice(0, -1).map(h => `| ${h[0]} | ${TL(h[1] as number)} | %${TL(h[3] as number)} |`), '', ...(yok.length ? [`Dikkat: ${yok.length} kodun gramajı tanımsız, hesaba katılmadı.`] : []), 'Not: Bu, SATILAN ürünlerin hammaddesidir (adet × reçete gramajı); fire, boya, koli ve etiket dahil değildir. Ürün ve hammadde detayı Excel\'dedir.']
   return bitir(sb, `Satışa göre hammadde kullanımı — ${mkYazi} ${dn ? donemAd(dn) : ''}`.trim(), sayfalar, govde, ['rapor_hammadde'])
 }
 
