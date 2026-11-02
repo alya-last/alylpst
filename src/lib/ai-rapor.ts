@@ -991,6 +991,23 @@ Emin değilsen "yok". Alanlar bilinmiyorsa mekan="hepsi", metinler "", sayılar 
   }
 }
 
+/** Kısa devam soruları ("dış mekan?", "peki hammaddesi?", "toplam") bir önceki sorularla birleştirilerek yorumlanır:
+ *  son soru tek başına anlamsızsa ya da dönemi eksikse, son 3 kullanıcı sorusundan biriyle birleştirilir. */
+export function baglamliSoru(gecmis: { role: string; content: string }[]): string {
+  const kul = gecmis.filter(m => m.role === 'user' && typeof m.content === 'string' && m.content.trim()).map(m => m.content)
+  const son = kul[kul.length - 1] || ''
+  if (!son || son.trim().split(/\s+/).length > 8) return son
+  const solo = raporNiyeti(son)
+  if (solo && donemBul(son)) return son
+  for (const onceki of kul.slice(-4, -1).reverse()) {
+    const aday = `${onceki} ${son}`
+    const n = raporNiyeti(aday)
+    if (!n) continue
+    if (!solo || (!donemBul(son) && donemBul(onceki))) return aday
+  }
+  return son
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   let n0 = raporNiyeti(soru)
   if (!n0) { try { n0 = donemUygula(await niyetSinifla(soru), soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }

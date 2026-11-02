@@ -660,8 +660,9 @@ export async function asistanYanit(
   }
   // Satış / stok / tahsilat / ihracat gibi sık sorulan veri sorularında tek satırlık cevap yerine detaylı çok sayfalı Excel + özet üretilir
   {
-    const son = [...gecmis].reverse().find(m => m.role === 'user')?.content || ''
-    const rp = await (await import('@/lib/ai-rapor')).detayliRapor(sb, son, izinli)
+    const rpMod = await import('@/lib/ai-rapor')
+    const son = rpMod.baglamliSoru(gecmis)
+    const rp = await rpMod.detayliRapor(sb, son, izinli)
     if (rp) return rp
   }
   const bugun = bugunISO()
