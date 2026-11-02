@@ -701,12 +701,12 @@ async function hammadde(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<S
   for (const x of sat) { const key = `${x.kod}|${x.recete_kodu || ''}|${x.mekan}`, o = u.get(key) || { kod: String(x.kod), ad: String(x.ad || '').replace(/\s+/g, ' ').trim(), rk: String(x.recete_kodu || x.kod), mekan: String(x.mekan), adet: 0 }; o.adet += +x.adet || 0; u.set(key, o) }
   const liste = [...u.values()].sort((x, y) => y.adet - x.adet || x.kod.localeCompare(y.kod, 'tr', { numeric: true }))
   const hepsiMk = mekan === 'hepsi', mk = (x: { mekan: string }): Hucre[] => (hepsiMk ? [mekanAd(x.mekan)] : [])
-  const detay: Hucre[][] = [], urunSat: { x: (typeof liste)[number]; gr: number; kg: number }[] = [], yok: typeof liste = [], hmTop = new Map<string, { kg: number; urun: Set<string> }>()
+  const detay: Hucre[][] = [], urunSat: { x: (typeof liste)[number]; gr: number; kg: number }[] = [], yok: typeof liste = [], hmTop = new Map<string, { kg: number; urun: Set<string> }>(), hmMk = new Map<string, { kg: number; urun: Set<string> }>()
   for (const x of liste) {
     const k = rec.get(x.rk) || rec.get(x.kod) || mal.get(x.rk) || mal.get(x.kod) || (ek.has(x.rk) ? [{ hm: 'Gramaj (ek tablo, hammadde ayrımı yok)', gr: ek.get(x.rk) as number }] : ek.has(x.kod) ? [{ hm: 'Gramaj (ek tablo, hammadde ayrımı yok)', gr: ek.get(x.kod) as number }] : null)
     if (!k) { yok.push(x); continue }
     let gt = 0, kt = 0
-    for (const p of [...k].sort((a, b) => b.gr - a.gr)) { const kg = x.adet * p.gr / 1000; gt += p.gr; kt += kg; detay.push([x.kod, x.ad, ...mk(x), x.rk, x.adet, p.hm, r2(p.gr), r2(kg)]); const h = hmTop.get(p.hm) || { kg: 0, urun: new Set<string>() }; h.kg += kg; h.urun.add(`${x.kod}|${x.mekan}`); hmTop.set(p.hm, h) }
+    for (const p of [...k].sort((a, b) => b.gr - a.gr)) { const kg = x.adet * p.gr / 1000; gt += p.gr; kt += kg; detay.push([x.kod, x.ad, ...mk(x), x.rk, x.adet, p.hm, r2(p.gr), r2(kg)]); const h = hmTop.get(p.hm) || { kg: 0, urun: new Set<string>() }; h.kg += kg; h.urun.add(`${x.kod}|${x.mekan}`); hmTop.set(p.hm, h); if (hepsiMk) { const k2 = `${x.mekan}|${p.hm}`, h2 = hmMk.get(k2) || { kg: 0, urun: new Set<string>() }; h2.kg += kg; h2.urun.add(x.kod); hmMk.set(k2, h2) } }
     urunSat.push({ x, gr: gt, kg: kt })
   }
   const topKg = urunSat.reduce((t, o) => t + o.kg, 0), topAdet = urunSat.reduce((t, o) => t + o.x.adet, 0)
@@ -714,19 +714,30 @@ async function hammadde(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<S
   const mkYazi = hepsiMk ? 'İç + Dış Mekan' : mekanAd(mekan)
   const hmSat = [...hmTop.entries()].sort((a, b) => b[1].kg - a[1].kg).map(([ad, h]): Hucre[] => [ad, r2(h.kg), r2(h.kg / 1000), topKg ? r2(h.kg / topKg * 100) : 0, h.urun.size])
   if (hmSat.length) hmSat.push(['TOPLAM', r2(topKg), r2(topKg / 1000), 100, null])
+  // İç + dış birlikte sorulunca Hammadde Özeti sayfası mekan kırılımlı olur (her mekanın kendi içindeki pay + mekan toplamı)
+  const mkKg = (m: string) => urunSat.filter(o => o.x.mekan === m).reduce((t, o) => t + o.kg, 0), mkAdet = (m: string) => urunSat.filter(o => o.x.mekan === m).reduce((t, o) => t + o.x.adet, 0)
+  const hmMkSat: Hucre[][] = []
+  if (hepsiMk) {
+    for (const m of ['ic', 'dis']) {
+      const t = mkKg(m)
+      for (const [k, h] of [...hmMk.entries()].filter(([k]) => k.startsWith(m + '|')).sort((a, b) => b[1].kg - a[1].kg)) hmMkSat.push([mekanAd(m), k.slice(m.length + 1), r2(h.kg), r2(h.kg / 1000), t ? r2(h.kg / t * 100) : 0, h.urun.size])
+      if (t) hmMkSat.push([mekanAd(m), 'MEKAN TOPLAMI', r2(t), r2(t / 1000), 100, null])
+    }
+    if (hmMkSat.length) hmMkSat.push(['GENEL', 'TOPLAM', r2(topKg), r2(topKg / 1000), null, null])
+  }
   const notlar = ['Yöntem: satış adedi × ürün reçetesindeki hammadde gramajı (panel reçeteleri; Excel ÜRÜN MALİYET 2026 Ocak–Eylül dosyasındaki gramlar).', yok.length ? `Gramajı/reçetesi olmayan ${yok.length} kod hesaba katılmadı (${AD(yok.reduce((t, x) => t + x.adet, 0))} adet) — "Gramajı Tanımsız" sayfasında.` : `Satışı olan ${liste.length} kodun tamamının reçetesi var (tam kapsam).`, 'Boya/masterbatch, koli ve etiket bu hesaba dahil değil; yalnızca plastik hammadde. Fire oranı eklenmedi (%0).', "Efes saksıların şişirme gövdesi hazır/fason parça olduğu için hammadde olarak düşülmez."]
-  const ozet: Hucre[][] = [['Kapsam', `${mkYazi} — ${donemYazi}`], ['Satılan ürün kodu sayısı', urunSat.length], ['Toplam satış adedi', topAdet], ['Toplam hammadde (kg)', r2(topKg)], ['Toplam hammadde (ton)', r2(topKg / 1000)], ['Ortalama gramaj (gr/adet)', topAdet ? r2(topKg * 1000 / topAdet) : 0], ...hmSat.slice(0, -1).map((h): Hucre[] => [`${h[0]} (kg)`, h[1]]), ...notlar.map((n): Hucre[] => ['Not', n])]
+  const ozet: Hucre[][] = [['Kapsam', `${mkYazi} — ${donemYazi}`], ['Satılan ürün kodu sayısı', urunSat.length], ['Toplam satış adedi', topAdet], ['Toplam hammadde (kg)', r2(topKg)], ['Toplam hammadde (ton)', r2(topKg / 1000)], ['Ortalama gramaj (gr/adet)', topAdet ? r2(topKg * 1000 / topAdet) : 0], ...(hepsiMk ? (['ic', 'dis'] as const).flatMap((m): Hucre[][] => [[`${mekanAd(m)} satış (adet)`, mkAdet(m)], [`${mekanAd(m)} hammadde (kg)`, r2(mkKg(m))], [`${mekanAd(m)} hammadde (ton)`, r2(mkKg(m) / 1000)]]) : []), ...hmSat.slice(0, -1).map((h): Hucre[] => [`${h[0]} (kg)`, h[1]]), ...notlar.map((n): Hucre[] => ['Not', n])]
   const urunBaz = [...urunSat].sort((a, b) => b.x.adet - a.x.adet).map(o => [o.x.kod, o.x.ad, ...mk(o.x), o.x.adet, r2(o.gr), r2(o.kg), topKg ? r2(o.kg / topKg * 100) : 0] as Hucre[])
   if (urunBaz.length) urunBaz.push(['', 'TOPLAM', ...(hepsiMk ? [''] : []), topAdet, null, r2(topKg), 100])
   if (detay.length) detay.push(['', 'TOPLAM', ...(hepsiMk ? [''] : []), '', null, '', null, r2(topKg)])
   const sayfalar: Sayfa[] = [
     { ad: 'Özet', sutunlar: ['Alan', 'Değer'], satirlar: ozet },
-    { ad: 'Hammadde Özeti', sutunlar: ['Hammadde', 'Kullanılan (kg)', 'Kullanılan (ton)', 'Pay %', 'Ürün sayısı'], satirlar: hmSat },
+    hepsiMk ? { ad: 'Hammadde Özeti', sutunlar: ['Mekan', 'Hammadde', 'Kullanılan (kg)', 'Kullanılan (ton)', 'Mekan içi pay %', 'Ürün sayısı'], satirlar: hmMkSat } : { ad: 'Hammadde Özeti', sutunlar: ['Hammadde', 'Kullanılan (kg)', 'Kullanılan (ton)', 'Pay %', 'Ürün sayısı'], satirlar: hmSat },
     { ad: 'Ürün Bazında Toplam', sutunlar: ['Ürün Kodu', 'Ürün', ...(hepsiMk ? ['Mekan'] : []), 'Satış Adedi', 'Toplam Gramaj (gr/adet)', 'Toplam Hammadde (kg)', 'Pay %'], satirlar: urunBaz },
     { ad: 'Ürün x Hammadde Detay', sutunlar: ['Ürün Kodu', 'Ürün', ...(hepsiMk ? ['Mekan'] : []), 'Reçete', 'Satış Adedi', 'Hammadde', 'Gramaj (gr/adet)', 'Kullanılan Hammadde (kg)'], satirlar: detay },
     ...(yok.length ? [{ ad: 'Gramajı Tanımsız', sutunlar: ['Ürün Kodu', 'Ürün', ...(hepsiMk ? ['Mekan'] : []), 'Satış Adedi'], satirlar: yok.map((x): Hucre[] => [x.kod, x.ad, ...mk(x), x.adet]) }] : []),
   ]
-  const govde = [`${mkYazi.toUpperCase()} SATIŞLARINA GÖRE HAMMADDE KULLANIMI — ${donemYazi}`, '', `${AD(topAdet)} adet satış (${urunSat.length} ürün kodu) → **${TL(topKg)} kg (${TL(topKg / 1000)} ton)** hammadde`, '', ...(hepsiMk ? (['ic', 'dis'] as const).map(m => { const l = urunSat.filter(o => o.x.mekan === m); return `• ${mekanAd(m)}: ${AD(l.reduce((t, o) => t + o.x.adet, 0))} adet → ${TL(l.reduce((t, o) => t + o.kg, 0))} kg (${TL(l.reduce((t, o) => t + o.kg, 0) / 1000)} ton)` }).concat(['']) : []), '| Hammadde | Kullanım (kg) | Pay |', '|---|---:|---:|', ...hmSat.slice(0, -1).map(h => `| ${h[0]} | ${TL(h[1] as number)} | %${TL(h[3] as number)} |`), '', ...(yok.length ? [`Dikkat: ${yok.length} kodun gramajı tanımsız, hesaba katılmadı.`] : []), 'Not: Bu, SATILAN ürünlerin hammaddesidir (adet × reçete gramajı); fire, boya, koli ve etiket dahil değildir. Ürün ve hammadde detayı Excel\'dedir.']
+  const govde = [`${mkYazi.toUpperCase()} SATIŞLARINA GÖRE HAMMADDE KULLANIMI — ${donemYazi}`, '', `${AD(topAdet)} adet satış (${urunSat.length} ürün kodu) → **${TL(topKg)} kg (${TL(topKg / 1000)} ton)** hammadde`, '', ...(hepsiMk ? (['ic', 'dis'] as const).map(m => { const l = urunSat.filter(o => o.x.mekan === m); return `• ${mekanAd(m)}: ${AD(l.reduce((t, o) => t + o.x.adet, 0))} adet → ${TL(l.reduce((t, o) => t + o.kg, 0))} kg (${TL(l.reduce((t, o) => t + o.kg, 0) / 1000)} ton)` }).concat(['']) : []), ...(hepsiMk ? (['ic', 'dis'] as const).flatMap(m => { const l = hmMkSat.filter(h => h[0] === mekanAd(m) && h[1] !== 'MEKAN TOPLAMI'); return l.length ? [`**${mekanAd(m)} hammaddesi**`, '| Hammadde | Kullanım (kg) | Mekan içi pay |', '|---|---:|---:|', ...l.map(h => `| ${h[1]} | ${TL(h[2] as number)} | %${TL(h[4] as number)} |`), ''] : [] }) : ['| Hammadde | Kullanım (kg) | Pay |', '|---|---:|---:|', ...hmSat.slice(0, -1).map(h => `| ${h[0]} | ${TL(h[1] as number)} | %${TL(h[3] as number)} |`), '']), ...(yok.length ? [`Dikkat: ${yok.length} kodun gramajı tanımsız, hesaba katılmadı.`] : []), 'Not: Bu, SATILAN ürünlerin hammaddesidir (adet × reçete gramajı); fire, boya, koli ve etiket dahil değildir. Ürün ve hammadde detayı Excel\'dedir.']
   return bitir(sb, `Satışa göre hammadde kullanımı — ${mkYazi} ${dn ? donemAd(dn) : ''}`.trim(), sayfalar, govde, ['rapor_hammadde'])
 }
 
