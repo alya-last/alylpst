@@ -679,6 +679,18 @@ async function kullanimOzet(sb: SupabaseClient, dn?: Donem): Promise<Sonuc> {
     ['Koli (adet, satıştan hesaplanan)', kv ? Math.round(kv.koli) : null, 'tanımsız', kv ? Math.round(kv.koli) : null],
     ['Koli (adet, gelir tablosunda kayıtlı)', kv && kv.kayitSatir ? kv.kayitAdet : null, 'tanımsız', kv && kv.kayitSatir ? kv.kayitAdet : null],
   ]
+  // Gelir tablonuzda kayıtlı hammadde: "KULLANILAN HAM MADDE" (iç mekan) ve "ROTASYON HAM MADDE" (dış mekan); kg = tutar ÷ birim fiyat
+  try {
+    const yl = bugunISO().slice(0, 4), b0 = dn ? dn.bas : 1, b1 = dn ? dn.bit : 12
+    let icK = 0, disK = 0
+    for (const r of await sayfala(sb, 'islemler', 'tutar,aciklama,tarih', q => q.eq('tip', 'gider').ilike('aciklama', '[Aylık tablo]%HAM%MADDE%').gte('tarih', `${yl}-${String(b0).padStart(2, '0')}-01`).lte('tarih', `${yl}-${String(b1).padStart(2, '0')}-31`).order('tarih').order('id'))) {
+      const a = String(r.aciklama || ''), fy = /K\s?G\s*\*\s*([\d.,]+)/i.exec(a); if (!fy) continue
+      const fiyat = parseFloat(fy[1].replace(/\.(?=\d{3}\b)/g, '').replace(',', '.')) || 0; if (!fiyat) continue
+      const kg = (+r.tutar || 0) / fiyat
+      if (/ROTASYON/i.test(a)) disK += kg; else if (/KULLANILAN/i.test(a)) icK += kg
+    }
+    if (icK || disK) sat.splice(3, 0, ['Hammadde (kg, gelir tablonuzda kayıtlı)', icK ? Math.round(icK) : null, disK ? Math.round(disK) : null, Math.round(icK + disK)])
+  } catch { /* kayıtlı hammadde okunamazsa yalnız satış hesabı gösterilir */ }
   const sayfalar: Sayfa[] = [{ ad: 'Özet', sutunlar: ['Kalem', 'İç mekan', 'Dış mekan', 'Toplam'], satirlar: sat }]
   const k2 = await excelKaydet(sb, `Satışa göre hammadde-koli-boya kullanımı ${donemYazi}`, sayfalar)
   const f = (v: any) => (v === null || v === undefined ? '—' : typeof v === 'number' ? TL(v) : String(v))
