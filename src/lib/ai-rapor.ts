@@ -153,7 +153,7 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     if (kg > 0) return { tur: 'boya_kg', kg, oran: (o < 1 ? o * 100 : o) / 100 }
   }
   // "satışlara göre iç mekan dış mekan ne kadar hammadde koli ve boya kullanmışım": üçü birlikte, tek tabloda
-  if (/ham ?madde/.test(t) && /\bkoli/.test(t) && /boya/.test(t) && /kullan|tuket|sarf|harca|gitti/.test(t) && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|maliyet/.test(t)) return { tur: 'kullanim_ozet' }
+  if (/ham ?madde/.test(t) && /\bkoli/.test(t) && /boya/.test(t) && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|maliyet|kod|renk/.test(t)) return { tur: 'kullanim_ozet' }
   // "ekim satışlarına göre ne kadar koli kullandım": iç mekan satış adedi ÷ koli içi adet (stok sorusu değil)
   if (/\bkoli/.test(t) && /kullan|tuket|sarf|harca|gitti|lazim|gerek/.test(t) && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|maliyet|hacim|m3|olcu|agirlik/.test(t)) return { tur: 'koli_kullanim' }
   const boyaOran = () => { const om = /%\s*(\d+(?:[.,]\d+)?)|\b0 (\d+)\b|oran\w*\s*(\d+(?:[.,]\d+)?)(?! \d)/.exec(t), o = om ? (om[2] ? +('0.' + om[2]) : +(om[1] || om[3]).replace(',', '.')) : 2; return (o < 1 ? o * 100 : o) / 100 }
