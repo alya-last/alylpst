@@ -1163,6 +1163,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   } catch (e: any) {
     console.error('[ai-rapor]', n.tur, e?.message)
     if (n.tur === 'ekstre') return { yanit: `Cari ekstresi hazırlanırken hata oluştu (${String(e?.message || e).slice(0, 160)}). Eski/yanlış rakam vermemek için dosya üretmedim.`, araclar: ['rapor_ekstre'] }
+    if (n.tur === 'hammadde' || n.tur === 'koli_kullanim' || n.tur === 'boya_kullanim' || n.tur === 'kullanim_ozet') return { yanit: `Bu rapor şu an hazırlanamadı (teknik hata: ${String(e?.message || e).slice(0, 160)}). Yanlış rakam vermemek için tahmin yürütmedim; lütfen bu mesajı yöneticiye iletin.`, araclar: ['rapor_hata'] }
     return null
   }
 }
