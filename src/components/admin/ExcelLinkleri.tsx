@@ -4,9 +4,9 @@ import { FileSpreadsheet, Image as ImageIcon } from 'lucide-react'
 // Yapay zekanın cevabında geçen Excel yollarını (/api/admin/...) indirme düğmesine çevirir.
 export function excelLinkleri(t: string) {
   const o: { href: string; etiket: string }[] = []
-  for (const m of t.matchAll(/\/api\/admin\/(pos-ekstre|fuar-excel|ai-excel|satis-excel|gelir-tablosu)(\?[\w=&-]*)?/g)) {
+  for (const m of t.matchAll(/\/api\/admin\/(pos-ekstre|fuar-excel|ai-excel|satis-excel|stok-excel|gelir-tablosu)(\?[\w=&-]*)?/g)) {
     if (m[1] === 'gelir-tablosu' && !/format=xlsx/.test(m[0])) continue // görüntü olarak gösterilir
-    if (!o.some(x => x.href === m[0])) o.push({ href: m[0], etiket: m[1] === 'pos-ekstre' ? 'POS ekstresini Excel indir' : m[1] === 'fuar-excel' ? 'Fuar listesini Excel indir' : m[1] === 'satis-excel' ? 'Satış listesini Excel indir' : m[1] === 'gelir-tablosu' ? 'Gelir tablosunu Excel indir' : 'Excel dosyasını indir' })
+    if (!o.some(x => x.href === m[0])) o.push({ href: m[0], etiket: m[1] === 'pos-ekstre' ? 'POS ekstresini Excel indir' : m[1] === 'fuar-excel' ? 'Fuar listesini Excel indir' : m[1] === 'satis-excel' ? 'Satış listesini Excel indir' : m[1] === 'stok-excel' ? 'Stok listesini Excel indir (depo fişi şablonu)' : m[1] === 'gelir-tablosu' ? 'Gelir tablosunu Excel indir' : 'Excel dosyasını indir' })
   }
   return o
 }

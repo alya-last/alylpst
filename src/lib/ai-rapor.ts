@@ -100,7 +100,10 @@ export function raporNiyeti(soru: string): RaporNiyet | null { return donemUygul
 function raporNiyetiHam(soru: string): RaporNiyet | null {
   const t = nrm(soru).replace(/\bham{1,2}[ae]dde/g, 'hammadde') // yazım hataları: hammedde, hamadde
   if (!t || t.split(' ').length > 40) return null
-  if (/gelir tablo|gelir gider tablo|kar zarar tablo|yonetim rapor|aylik rapor/.test(t) && !/kdv|hesaplanan|indirilecek/.test(t)) {
+  // "nisan ayı gider tablosu / nisan giderleri / nisan masrafları" da aynı çıktıyı ister: ALYA PLASTİK <YIL> <AY> GELİR TABLOSU (SATIŞLAR | MASRAFLAR | ÜRETİM MALİYETİ | CİRO | KAR-ZARAR). Ayrı, eksik bir gider listesi üretilmez.
+  const AY_RE = /\b(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\b/
+  const aylikGider = AY_RE.test(t) && /\b(gider\w*|masraf\w*)\b/.test(t) && t.split(' ').length <= 7 && !/kira|elektrik|personel|maas|nakliye|yemek|sgk|stopaj|vergi|kdv|hammadde|boya|koli|etiket|fatura|cari|banka|kasa|cek|senet|ihracat|fuar|kategori/.test(t)
+  if ((/gelir tablo|gelir gider tablo|kar zarar tablo|yonetim rapor|aylik rapor|gider tablo\w*|masraf tablo\w*/.test(t) || aylikGider) && !/kdv|hesaplanan|indirilecek/.test(t)) {
     const AYK = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik'], bg = bugunISO()
     const ayI = AYK.findIndex(a => new RegExp(`\\b${a}`).test(t))
     return { tur: 'gelir_tablosu', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: ayI >= 0 ? ayI + 1 : +bg.slice(5, 7) }
@@ -330,6 +333,7 @@ async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   if (mekan !== 'dis' && ti.koliYok.length) govde.push(`Koli içi adedi tanımlı olmayan stoklu iç mekan kodları: ${ti.koliYok.slice(0, 8).map(x => `${x.kod} (${AD(x.stok)})`).join(', ')}${ti.koliYok.length > 8 ? '…' : ''}`)
   const eksi = [...(mekan !== 'dis' ? ti.eksi : []), ...(mekan !== 'ic' ? td.eksi : [])]
   if (eksi.length) govde.push(`Dikkat: ${eksi.length} kodda eksi stok var (${eksi.slice(0, 5).map(x => `${x.kod}: ${AD(x.stok)}`).join(', ')}) — sayım/giriş eksik olabilir.`)
+  govde.push('', `Depo giriş fişi şablonunda Excel (STOK KODU, ÜRÜN İSMİ, KOLİ ADETİ, ÜRÜN ADETİ, KOLİ İÇİ ADET, TOPLAM m3, BİRİM FİYAT, TUTAR, m3): /api/admin/stok-excel?mekan=${mekan}`)
   return bitir(sb, `${mekan === 'hepsi' ? 'İç ve dış mekan' : mekanAd(mekan)} depo stokları`, sayfalar, govde, ['rapor_stok'])
 }
 
