@@ -40,9 +40,12 @@ export async function gelirTablosuVeri(sb: SupabaseClient, yil: number, ay: numb
   const satislar = new Map<string, number>(), masraflar = new Map<string, number>(), uretim = new Map<string, number>(), diger = new Map<string, number>()
   const ekle = (m: Map<string, number>, ad: string, t: number) => m.set(ad, r2((m.get(ad) || 0) + t))
   let kayit = 0
+  // Ay için "[Aylık tablo] … İÇ/DIŞ MEKAN SATIŞLAR" aktarımı varsa, banka ekstresinden gelen tahsilat kayıtları (kategori "Ürün Satışı") satış sayılmaz: bunlar zaten faturalanmış satışların tahsilatıdır, eklenirse ciro mükerrer olur
+  const aktarimSatis = ((data || []) as any[]).some(x => x.tip === 'gelir' && x.kategori === 'Ürün Satışı' && /^\[Aylık tablo\]/.test(String(x.aciklama || '')))
   for (const x of (data || []) as any[]) {
     const kat = String(x.kategori || ''), t = +x.tutar || 0
     if (OZEL.test(kat) || !t) continue
+    if (aktarimSatis && x.tip === 'gelir' && kat === 'Ürün Satışı' && !/^\[Aylık tablo\]/.test(String(x.aciklama || ''))) continue
     // "[Aylık tablo] Ocak 2026 - KİRA GİDERLERİ" biçimindeki aktarım kayıtları kalem adıyla, diğerleri kategori adıyla gösterilir
     const aktarim = /^\[Aylık tablo\][^-]*-\s*(.+)$/.exec(String(x.aciklama || '')), ad = (aktarim ? aktarim[1] : kat).trim()
     kayit++
