@@ -4,13 +4,13 @@ import { web } from '@/lib/web-data'
 import { createClient } from '@/lib/supabase/client'
 import { aiIstek, AiKapali } from '@/lib/ai-client'
 import { Card, Field, FormGrid, Badge } from '@/components/admin/erp/ui'
-import { Sparkles, Copy, CalendarPlus, Image as Img } from 'lucide-react'
+import { Sparkles, Copy, CalendarPlus, Rocket } from 'lucide-react'
 import { PLATFORM, AMAC, etiketAyikla, etiketMetni, tamMetin, panoyaKopyala, sonrakiGun, bugunTR, type Platform } from './ortak'
 
 type Toast = { show: (m: string, err?: boolean) => void }
 type Tas = { baslik: string; metin: string; hashtagler: string; gorsel_fikri: string; eklendi?: boolean }
 
-export default function UreticiTab({ toast, onGorsel, onKaydedildi }: { toast: Toast; onGorsel: (urunId: string) => void; onKaydedildi: () => void }) {
+export default function UreticiTab({ toast, onOnay, onKaydedildi }: { toast: Toast; onOnay: (row: any) => void; onKaydedildi: () => void }) {
   const [urunler, setUrunler] = useState<any[]>([])
   const [f, setF] = useState<any>({ platform: 'linkedin', amac: 'urun', urun_id: '', dil: 'en', adet: 3, not: '' })
   const [busy, setBusy] = useState(false)
@@ -32,13 +32,16 @@ export default function UreticiTab({ toast, onGorsel, onKaydedildi }: { toast: T
   }
   const guncelle = (i: number, p: Partial<Tas>) => setListe(l => l.map((x, j) => j === i ? { ...x, ...p } : x))
 
-  async function takvimeEkle(i: number) {
+  async function takvimeEkle(i: number, onaya = false) {
     const g = liste[i]; if (g.eklendi) return
     const { data: { user } } = await createClient().auth.getUser()
     const tarih = sonrakiGun(sonTarih)
-    const { error } = await web.from('sosyal_gonderiler').insert({ baslik: g.baslik.slice(0, 160), platform: f.platform, metin: g.metin, hashtagler: etiketAyikla(g.hashtagler), urun_id: f.urun_id || null, planlanan_tarih: tarih, durum: 'planlandi', notlar: g.gorsel_fikri ? `Görsel fikri: ${g.gorsel_fikri}` : null, ai_uretildi: true, created_by: user?.id ?? null })
+    const urunAd = urunler.find(u => u.id === f.urun_id)?.name
+    const yonerge = urunAd ? `Professional product photo of "${urunAd}" by Alya Plastik (plastic planter / basket manufacturer), placed in a bright, tasteful modern home or garden setting, soft natural light, clean composition, premium look suitable for global B2B wholesale marketing on ${PLATFORM[f.platform as Platform].l}.` : `Clean, modern plastic manufacturing facility in Istanbul with neatly stacked colorful plastic planters and baskets, professional corporate photography, bright daylight, premium look suitable for global B2B wholesale marketing on ${PLATFORM[f.platform as Platform].l}.`
+    const { data: ins, error } = await web.from('sosyal_gonderiler').insert({ baslik: g.baslik.slice(0, 160), platform: f.platform, metin: g.metin, hashtagler: etiketAyikla(g.hashtagler), urun_id: f.urun_id || null, planlanan_tarih: tarih, planlanan_saat: f.platform === 'linkedin' ? '10:00' : '13:00', durum: onaya ? 'taslak' : 'planlandi', notlar: g.gorsel_fikri ? `Görsel fikri: ${g.gorsel_fikri}` : null, gorsel_yonerge: yonerge, ai_uretildi: true, created_by: user?.id ?? null }).select('*').single()
     if (error) return toast.show(error.message, true)
-    setSonTarih(tarih); guncelle(i, { eklendi: true }); toast.show(`Takvime eklendi: ${tarih.split('-').reverse().join('.')}`); onKaydedildi()
+    setSonTarih(tarih); guncelle(i, { eklendi: true }); onKaydedildi()
+    if (onaya && ins) onOnay(ins); else toast.show(`Takvime eklendi: ${tarih.split('-').reverse().join('.')}`)
   }
   async function kopyala(i: number) { const g = liste[i]; toast.show(await panoyaKopyala(tamMetin(g.metin, etiketAyikla(g.hashtagler))) ? 'Kopyalandı' : 'Kopyalanamadı', false) }
 
@@ -72,8 +75,8 @@ export default function UreticiTab({ toast, onGorsel, onKaydedildi }: { toast: T
                 <span style={{ fontSize: 11.5, color: boy > lim.limit ? 'var(--adm-red)' : 'var(--adm-tx3)' }}>{boy} / {lim.limit} karakter</span>
                 <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button className="adm-btn-ghost" onClick={() => kopyala(i)}><Copy size={13} />Kopyala</button>
-                  {f.urun_id && <button className="adm-btn-ghost" onClick={() => onGorsel(f.urun_id)}><Img size={13} />Görsel oluştur</button>}
-                  <button className="adm-btn" disabled={g.eklendi || boy > lim.limit} onClick={() => takvimeEkle(i)}><CalendarPlus size={13} />{g.eklendi ? 'Eklendi' : 'Takvime ekle'}</button>
+                  <button className="adm-btn-ghost" disabled={g.eklendi || boy > lim.limit} onClick={() => takvimeEkle(i)}><CalendarPlus size={13} />{g.eklendi ? 'Eklendi' : 'Takvime ekle'}</button>
+                  <button className="adm-btn" disabled={g.eklendi || boy > lim.limit} onClick={() => takvimeEkle(i, true)}><Rocket size={13} />Görsel üret ve zamanla</button>
                 </span>
               </div>
             </Card>)

@@ -1,28 +1,31 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import AdminTopBar from '@/components/admin/TopBar'
 import { Page, PageHead, Tabs, useToast } from '@/components/admin/erp/ui'
+import { web } from '@/lib/web-data'
 import UreticiTab from '@/components/admin/sosyal/UreticiTab'
 import TakvimTab from '@/components/admin/sosyal/TakvimTab'
-import GorselTab from '@/components/admin/sosyal/GorselTab'
+import OnayModal from '@/components/admin/sosyal/OnayModal'
 import SesliAsistan from '@/components/admin/SesliAsistan'
 
 export default function SosyalMedyaPage() {
   const toast = useToast()
   const [tab, setTab] = useState('uretici')
-  const [urunId, setUrunId] = useState('')
   const [yenile, setYenile] = useState(0)
+  const [onay, setOnay] = useState<any>(null)
+  const [urunler, setUrunler] = useState<any[]>([])
+  useEffect(() => { web.from('products').select('id,name').order('name').limit(1500).then(({ data }) => setUrunler(data || [])) }, [])
   return (
     <div style={{ flex: 1, overflow: 'auto' }}>
       <AdminTopBar title="Sosyal Medya" />
       <Page>
-        <PageHead title="Sosyal Medya" sub="B2B içerik üretimi · paylaşım takvimi · görsel şablonları" />
+        <PageHead title="Sosyal Medya" sub="Yapay zeka içerik ve görsel hazırlar · siz zamanı onaylarsınız · zamanı gelince otomatik paylaşılır" />
         <SesliAsistan birim="sosyal" baslik="Sesli Sosyal Medya Asistanı" />
-        <Tabs value={tab} onChange={setTab} style={{ marginBottom: 16 }} tabs={[{ v: 'uretici', l: 'İçerik Üretici (AI)' }, { v: 'takvim', l: 'Takvim' }, { v: 'gorsel', l: 'Görsel Şablonlar' }]} />
-        {tab === 'uretici' && <UreticiTab toast={toast} onGorsel={id => { setUrunId(id); setTab('gorsel') }} onKaydedildi={() => setYenile(n => n + 1)} />}
+        <Tabs value={tab} onChange={setTab} style={{ marginBottom: 16 }} tabs={[{ v: 'uretici', l: 'İçerik Üretici (AI)' }, { v: 'takvim', l: 'Takvim' }]} />
+        {tab === 'uretici' && <UreticiTab toast={toast} onOnay={setOnay} onKaydedildi={() => setYenile(n => n + 1)} />}
         {tab === 'takvim' && <TakvimTab toast={toast} yenile={yenile} />}
-        {tab === 'gorsel' && <GorselTab toast={toast} urunId={urunId} setUrunId={setUrunId} />}
       </Page>
+      {onay && <OnayModal r={onay} urunler={urunler} toast={toast} onKapat={() => setOnay(null)} onBitti={() => { setOnay(null); setYenile(n => n + 1) }} />}
       {toast.node}
     </div>
   )
