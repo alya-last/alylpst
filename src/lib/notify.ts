@@ -59,6 +59,8 @@ export async function sendWhatsApp(event: NotifyEvent | 'test', to: string, mess
 }
 
 export async function notify(event: NotifyEvent, subject: string, message: string, data: unknown = {}) {
+  // Yönetici cihazlarına anlık bildirim (ayar satırından bağımsız; VAPID tanımlı değilse sessizce atlanır)
+  const pushIs = import('@/lib/push').then(m => m.adminPushGonder(subject, message)).catch(() => {})
   try {
     const { data: row, error } = await admin()
       .from('notification_settings')
@@ -66,7 +68,7 @@ export async function notify(event: NotifyEvent, subject: string, message: strin
       .eq('event', event)
       .maybeSingle()
     if (error) throw error
-    if (!row) return
+    if (!row) { await pushIs; return }
 
     const jobs: Promise<unknown>[] = []
     if (row.email_enabled && row.email_to) jobs.push(sendEmail(row.email_to, subject, message))
@@ -74,6 +76,7 @@ export async function notify(event: NotifyEvent, subject: string, message: strin
 
     const results = await Promise.allSettled(jobs)
     results.forEach(r => { if (r.status === 'rejected') console.error('[notify] gönderim hatası:', r.reason) })
+    await pushIs
   } catch (e) {
     console.error('[notify] hata:', e)
   }
