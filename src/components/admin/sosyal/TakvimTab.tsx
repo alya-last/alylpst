@@ -3,8 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { web } from '@/lib/web-data'
 import { createClient } from '@/lib/supabase/client'
 import { Badge, Modal, Field, FormGrid, Card } from '@/components/admin/erp/ui'
-import { ChevronLeft, ChevronRight, Plus, Copy, Trash2, Send, Rocket } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Copy, Trash2, Send, Rocket, CalendarRange } from 'lucide-react'
 import OnayModal from './OnayModal'
+import PlanModal from './PlanModal'
 import { PLATFORM, DURUM, bugunTR, tarihTR, etiketAyikla, etiketMetni, tamMetin, panoyaKopyala, type Platform } from './ortak'
 
 type Toast = { show: (m: string, err?: boolean) => void }
@@ -21,6 +22,7 @@ export default function TakvimTab({ toast, yenile }: { toast: Toast; yenile: num
   const [form, setForm] = useState<any>(bos)
   const [busy, setBusy] = useState(false)
   const [onay, setOnay] = useState<any>(null)
+  const [plan, setPlan] = useState(false)
 
   const yukle = useCallback(async () => {
     const [g, u] = await Promise.all([web.from('sosyal_gonderiler').select('*').order('planlanan_tarih', { ascending: true, nullsFirst: false }).limit(1500), web.from('products').select('id,name').order('name').limit(1500)])
@@ -85,7 +87,7 @@ export default function TakvimTab({ toast, yenile }: { toast: Toast; yenile: num
         <b style={{ minWidth: 130, textAlign: 'center' }}>{AYLAR[m - 1]} {y}</b>
         <button className="adm-btn-ghost" onClick={() => setAy(ayEkle(ay + '-01', 1))}><ChevronRight size={14} /></button>
         <button className="adm-btn-ghost" onClick={() => setAy(bugun.slice(0, 7))}>Bugün</button>
-        <span style={{ marginLeft: 'auto' }}><button className="adm-btn" onClick={() => ac()}><Plus size={14} />Gönderi Ekle</button></span>
+        <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}><button className="adm-btn-ghost" onClick={() => setPlan(true)}><CalendarRange size={14} />Aylık plan</button><button className="adm-btn" onClick={() => ac()}><Plus size={14} />Gönderi Ekle</button></span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,minmax(0,1fr))', gap: 1, background: 'var(--adm-bd)', border: '1px solid var(--adm-bd)' }}>
         {['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'].map(g => <div key={g} style={{ background: 'var(--adm-bg2)', padding: '6px 8px', fontSize: 11, color: 'var(--adm-tx3)' }}>{g}</div>)}
@@ -133,6 +135,7 @@ export default function TakvimTab({ toast, yenile }: { toast: Toast; yenile: num
         </FormGrid>
         {form.metin && <div style={{ marginTop: 10 }}><button type="button" className="adm-btn-ghost" onClick={async () => toast.show(await panoyaKopyala(tamMetin(form.metin, etiketAyikla(form.hashtagler))) ? 'Kopyalandı' : 'Kopyalanamadı')}><Copy size={13} />Metni + hashtagleri kopyala</button></div>}
       </Modal>
+      {plan && <PlanModal toast={toast} onKapat={() => setPlan(false)} onBitti={yukle} />}
       {onay && <OnayModal r={onay} urunler={urunler} toast={toast} onKapat={() => setOnay(null)} onBitti={() => { setOnay(null); yukle() }} />}
     </>
   )
