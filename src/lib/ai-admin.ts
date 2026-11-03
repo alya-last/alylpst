@@ -750,9 +750,18 @@ ${VERI_KURALLARI}
       }
       continue
     }
-    const yanit = (m.content || '').trim() || 'Bir yanıt üretemedim.'
+    let yanit = (m.content || '').trim() || 'Bir yanıt üretemedim.'
+    // Sayı doğrulama: cevaptaki büyük sayılar sistem istemi / konuşma / araç sonuçlarında yoksa uydurma sayılır
+    const { dogrulanamayanSayilar } = await import('@/lib/ai-dogrula')
+    const kaynak = msgs.map(x => String((x as { content?: unknown }).content || '')).join('\n')
+    const dogrulanamayan = dogrulanamayanSayilar(yanit, kaynak)
+    if (dogrulanamayan.length) {
+      yanit = kullanilan.length
+        ? yanit + '\n\n⚠️ Not: şu rakamlar araç sonuçlarında birebir bulunamadı, kontrol edin: ' + dogrulanamayan.join(', ')
+        : 'Bu bilgi sistemde doğrulanamadı; kaynağı olmayan rakam vermiyorum. Sorunuzu rapor/liste adıyla (ör. "satış raporu", "stok durumu") sorarsanız kayıtlardan cevaplarım.'
+    }
     const eksik = excelYollari.filter(y => !yanit.includes(y))
-    return { yanit: eksik.length ? yanit + '\n\n' + eksik.join('\n') : yanit, araclar: kullanilan }
+    return { yanit: eksik.length ? yanit + '\n\n' + eksik.join('\n') : yanit, araclar: kullanilan, dogrulanamayan }
   }
   return { yanit: 'Soru çok fazla adım gerektirdi; lütfen daha spesifik sorun.', araclar: kullanilan }
 }

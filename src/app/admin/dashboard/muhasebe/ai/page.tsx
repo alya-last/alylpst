@@ -1,4 +1,5 @@
 'use client'
+import YanlisDugme from '@/components/admin/YanlisDugme'
 import ExcelDugmeleri from '@/components/admin/ExcelLinkleri'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AdminTopBar from '@/components/admin/TopBar'
@@ -81,7 +82,7 @@ const BELGE_ISTEKLERI = [
   { l: 'Ekstre hareketleri', t: 'Tüm hareketler: tarih, açıklama, tutar, borç/alacak yönü, bakiye (tablo olarak)' },
 ]
 
-type Msg = { role: 'user' | 'assistant'; content: string; araclar?: string[] }
+type Msg = { role: 'user' | 'assistant'; content: string; araclar?: string[]; kayit?: string | null }
 type BelgeSatir = { ad: string; durum: 'bekliyor' | 'okunuyor' | 'tamam' | 'hata'; sonuc?: any; hata?: string }
 
 const bosMevzuat = { kategori: '', anahtar: '', baslik: '', deger: '', gecerlilik_baslangic: '', gecerlilik_bitis: '', kaynak_adi: '', kaynak_url: '', guven: 'tek_kaynak', dogrulama_tarihi: '', notlar: '', aktif: true }
@@ -197,7 +198,7 @@ export default function MuhasebeAiPage() {
   useEffect(() => { loadGecmis() }, [loadGecmis])
   async function sohbetKaydet(tum: Msg[], id: string | null) {
     try {
-      const mesajlar = tum.slice(-60).map(m => ({ role: m.role, content: m.content.slice(0, 6000), ...(m.araclar ? { araclar: m.araclar } : {}) }))
+      const mesajlar = tum.slice(-60).map(m => ({ role: m.role, content: m.content.slice(0, 6000), ...(m.araclar ? { araclar: m.araclar } : {}), ...(m.kayit ? { kayit: m.kayit } : {}) }))
       if (id) { await web.from('muhasebe_ai_sohbetleri').update({ mesajlar, updated_at: new Date().toISOString() }).eq('id', id); return id }
       const { data: { user } } = await createClient().auth.getUser(); if (!user) return null
       const { data } = await web.from('muhasebe_ai_sohbetleri').insert({ user_id: user.id, baslik: (tum.find(m => m.role === 'user')?.content || 'Sohbet').slice(0, 70), mesajlar }).select('id').single()
@@ -221,8 +222,8 @@ export default function MuhasebeAiPage() {
     const yeni: Msg[] = [...msgs, { role: 'user', content: q }]
     setMsgs(yeni); setGirdi(''); setLoading(true)
     try {
-      const r = await aiIstek<{ yanit: string; araclar: string[] }>('sor', { mesajlar: yeni.map(m => ({ role: m.role, content: m.content })), belge: belgeBaglam?.veri }, ENDPOINT)
-      const tum: Msg[] = [...yeni, { role: 'assistant', content: r.yanit, araclar: r.araclar }]
+      const r = await aiIstek<{ yanit: string; araclar: string[]; kayit_id?: string | null }>('sor', { mesajlar: yeni.map(m => ({ role: m.role, content: m.content })), belge: belgeBaglam?.veri }, ENDPOINT)
+      const tum: Msg[] = [...yeni, { role: 'assistant', content: r.yanit, araclar: r.araclar, kayit: r.kayit_id }]
       setMsgs(tum)
       sohbetKaydet(tum, sohbetId).then(id => { if (id) setSohbetId(id) })
     } catch (e: any) { toast.show(e.message, true); setMsgs(yeni.slice(0, -1)); setGirdi(q) }
@@ -341,6 +342,7 @@ export default function MuhasebeAiPage() {
                 <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: 'min(760px, 92%)' }}>
                   <div style={{ padding: '10px 14px', borderRadius: 12, fontSize: 13.5, lineHeight: 1.65, whiteSpace: 'pre-wrap', background: m.role === 'user' ? 'var(--adm-ac)' : 'var(--adm-s2)', color: m.role === 'user' ? '#fff' : 'var(--adm-tx)' }}>{m.content}{m.role !== 'user' && <ExcelDugmeleri metin={m.content} />}</div>
                   {m.araclar && m.araclar.length > 0 && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginTop: 4 }}>Kullanılan araçlar: {Array.from(new Set(m.araclar)).join(', ')}</div>}
+                  {m.role === 'assistant' && <YanlisDugme id={m.kayit} />}
                 </div>
               ))}
               {loading && <div style={{ alignSelf: 'flex-start', fontSize: 12.5, color: 'var(--adm-tx3)' }}>Mevzuat ve verilerle çalışıyor…</div>}

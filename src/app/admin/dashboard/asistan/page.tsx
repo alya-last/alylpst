@@ -5,9 +5,10 @@ import AdminTopBar from '@/components/admin/TopBar'
 import { Page, PageHead, Card, useToast } from '@/components/admin/erp/ui'
 import { aiIstek } from '@/lib/ai-client'
 import { Send, Sparkles, Trash2 } from 'lucide-react'
+import YanlisDugme from '@/components/admin/YanlisDugme'
 import SesliAsistan from '@/components/admin/SesliAsistan'
 
-type Msg = { role: 'user' | 'assistant'; content: string; araclar?: string[] }
+type Msg = { role: 'user' | 'assistant'; content: string; araclar?: string[]; kayit?: string | null }
 type Soru = { metin: string; secenekler: string[] }
 
 const ONERILER = [
@@ -39,8 +40,8 @@ export default function AsistanPage() {
     const yeni: Msg[] = [...msgs, { role: 'user', content: q }]
     setMsgs(yeni); setGirdi(''); setLoading(true)
     try {
-      const r = await aiIstek<{ yanit: string; araclar: string[]; soru?: Soru }>('asistan', { mesajlar: yeni.map(m => ({ role: m.role, content: m.content })) })
-      setMsgs(m => [...m, { role: 'assistant', content: r.yanit, araclar: r.araclar }])
+      const r = await aiIstek<{ yanit: string; araclar: string[]; soru?: Soru; kayit_id?: string | null }>('asistan', { mesajlar: yeni.map(m => ({ role: m.role, content: m.content })) })
+      setMsgs(m => [...m, { role: 'assistant', content: r.yanit, araclar: r.araclar, kayit: r.kayit_id }])
       if (r.soru) { setSerbest(''); setSoru(r.soru) }
     } catch (e: any) { toast.show(e.message, true); setMsgs(yeni.slice(0, -1)); setGirdi(q) }
     setLoading(false)
@@ -66,6 +67,7 @@ export default function AsistanPage() {
               <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: 'min(720px, 90%)' }}>
                 <div style={{ padding: '10px 14px', borderRadius: 12, fontSize: 13.5, lineHeight: 1.65, whiteSpace: 'pre-wrap', background: m.role === 'user' ? 'var(--adm-ac)' : 'var(--adm-s2)', color: m.role === 'user' ? '#fff' : 'var(--adm-tx)' }}>{m.content}{m.role !== 'user' && <ExcelDugmeleri metin={m.content} />}</div>
                 {m.araclar && m.araclar.length > 0 && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginTop: 4 }}>Kaynak: {Array.from(new Set(m.araclar)).join(', ')}</div>}
+                {m.role === 'assistant' && <YanlisDugme id={m.kayit} />}
               </div>
             ))}
             {loading && <div style={{ alignSelf: 'flex-start', fontSize: 12.5, color: 'var(--adm-tx3)' }}>Veriler sorgulanıyor…</div>}

@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         .map((m: any) => ({ role: m.role, content: m.content.slice(0, 3000) }))
       if (!g.length || g[g.length - 1].role !== 'user') return NextResponse.json({ error: 'Soru gerekli' }, { status: 400 })
       const belge = typeof body.belge === 'string' && body.belge.trim() ? body.belge.slice(0, 9000) : undefined
-      { const r: any = await muhasebeAsistan(y.sb, g, belge); if (typeof r.yanit === 'string') r.yanit = await (await import('@/lib/ai-excel')).sahteLinkTemizle(y.sb, r.yanit); return NextResponse.json({ ok: true, ...r }) }
+      { const r: any = await muhasebeAsistan(y.sb, g, belge); if (typeof r.yanit === 'string') { r.yanit = await (await import('@/lib/ai-excel')).sahteLinkTemizle(y.sb, r.yanit); r.kayit_id = await (await import('@/lib/ai-kayit')).soruKaydet(y.sb, { kanal: 'muhasebe', soru: g[g.length - 1].content, yanit: r.yanit, araclar: r.araclar, dogrulanamayan: r.dogrulanamayan }) } return NextResponse.json({ ok: true, ...r }) }
     }
     if (action === 'rapor_yorum') return NextResponse.json({ ok: true, yorum: await raporYorumla(await raporUret(y.sb, String(body.tip), String(body.donem))) })
     if (action === 'kayit_oner') {
