@@ -105,8 +105,9 @@ export function ozetOlustur(v: Veri, bugun: string): Ozet {
 }
 
 /** Veriyi çeker (her bölüm bağımsız; yetki/erişim yoksa o bölüm atlanır) ve özeti üretir. */
-export async function gunlukOzet(sb: SupabaseClient, bugun = bugunTR()): Promise<Ozet & { atlanan: string[] }> {
+export async function gunlukOzet(sb: SupabaseClient, bugun = bugunTR(), mod: 'sabah' | 'aksam' = 'sabah'): Promise<Ozet & { atlanan: string[] }> {
   const atlanan: string[] = []
+  const akisP = import('@/lib/gunluk-akis').then(m => m.gunlukAkis(sb, bugun, mod)).catch(() => null)
   const al = async (ad: string, f: () => PromiseLike<{ data: any[] | null; error: any }>) => {
     try { const r = await f(); if (r.error) { atlanan.push(ad); return [] as any[] } return r.data || [] } catch { atlanan.push(ad); return [] as any[] }
   }
@@ -134,5 +135,13 @@ export async function gunlukOzet(sb: SupabaseClient, bugun = bugunTR()): Promise
   const onayBekleyen = onayHam.map((o: any) => ({ no: o.no, tedarikci_id: o.tedarikci_id, tl: (o.satinalma_siparisi_kalemleri || []).reduce((t: number, k: any) => t + (+k.miktar || 0) * (+k.birim_fiyat || 0), 0) * (+o.kur || 1) }))
   const av = onayAyarSatir[0]?.value
   const onayAyar = av ? { aktif: !!av.aktif, limit: +av.limit || 0 } : null
-  return { ...ozetOlustur({ faturalar, cariler, cekler, kritikHam, kritikUrun, satinalma, satis, basvurular, talepler, satinalmaYaklasan, onayBekleyen, onayAyar, kasaEksi, veriSorun }, bugun), atlanan }
+  const o = ozetOlustur({ faturalar, cariler, cekler, kritikHam, kritikUrun, satinalma, satis, basvurular, talepler, satinalmaYaklasan, onayBekleyen, onayAyar, kasaEksi, veriSorun }, bugun)
+  const akis = await akisP
+  if (akis && akis.satirlar.length) {
+    const ad = mod === 'sabah' ? 'Sabah raporu' : 'Gün sonu raporu'
+    o.baslik = o.toplamUyari ? `${ad} ${trTarih(bugun)}: ${o.toplamUyari} madde dikkat istiyor` : `${ad} ${trTarih(bugun)}`
+    o.metin = `Alya Plastik — ${o.baslik}\n\n${akis.satirlar.join('\n')}\n\n${o.metin.split('\n\n').slice(1).join('\n\n')}`
+    atlanan.push(...akis.atlanan.map(a => 'akis:' + a))
+  }
+  return { ...o, atlanan }
 }

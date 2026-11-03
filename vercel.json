@@ -1,12 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/cron/mevzuat",
-      "schedule": "0 5 * * *"
+      "path": "/api/cron/gunluk-ozet?mod=sabah",
+      "schedule": "30 5 * * *"
     },
     {
-      "path": "/api/cron/gunluk-ozet",
-      "schedule": "30 5 * * 1-6"
+      "path": "/api/cron/gunluk-ozet?mod=aksam",
+      "schedule": "0 15 * * *"
     }
   ]
 }
