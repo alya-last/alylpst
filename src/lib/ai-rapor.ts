@@ -192,6 +192,7 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
   if (/\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && mekanVar && !/hammadde|boya|ambalaj|kritik|minimum/.test(t)) return { tur: 'stok', mekan }
   if (/\b(stok\w*|stog\w*|depo\w*)\b/.test(t) && !mekanVar && !kodlar.length && /\b(ver|goster|listele|getir|dok|rapor\w*|excel\w*|kac|ne kadar|yan yana)\b/.test(t) && !/hammadde|boya|ambalaj|kritik|minimum|\bkg\b|kilo|\bton\b|maliyet|recete|fiyat|musteri|cari|satis|satti|siparis|tedarik|alis|alim|urun\b/.test(t)) return { tur: 'stok', mekan: 'hepsi' }
   if (/sat(mis|tim|ti|is|ilan|tik)|satis|ciro/.test(t) && mekanVar) return { tur: 'satis', mekan }
+  if (/\bgelir\w*/.test(t) && mekanVar && !/tablo|kar |zarar|gider|maliyet|kdv|fatura|tahsilat|bakiye|borc|cek|senet|ekstre|hammadde|boya|koli|stok/.test(t)) return { tur: 'satis', mekan }
   // Ürün ADI ile satış/müşteri sorusu (kod yok): "line saksı satışlarımı müşteri detaylı excel ver"
   if (!kodlar.length && /sat(mis|tim|ti|is|ilan|tik)|satis|adet|ne kadar|ciro|musteri/.test(t) && !/stok|stog|recete|maliyet|hammadde|fiyat|tahsilat|bakiye|borc|kdv|fatura/.test(t) && /saksi|sepet|sandik|casa|selesi|kova|firca|deterjanlik|banyo seti|camasir|set\b|\b(line|polo|cornet|efes|venus|tripot|ufo|kozalak|somon|kale|ordek|kordon|guvec|ahsap|dantel|orgu|kapakli|kaktus|3d|cesme|kemer|milas|datca|kosk|arajman|gondol|armut|vitrin|turuva|cit|lotte)\b/.test(t)) return { tur: 'urun_ad', arama: t }
   // Genel satış sorusu (iç/dış belirtilmemiş): "mart nisan mayıs satışları", "toplam satış ne kadar" → iç+dış birlikte
@@ -401,6 +402,14 @@ async function satis(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<Sonu
   const ciroTop = () => dn ? gosterAy.reduce((t, n) => t + (ciroAy[n] || 0), 0) : Object.values(ciroAy).reduce((t, x) => t + x, 0)
   const aylikSat: Hucre[][] = gosterAy.map(n => [AYLAR[n - 1], r2(ay[n]?.a || 0), r2(ay[n]?.t || 0), ay[n]?.a ? r2(ay[n].t / ay[n].a) : 0, ciro ? r2(ciroAy[n] || 0) : null])
   aylikSat.push(['TOPLAM', r2(toplamAdet), r2(toplamTutar), toplamAdet ? r2(toplamTutar / toplamAdet) : 0, ciro ? r2(ciroTop()) : null])
+  // İç + dış birlikte sorulduğunda aylık döküm iç ve dış ayrı gösterilir
+  const ayM: Record<string, { a: number; t: number }> = {}
+  for (const x of rows) { const k = ayM[`${+x.ay}|${x.mekan}`] = ayM[`${+x.ay}|${x.mekan}`] || { a: 0, t: 0 }; k.a += +x.adet || 0; k.t += +x.tutar || 0 }
+  const ciroM: Record<string, number> = {}
+  for (const x of (ciro?.aylik || [])) { const n = +String(x.ay).slice(5, 7); ciroM[`${n}|ic`] = (ciroM[`${n}|ic`] || 0) + (+x.ic_mekan || 0); ciroM[`${n}|dis`] = (ciroM[`${n}|dis`] || 0) + (+x.dis_mekan || 0) }
+  const mk = (n: number, m: 'ic' | 'dis') => ayM[`${n}|${m}`] || { a: 0, t: 0 }
+  const aylikIcDis: Hucre[][] = gosterAy.map(n => [AYLAR[n - 1], r2(mk(n, 'ic').a), r2(mk(n, 'ic').t), r2(mk(n, 'dis').a), r2(mk(n, 'dis').t), r2(ay[n]?.a || 0), r2(ay[n]?.t || 0), ciro ? r2(ciroM[`${n}|ic`] || 0) : null, ciro ? r2(ciroM[`${n}|dis`] || 0) : null])
+  { const top = (i: number) => r2(aylikIcDis.reduce((t, r) => t + (+(r[i] as number) || 0), 0)); aylikIcDis.push(['TOPLAM', top(1), top(2), top(3), top(4), top(5), top(6), ciro ? top(7) : null, ciro ? top(8) : null]) }
   // Ürün bazlı (renksiz ana kod) ve kod/renk detayı
   type G = { kod: string; ad: string; mekan: string; adet: number; tutar: number; enCok: number; ay: number[]; tay: number[] }
   const ana: Record<string, G> = {}, kodlu: Record<string, G> = {}
@@ -441,7 +450,9 @@ async function satis(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<Sonu
       ...(must ? [['Müşteri sayısı', must.musteri_sayisi], ['İade tutarı (TL)', must.genel?.iade_tl]] as Hucre[][] : []),
       ...(ciro ? [['Muhasebe ciro: Ürün Satışı (TL)', r2(ciroTop())]] as Hucre[][] : []),
     ] },
-    { ad: 'Aylık', sutunlar: ['Ay', 'Adet', 'Tutar (TL)', 'Ort. Birim Fiyat (TL)', 'Muhasebe Ciro (TL)'], satirlar: aylikSat },
+    mekan === 'hepsi'
+      ? { ad: 'Aylık', sutunlar: ['Ay', 'İÇ MEKAN adet', 'İÇ MEKAN tutar (TL)', 'DIŞ MEKAN adet', 'DIŞ MEKAN tutar (TL)', 'Toplam adet', 'Toplam tutar (TL)', 'Muhasebe ciro İÇ MEKAN (TL)', 'Muhasebe ciro DIŞ MEKAN (TL)'], satirlar: aylikIcDis }
+      : { ad: 'Aylık', sutunlar: ['Ay', 'Adet', 'Tutar (TL)', 'Ort. Birim Fiyat (TL)', 'Muhasebe Ciro (TL)'], satirlar: aylikSat },
     { ad: 'Ürün Bazlı', sutunlar: ['Sıra', 'Ürün Kodu', 'Ürün', 'Mekan', 'Adet', 'Birim Fiyat (TL)', 'Tutar (TL)', 'Pay %'], satirlar: urunSat },
     { ad: 'Renk Kod Detay', sutunlar: ['Kod', 'Ürün (renkli)', 'Renk', 'Mekan', 'Adet', 'Birim Fiyat (TL)', 'Tutar (TL)'], satirlar: kodSat },
     { ad: 'Ürün x Ay Adet', sutunlar: ['Ürün Kodu', 'Ürün', 'Mekan', ...aySut, 'Toplam'], satirlar: matris('ay') },
@@ -452,7 +463,9 @@ async function satis(sb: SupabaseClient, mekan: Mekan, dn?: Donem): Promise<Sonu
   const govde = [
     `${ad.toUpperCase()} SATIŞ — ${bugunISO().slice(0, 4)} ${dn ? donemAd(dn) : `Ocak–${AYLAR[sonAy - 1]}`} (satış dosyası): ${AD(toplamAdet)} adet, ${TL(toplamTutar)} TL (KDV hariç)`,
     ciro ? `Muhasebe ciro (Ürün Satışı, ${ad}): ${TL(ciroTop())} TL — satış dosyasından farklı olabilir (tahakkuk/zamanlama).` : '',
-    '', ...(dn && dn.bas === dn.bit ? [] : ['AYLIK:', ...gosterAy.map(n => `• ${AYLAR[n - 1]}: ${AD(ay[n]?.a || 0)} adet — ${TL(ay[n]?.t || 0)} TL`), ''] ),
+    '', ...(mekan === 'hepsi'
+      ? ['AYLIK (İÇ ve DIŞ MEKAN AYRI):', '', '| Ay | İÇ MEKAN adet | İÇ MEKAN TL | DIŞ MEKAN adet | DIŞ MEKAN TL |', '|---|---:|---:|---:|---:|', ...gosterAy.map(n => `| ${AYLAR[n - 1]} | ${AD(mk(n, 'ic').a)} | ${TL(mk(n, 'ic').t)} | ${AD(mk(n, 'dis').a)} | ${TL(mk(n, 'dis').t)} |`), ...(ciro ? ['', 'Muhasebe ciro (Ürün Satışı): ' + gosterAy.map(n => `${AYLAR[n - 1]} İÇ ${TL(ciroM[`${n}|ic`] || 0)} / DIŞ ${TL(ciroM[`${n}|dis`] || 0)}`).join(' • ')] : []), '']
+      : dn && dn.bas === dn.bit ? [] : ['AYLIK:', ...gosterAy.map(n => `• ${AYLAR[n - 1]}: ${AD(ay[n]?.a || 0)} adet — ${TL(ay[n]?.t || 0)} TL`), ''] ),
     ...(mekan === 'hepsi'
       ? ['İÇ / DIŞ MEKAN AYRIMI:', ...(['ic', 'dis'] as const).flatMap(m => { const rm = rows.filter(x => x.mekan === m), am = rm.reduce((t, x) => t + (+x.adet || 0), 0), tm = rm.reduce((t, x) => t + (+x.tutar || 0), 0); return [`• ${mekanAd(m)}: ${AD(am)} adet — ${TL(tm)} TL`] }), '',
         ...(['ic', 'dis'] as const).flatMap(m => { const l = anaL.filter(g => g.mekan === m).slice(0, 5); return l.length ? [`${mekanAd(m).toUpperCase()} — EN ÇOK SATAN ${l.length} ÜRÜN (tutara göre):`, ...l.map((g, i) => `${i + 1}. ${g.kod} ${g.ad}: ${AD(g.adet)} adet — ${TL(g.tutar)} TL`), ''] : [] })]
