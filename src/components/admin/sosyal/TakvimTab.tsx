@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { web } from '@/lib/web-data'
 import { createClient } from '@/lib/supabase/client'
 import { Badge, Modal, Field, FormGrid, Card } from '@/components/admin/erp/ui'
-import { ChevronLeft, ChevronRight, Plus, Copy, Trash2, Send } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Copy, Trash2, Send, Rocket } from 'lucide-react'
+import OnayModal from './OnayModal'
 import { PLATFORM, DURUM, bugunTR, tarihTR, etiketAyikla, etiketMetni, tamMetin, panoyaKopyala, type Platform } from './ortak'
 
 type Toast = { show: (m: string, err?: boolean) => void }
@@ -19,6 +20,7 @@ export default function TakvimTab({ toast, yenile }: { toast: Toast; yenile: num
   const [edit, setEdit] = useState<any>(null)
   const [form, setForm] = useState<any>(bos)
   const [busy, setBusy] = useState(false)
+  const [onay, setOnay] = useState<any>(null)
 
   const yukle = useCallback(async () => {
     const [g, u] = await Promise.all([web.from('sosyal_gonderiler').select('*').order('planlanan_tarih', { ascending: true, nullsFirst: false }).limit(1500), web.from('products').select('id,name').order('name').limit(1500)])
@@ -109,6 +111,7 @@ export default function TakvimTab({ toast, yenile }: { toast: Toast; yenile: num
               <Badge tone="blue">{PLATFORM[r.platform as Platform].l}</Badge>
               <span style={{ flex: 1, cursor: 'pointer' }} onClick={() => ac(r)}>{r.baslik}</span>
               <button className="adm-btn-ghost" style={{ padding: '3px 8px', fontSize: 12 }} onClick={async () => toast.show(await panoyaKopyala(tamMetin(r.metin, r.hashtagler)) ? 'Kopyalandı' : 'Kopyalanamadı')}><Copy size={12} />Kopyala</button>
+              {(r.platform === 'linkedin' || r.platform === 'instagram') && <button className="adm-btn" style={{ padding: '3px 8px', fontSize: 12 }} onClick={() => setOnay(r)} title="Görsel üret, onayla ve paylaş"><Rocket size={12} />Onay / Paylaş</button>}
               <button className="adm-btn-ghost" style={{ padding: '3px 8px', fontSize: 12 }} onClick={() => n8nGonder(r)} title="n8n workflow'una gönder"><Send size={12} />n8n</button>
               <button className="adm-btn-ghost" style={{ padding: '3px 8px', fontSize: 12 }} onClick={() => hizliDurum(r, 'paylasildi')}>Paylaşıldı</button>
             </div>))}
@@ -116,7 +119,7 @@ export default function TakvimTab({ toast, yenile }: { toast: Toast; yenile: num
       </div>
 
       <Modal open={modal} onClose={() => setModal(false)} onSubmit={kaydet} width={720} title={edit ? 'Gönderiyi Düzenle' : 'Yeni Gönderi'}
-        footer={<>{edit && <button type="button" className="adm-btn-danger" style={{ marginRight: 'auto' }} onClick={sil}><Trash2 size={13} />Sil</button>}<button type="button" className="adm-btn-ghost" onClick={() => setModal(false)}>İptal</button><button type="submit" className="adm-btn" disabled={busy}>Kaydet</button></>}>
+        footer={<>{edit && <button type="button" className="adm-btn-danger" style={{ marginRight: 'auto' }} onClick={sil}><Trash2 size={13} />Sil</button>}{edit && edit.durum !== 'paylasildi' && (edit.platform === 'linkedin' || edit.platform === 'instagram') && <button type="button" className="adm-btn-ghost" onClick={() => { setModal(false); setOnay(edit) }}><Rocket size={13} />Onay ve paylaşım…</button>}<button type="button" className="adm-btn-ghost" onClick={() => setModal(false)}>İptal</button><button type="submit" className="adm-btn" disabled={busy}>Kaydet</button></>}>
         <FormGrid cols={3}>
           <Field label="Başlık (iç not) *" span={3}><input className="adm-inp" required maxLength={160} value={form.baslik} onChange={e => set('baslik', e.target.value)} /></Field>
           <Field label="Platform"><select className="adm-inp" value={form.platform} onChange={e => set('platform', e.target.value)}>{Object.entries(PLATFORM).map(([k, v]) => <option key={k} value={k}>{v.l}</option>)}</select></Field>
@@ -130,6 +133,7 @@ export default function TakvimTab({ toast, yenile }: { toast: Toast; yenile: num
         </FormGrid>
         {form.metin && <div style={{ marginTop: 10 }}><button type="button" className="adm-btn-ghost" onClick={async () => toast.show(await panoyaKopyala(tamMetin(form.metin, etiketAyikla(form.hashtagler))) ? 'Kopyalandı' : 'Kopyalanamadı')}><Copy size={13} />Metni + hashtagleri kopyala</button></div>}
       </Modal>
+      {onay && <OnayModal r={onay} urunler={urunler} toast={toast} onKapat={() => setOnay(null)} onBitti={() => { setOnay(null); yukle() }} />}
     </>
   )
 }
