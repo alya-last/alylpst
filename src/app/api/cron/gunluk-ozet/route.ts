@@ -13,8 +13,12 @@ export async function GET(req: NextRequest) {
   const m = /^Bearer (.+)$/.exec(req.headers.get('authorization') || '')
   if (!m || !crypto.timingSafeEqual(sha(m[1]), sha(secret))) return NextResponse.json({ error: 'Yetkisiz' }, { status: 401 })
   try {
-    const o = await gunlukOzet(supabaseAdmin())
-    if (o.toplamUyari > 0) await notify('gunluk_ozet', o.baslik, o.metin, { tarih: o.tarih, bolumler: o.bolumler.map(b => ({ anahtar: b.anahtar, sayi: b.sayi })) })
+    const mod = req.nextUrl.searchParams.get('mod') === 'aksam' ? 'aksam' : 'sabah'
+    // Hobby planda cron sayısı sınırlı: mevzuat kontrolü sabah çalışmasıyla birlikte yürütülür
+    const mevzuatP = mod === 'sabah' ? import('../mevzuat/route').then(m => m.GET(req)).catch(e => console.error('[cron/mevzuat]', e)) : null
+    const o = await gunlukOzet(supabaseAdmin(), undefined, mod)
+    await mevzuatP
+    await notify('gunluk_ozet', o.baslik, o.metin, { mod, tarih: o.tarih, bolumler: o.bolumler.map(b => ({ anahtar: b.anahtar, sayi: b.sayi })) })
     return NextResponse.json({ ok: true, gonderildi: o.toplamUyari > 0, toplamUyari: o.toplamUyari, bolumler: o.bolumler.map(b => ({ anahtar: b.anahtar, sayi: b.sayi })), atlanan: o.atlanan })
   } catch (e: any) {
     console.error('[cron/gunluk-ozet]', e)
