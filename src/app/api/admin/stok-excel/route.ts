@@ -7,11 +7,11 @@ export const maxDuration = 30
 // Depo stoğu, "ALYA DEPO GİRİŞ FİŞİ" şablonunda Excel. ?mekan=ic | dis | hepsi — yalnızca 'muhasebe' / 'satis' modülü; veri kullanıcının kendi oturumuyla okunur.
 export async function GET(req: Request) {
   const y = await modulGerekli(['muhasebe', 'satis']); if (y.hata) return y.hata
-  const m = new URL(req.url).searchParams.get('mekan')
+  const sp = new URL(req.url).searchParams, m = sp.get('mekan'), sayim = sp.get('form') === 'sayim'   // form=sayim → "DEPO SAYIM FORMU" şablonu
   const mekanlar: StokMekan[] = m === 'dis' ? ['dis'] : m === 'hepsi' ? ['ic', 'dis'] : ['ic']
   try {
-    const buf = await stokFisBuffer(y.sb, mekanlar)
-    const ad = m === 'dis' ? 'dis-mekan-stok' : m === 'hepsi' ? 'ic-dis-mekan-stok' : 'ic-mekan-stok'
+    const buf = await stokFisBuffer(y.sb, mekanlar, sayim)
+    const ad = (sayim ? 'depo-sayim-formu-' : '') + (m === 'dis' ? 'dis-mekan-stok' : m === 'hepsi' ? 'ic-dis-mekan-stok' : 'ic-mekan-stok')
     return new NextResponse(buf as ArrayBuffer, { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="${ad}.xlsx"`, 'Cache-Control': 'no-store' } })
   } catch (e: any) {
     console.error('[stok-excel]', e?.message || e)

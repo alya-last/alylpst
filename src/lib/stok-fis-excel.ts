@@ -17,7 +17,8 @@ async function hepsi(q: (bas: number) => PromiseLike<{ data: any[] | null; error
 
 const ince = { style: 'thin' as const }, kenar = { top: ince, left: ince, bottom: ince, right: ince }
 
-export async function stokFisBuffer(sb: SupabaseClient, mekanlar: StokMekan[]) {
+// sayim=true: "DEPO SAYIM FORMU" — aynı sütunlara ek olarak elle doldurulacak DEPO SAYIM KOLİ ADETİ (J) ve formüllü DEPO SAYIM STOK ADETİ (K = J × koli içi)
+export async function stokFisBuffer(sb: SupabaseClient, mekanlar: StokMekan[], sayim = false) {
   const [stok, liste] = await Promise.all([
     hepsi(b => sb.from('satis_kod_stok').select('kod,ad,stok,mekan,koli_ici').order('kod').range(b, b + 999)),
     hepsi(b => sb.from('fiyat_listesi_urunleri').select('kod,koli_ici_adet,koli_m3,tl_fiyat,aktif').eq('aktif', true).range(b, b + 999)),
@@ -28,26 +29,27 @@ export async function stokFisBuffer(sb: SupabaseClient, mekanlar: StokMekan[]) {
   const bugun = new Date()
   for (const mekan of mekanlar) {
     const satirlar = stok.filter((r: any) => r.mekan === mekan && +r.stok > 0).sort((a: any, b: any) => String(a.kod).localeCompare(String(b.kod), 'tr', { numeric: true }))
-    const ws = wb.addWorksheet(mekan === 'ic' ? 'İç Mekan Stok' : 'Dış Mekan Stok', { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
-    ws.columns = [{ width: 14 }, { width: 61 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 11 }, { width: 11 }, { width: 15 }, { width: 11 }]
+    const ws = wb.addWorksheet(sayim ? (mekan === 'ic' ? 'İç Mekan Sayım' : 'Dış Mekan Sayım') : mekan === 'ic' ? 'İç Mekan Stok' : 'Dış Mekan Stok', { pageSetup: { orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } })
+    ws.columns = [{ width: 14 }, { width: 61 }, { width: 10 }, { width: 12 }, { width: 12 }, { width: 11 }, { width: 11 }, { width: 15 }, { width: 11 }, ...(sayim ? [{ width: 14 }, { width: 14 }] : [])]
     ws.mergeCells('A8:B10')
     const f = ws.getCell('A8'); f.value = 'ALYAPLAS PLASTİK SAN.TİC.LTD.ŞTİ.\nİKİTELLİ OSB MAH.İPKAS 4B BLOK NO:26-28\nPK: 34480 BAŞAKŞEHİR / ISTANBUL / TÜRKİYE\nE-MAİL : info@alyaplastik.com'; f.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' }
     ws.getCell('G11').value = 'TARİH'; ws.getCell('G11').font = { name: 'Arial', size: 11, bold: true }; ws.getCell('G11').border = kenar
     const t = ws.getCell('I11'); t.value = bugun; t.numFmt = 'dd.mm.yyyy'; t.font = { name: 'Arial', size: 12, bold: true }; t.alignment = { horizontal: 'center' }; t.border = kenar
-    ws.mergeCells('A13:H14')
-    const b = ws.getCell('A13'); b.value = `ALYA DEPO GİRİŞ FİŞİ - ${mekan === 'ic' ? 'İÇ' : 'DIŞ'} MEKAN STOK`; b.font = { name: 'Arial', size: 14, bold: true }; b.alignment = { horizontal: 'center', vertical: 'middle' }
+    ws.mergeCells(sayim ? 'A13:K14' : 'A13:H14')
+    const b = ws.getCell('A13'); b.value = sayim ? `ALYA DEPO SAYIM FORMU - ${mekan === 'ic' ? 'İÇ' : 'DIŞ'} MEKAN` : `ALYA DEPO GİRİŞ FİŞİ - ${mekan === 'ic' ? 'İÇ' : 'DIŞ'} MEKAN STOK`; b.font = { name: 'Arial', size: 14, bold: true }; b.alignment = { horizontal: 'center', vertical: 'middle' }
     ws.getRow(15).height = 49.2
-    ;['STOK KODU', 'ÜRÜN İSMİ', 'KOLİ ADETİ', 'ÜRÜN ADETİ', 'KOLİ İÇİ ADET', 'TOPLAM m3', 'BİRİM FİYAT', 'TUTAR', 'm3'].forEach((h, i) => {
+    ;(sayim ? ['STOK KODU', 'ÜRÜN İSMİ', 'DEPO KOLİ ADETİ', 'DEPO STOK ADETİ', 'KOLİ İÇİ ADET', 'TOPLAM m3', 'BİRİM FİYAT', 'TUTAR', 'm3', 'DEPO SAYIM KOLİ ADETİ', 'DEPO SAYIM STOK ADETİ'] : ['STOK KODU', 'ÜRÜN İSMİ', 'KOLİ ADETİ', 'ÜRÜN ADETİ', 'KOLİ İÇİ ADET', 'TOPLAM m3', 'BİRİM FİYAT', 'TUTAR', 'm3']).forEach((h, i) => {
       const c = ws.getCell(15, i + 1); c.value = h; c.font = { name: 'Arial', size: 12, bold: true }; c.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }; c.border = kenar
     })
     let r = 16
     for (const x of satirlar) {
       const a = ana(String(x.kod).trim()), st = +x.stok, k = +x.koli_ici > 0 ? +x.koli_ici : (+a?.koli_ici_adet > 0 ? +a.koli_ici_adet : 0)
       const v: (string | number | { formula: string } | null)[] = [String(x.kod).trim(), String(x.ad || '').trim(), k ? Math.floor(st / k) : null, st, k || null, { formula: `I${r}*C${r}` }, a && +a.tl_fiyat > 0 ? +a.tl_fiyat : null, { formula: `G${r}*D${r}` }, a && +a.koli_m3 > 0 ? +a.koli_m3 : null]
+      if (sayim) v.push(null, { formula: `J${r}*E${r}` })   // J: sayımda elle yazılacak koli; K: sayılan stok adedi
       v.forEach((val, i) => {
         const c = ws.getCell(r, i + 1); c.value = val as any; c.font = { name: 'Arial', size: 12 }; c.border = kenar
         c.alignment = { horizontal: i === 1 ? 'left' : 'center' }
-        if (i === 3 || i === 2 || i === 4) c.numFmt = '#,##0'; if (i === 5 || i === 7) c.numFmt = '#,##0.00'; if (i === 8) c.numFmt = '0.000'
+        if (i === 3 || i === 2 || i === 4 || i === 9 || i === 10) c.numFmt = '#,##0'; if (i === 5 || i === 7) c.numFmt = '#,##0.00'; if (i === 8) c.numFmt = '0.000'
       })
       r++
     }
@@ -58,7 +60,7 @@ export async function stokFisBuffer(sb: SupabaseClient, mekanlar: StokMekan[]) {
     ws.getCell(`F${r + 1}`).value = '%10 İSK.'; ws.getCell(`F${r + 1}`).font = { name: 'Arial', size: 12, bold: true }; ws.mergeCells(`F${r + 1}:G${r + 1}`); toplam(r + 1, '', '', `(H${r}*10)/100`, 'H')
     ws.getCell(`F${r + 2}`).value = 'TOPLAM'; ws.getCell(`F${r + 2}`).font = { name: 'Arial', size: 12, bold: true }; ws.mergeCells(`F${r + 2}:G${r + 2}`); toplam(r + 2, '', '', `H${r}-H${r + 1}`, 'H')
     ws.getCell(`B${r + 4}`).value = `Toplam ürün adedi: ${satirlar.reduce((t: number, x: any) => t + (+x.stok), 0).toLocaleString('tr-TR')} (${satirlar.length} kod)`; ws.getCell(`B${r + 4}`).font = { name: 'Arial', size: 11, italic: true }
-    ws.pageSetup.printArea = `A8:I${r + 2}`
+    ws.pageSetup.printArea = `A8:${sayim ? 'K' : 'I'}${r + 2}`
   }
   return wb.xlsx.writeBuffer()
 }
