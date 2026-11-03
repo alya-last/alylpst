@@ -32,20 +32,27 @@ export function ayParse(ay: string): { yil: number; ay: number } | null {
   return { yil: +m[1], ay: +m[2] }
 }
 
-export async function gelirTablosuVeri(sb: SupabaseClient, yil: number, ay: number): Promise<GelirTablosu> {
+/** ayBas verilirse ayBas..ay arası (yıllık / dönemlik) toplu tablo; verilmezse tek ay. */
+export async function gelirTablosuVeri(sb: SupabaseClient, yil: number, ay: number, ayBas?: number): Promise<GelirTablosu> {
+  const b0 = ayBas && ayBas >= 1 && ayBas < ay ? ayBas : ay, donem = b0 !== ay
   const son = new Date(Date.UTC(yil, ay, 0)).getUTCDate()
-  const { data, error } = await sb.from('islemler').select('tip,kategori,tutar,aciklama').gte('tarih', `${yil}-${pad(ay)}-01`).lte('tarih', `${yil}-${pad(ay)}-${pad(son)}`).limit(5000)
-  if (error) throw new Error(`Veri okunamadı: ${error.message}`)
+  const data: any[] = []
+  for (let from = 0; ; from += 1000) {
+    const { data: d, error } = await sb.from('islemler').select('tip,kategori,tutar,aciklama,tarih').gte('tarih', `${yil}-${pad(b0)}-01`).lte('tarih', `${yil}-${pad(ay)}-${pad(son)}`).order('tarih').order('id').range(from, from + 999)
+    if (error) throw new Error(`Veri okunamadı: ${error.message}`)
+    data.push(...(d || []))
+    if (!d || d.length < 1000 || data.length >= 60000) break
+  }
   const OZEL = /virman|kapama|bakiye|a[çc][ıi]l[ıi][şs]|kur fark/i
   const satislar = new Map<string, number>(), masraflar = new Map<string, number>(), uretim = new Map<string, number>(), diger = new Map<string, number>()
   const ekle = (m: Map<string, number>, ad: string, t: number) => m.set(ad, r2((m.get(ad) || 0) + t))
   let kayit = 0
   // Ay için "[Aylık tablo] … İÇ/DIŞ MEKAN SATIŞLAR" aktarımı varsa, banka ekstresinden gelen tahsilat kayıtları (kategori "Ürün Satışı") satış sayılmaz: bunlar zaten faturalanmış satışların tahsilatıdır, eklenirse ciro mükerrer olur
-  const aktarimSatis = ((data || []) as any[]).some(x => x.tip === 'gelir' && x.kategori === 'Ürün Satışı' && /^\[Aylık tablo\]/.test(String(x.aciklama || '')))
+  const aktarimAy = new Set<string>(); for (const x of data as any[]) if (x.tip === 'gelir' && x.kategori === 'Ürün Satışı' && /^\[Aylık tablo\]/.test(String(x.aciklama || ''))) aktarimAy.add(String(x.tarih || '').slice(0, 7))
   for (const x of (data || []) as any[]) {
     const kat = String(x.kategori || ''), t = +x.tutar || 0
     if (OZEL.test(kat) || !t) continue
-    if (aktarimSatis && x.tip === 'gelir' && kat === 'Ürün Satışı' && !/^\[Aylık tablo\]/.test(String(x.aciklama || ''))) continue
+    if (x.tip === 'gelir' && kat === 'Ürün Satışı' && !/^\[Aylık tablo\]/.test(String(x.aciklama || '')) && aktarimAy.has(String(x.tarih || '').slice(0, 7))) continue
     // "[Aylık tablo] Ocak 2026 - KİRA GİDERLERİ" biçimindeki aktarım kayıtları kalem adıyla, diğerleri kategori adıyla gösterilir
     const aktarim = /^\[Aylık tablo\][^-]*-\s*(.+)$/.exec(String(x.aciklama || '')), ad = (aktarim ? aktarim[1] : kat).trim()
     kayit++
@@ -57,7 +64,7 @@ export async function gelirTablosuVeri(sb: SupabaseClient, yil: number, ay: numb
   const mas = sirala(dizi(masraflar), MASRAF_SIRA), uret = sirala(dizi(uretim), URETIM_SIRA), dg = dizi(diger).sort((a, b) => b.tutar - a.tutar)
   const top = (l: GTKalem[]) => r2(l.reduce((t, x) => t + x.tutar, 0))
   const netSatis = top(sat), masrafToplam = top(mas), uretimToplam = top(uret), digerToplam = top(dg), satisMaliyeti = r2(masrafToplam + uretimToplam)
-  return { yil, ay, baslik: `ALYA PLASTİK ${yil} ${AY_ADLARI[ay - 1].toLocaleUpperCase('tr-TR')} GELİR TABLOSU`, satislar: sat, netSatis, masraflar: mas, masrafToplam, uretim: uret, uretimToplam, satisMaliyeti, ciro: netSatis, digerGelirler: dg, digerToplam, karZarar: r2(netSatis + digerToplam - satisMaliyeti), kayit }
+  return { yil, ay, baslik: `ALYA PLASTİK ${yil} ${donem ? AY_ADLARI[b0 - 1].toLocaleUpperCase('tr-TR') + '-' : ''}${AY_ADLARI[ay - 1].toLocaleUpperCase('tr-TR')} ${donem ? 'YILLIK ' : ''}GELİR TABLOSU`, satislar: sat, netSatis, masraflar: mas, masrafToplam, uretim: uret, uretimToplam, satisMaliyeti, ciro: netSatis, digerGelirler: dg, digerToplam, karZarar: r2(netSatis + digerToplam - satisMaliyeti), kayit }
 }
 
 export const TL = (n: number) => (Math.round(n * 100) / 100).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
