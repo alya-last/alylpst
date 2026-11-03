@@ -12,7 +12,7 @@ type Tas = { baslik: string; metin: string; hashtagler: string; gorsel_fikri: st
 
 export default function UreticiTab({ toast, onGorsel, onKaydedildi }: { toast: Toast; onGorsel: (urunId: string) => void; onKaydedildi: () => void }) {
   const [urunler, setUrunler] = useState<any[]>([])
-  const [f, setF] = useState<any>({ platform: 'linkedin', amac: 'urun', urun_id: '', dil: 'tr', adet: 3, not: '' })
+  const [f, setF] = useState<any>({ platform: 'linkedin', amac: 'urun', urun_id: '', dil: 'en', adet: 3, not: '' })
   const [busy, setBusy] = useState(false)
   const [kapali, setKapali] = useState(false)
   const [liste, setListe] = useState<Tas[]>([])

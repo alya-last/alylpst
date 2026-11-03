@@ -36,7 +36,7 @@ export async function sosyalIcerikUret(o: { platform: SosyalPlatform; amac: stri
 KESİN KURALLAR:
 - Yalnızca <firma> ve <urun> içinde yazan bilgileri kullan. Ölçü, hacim, malzeme, renk, fiyat, indirim, stok, üretim kapasitesi, sertifika (ISO, CE vb.), müşteri/marka adı, ödül, tarih, fuar bilgisi UYDURMA. Bilgi yoksa o konuya girme.
 - Abartılı/karşılaştırmalı iddia ("en iyi", "bir numara") kullanma. Sade, profesyonel, alıcıya yararı anlatan dil.
-- Dil: ${o.dil === 'en' ? 'İngilizce (uluslararası B2B alıcı tonu)' : 'Türkçe'}. Hashtagler # işaretsiz, boşluksuz, küçük harf/ASCII yaz.
+- Dil: ${o.dil === 'en' ? 'İngilizce (uluslararası B2B alıcı tonu)' : 'Türkçe'}. Hashtagler # işaretsiz, boşluksuz, küçük harf/ASCII yaz. İngilizce ise küresel erişim için hashtaglerin çoğu uluslararası alıcıların aradığı yaygın etiketler olsun (örn. plasticplanters, wholesale, manufacturer, madeinturkey, b2b, export, homeandgarden).
 - ${PLATFORM_KURAL[o.platform]}
 - Amaç: ${AMACLAR[o.amac] || AMACLAR.urun}
 - Tam ${adet} farklı gönderi üret; her biri farklı bir açıdan olsun (örn. ${AÇILAR.slice(0, adet + 1).join('; ')}). Aynı cümleleri tekrar etme.
