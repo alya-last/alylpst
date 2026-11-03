@@ -12,7 +12,7 @@ export function excelLinkleri(t: string) {
 }
 export function gorselLinkleri(t: string) {
   const o: string[] = []
-  for (const m of t.matchAll(/\/api\/admin\/gelir-tablosu\?ay=\d{4}-\d{2}(?!&format)/g)) if (!o.includes(m[0])) o.push(m[0])
+  for (const m of t.matchAll(/\/api\/admin\/gelir-tablosu\?ay=\d{4}-\d{2}(?:&yil=\d{4})?(?![\w&=-]*format)/g)) if (!o.includes(m[0])) o.push(m[0])
   return o
 }
 
@@ -24,7 +24,7 @@ async function pngIndir(href: string) {
   const k = 2, c = document.createElement('canvas'); c.width = img.width * k; c.height = img.height * k
   const g = c.getContext('2d')!; g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height)
   URL.revokeObjectURL(url)
-  c.toBlob(b => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `gelir-tablosu-${href.slice(-7)}.png`; a.click() }, 'image/png')
+  c.toBlob(b => { if (!b) return; const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `gelir-tablosu-${/yil=(\d{4})/.test(href) ? href.match(/yil=(\d{4})/)![1] + '-yillik' : href.slice(-7)}.png`; a.click() }, 'image/png')
 }
 
 export default function ExcelDugmeleri({ metin }: { metin: string }) {
