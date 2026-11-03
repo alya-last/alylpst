@@ -167,7 +167,7 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     if (kg > 0) return { tur: 'boya_kg', kg, oran: (o < 1 ? o * 100 : o) / 100 }
   }
   // "satışlara göre iç mekan dış mekan ne kadar hammadde koli ve boya kullanmışım": üçü birlikte, tek tabloda
-  if (/ham ?madde/.test(t) && /\bkoli/.test(t) && /boya/.test(t) && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|maliyet|kod|renk/.test(t)) return { tur: 'kullanim_ozet' }
+  if ([/ham ?madde/.test(t), /\bkoli/.test(t), /boya/.test(t)].filter(Boolean).length >= 2 && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|maliyet|kod|renk/.test(t)) return { tur: 'kullanim_ozet' }
   // "ekim satışlarına göre ne kadar koli kullandım": iç mekan satış adedi ÷ koli içi adet (stok sorusu değil)
   if (/\bkoli/.test(t) && (/kullan|tuket|sarf|harca|gitti|lazim|gerek|satis\w* gore|uretim|uretil|imalat/.test(t) || (/\b(ic|dis) mekan/.test(t) && !!donemBul(soru) && !/satis/.test(t))) && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|maliyet|hacim|m3|olcu|agirlik/.test(t)) return { tur: 'koli_kullanim', ...(/uretim|uretil|imalat/.test(t) ? { uretim: true } : {}) }
   const boyaOran = () => { const om = /%\s*(\d+(?:[.,]\d+)?)|\b0 (\d+)\b|oran\w*\s*(\d+(?:[.,]\d+)?)(?! \d)/.exec(t), o = om ? (om[2] ? +('0.' + om[2]) : +(om[1] || om[3]).replace(',', '.')) : 2; return (o < 1 ? o * 100 : o) / 100 }
@@ -709,9 +709,17 @@ async function boyaStok(sb: SupabaseClient, oran: number): Promise<Sonuc> {
 
 async function kullanimOzet(sb: SupabaseClient, dn?: Donem, uretim = false, kap: Kap | null = null): Promise<Sonuc> {
   // Satışa göre hammadde (iç + dış), koli ve boya (yalnız iç mekan) tek özet tabloda; altında üç ayrıntılı rapor
-  const [h, k, b] = await Promise.all([hammadde(sb, 'hepsi', dn, uretim, kap), koliKullanim(sb, dn, uretim, kap), boyaKullanim(sb, 'ic', 0.02, dn, uretim, kap)])
+  let [h, k, b] = await Promise.all([hammadde(sb, 'hepsi', dn, uretim, kap), koliKullanim(sb, dn, uretim, kap), boyaKullanim(sb, 'ic', 0.02, dn, uretim, kap)])
+  // Tutarlılık kontrolü: hammadde ve koli aynı iç mekan adedinden hesaplanır; ikisi ciddi farklıysa (geçici okuma/içe aktarma anı gibi) bir kez sırayla yeniden hesaplanır
+  const farkli = () => !!(h.veri && k.veri && (k.veri.adet || 0) > 100 && Math.abs((h.veri.icAdet || 0) - k.veri.adet) / k.veri.adet > 0.03)
+  let tutarsiz = false
+  if (farkli()) {
+    h = await hammadde(sb, 'hepsi', dn, uretim, kap); k = await koliKullanim(sb, dn, uretim, kap); b = await boyaKullanim(sb, 'ic', 0.02, dn, uretim, kap)
+    tutarsiz = farkli()
+  }
   const hv = h.veri, kv = k.veri, bv = b.veri
   if (!hv) return h
+  if (tutarsiz) return { yanit: 'Hammadde ve koli hesapları aynı satış adedini vermedi (hesaplar arası tutarsızlık). Yanlış rakam vermemek için sonucu göstermiyorum; lütfen bir dakika sonra tekrar sorun, sürerse yöneticiye iletin.', araclar: ['rapor_hata'] }
   const donemYazi = dn ? `${donemAd(dn)} ${bugunISO().slice(0, 4)}` : `${bugunISO().slice(0, 4)} yılı (yıl başından bugüne)`
   const sat: Hucre[][] = [
     [uretim ? 'Üretim (adet)' : 'Satış (adet)', hv.icAdet, hv.disAdet, hv.topAdet],
