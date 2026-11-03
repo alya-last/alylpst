@@ -1121,8 +1121,10 @@ export function baglamliSoru(gecmis: { role: string; content: string }[]): strin
   if (!son || son.trim().split(/\s+/).length > 8) return son
   const solo = raporNiyeti(son)
   if (solo && donemBul(son)) return son
+  // Son soruda iç/dış mekan açıkça yazılmışsa ve soru kendi başına anlamlıysa önceki sorularla birleştirilmez (iç + dış karışıp yanlış kapsam çıkıyordu)
+  if (solo && /\b(ic|dis) mekan/.test(nrm(son))) return son
   for (const onceki of kul.slice(-4, -1).reverse()) {
-    const aday = `${onceki} ${son}`
+    const aday = `${/\b(ic|dis) mekan/.test(nrm(son)) ? onceki.replace(/(iç|ic|dış|dis|İç|Dış|IÇ|DIŞ)\s+mekan\w*/gi, ' ') : onceki} ${son}`
     const n = raporNiyeti(aday)
     if (!n) continue
     if (!solo || (!donemBul(son) && donemBul(onceki))) return aday
