@@ -11,7 +11,7 @@ type Mekan = 'ic' | 'dis' | 'hepsi'
 export type Donem = { bas: number; bit: number } // ay aralığı (1-12), bu yıl
 type Niyet =
   | { tur: 'tahsilat'; mekan: Mekan }
-  | { tur: 'stok'; mekan: Mekan }
+  | { tur: 'stok'; mekan: Mekan; sayim?: boolean } // sayim: "depo sayım listesi/formu" = DEPO SAYIM FORMU şablonu (koli + stok adedi, sayım sütunları boş)
   | { tur: 'satis'; mekan: Mekan; donem?: Donem } // donem verilirse yalnız o aylar
   | { tur: 'urun'; kodlar: string[]; donem?: Donem }
   | { tur: 'urun_ad'; arama: string; donem?: Donem } // ürün KODU yok, ürün ADI var ("line saksı satışlarım"): satış dosyasındaki adlardan kodlar bulunup 'urun' raporu verilir
@@ -184,6 +184,8 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     const ym = /(?:yuzde|%)\s*(\d+(?:[.,]\d+)?)/.exec(t), o = ym ? +ym[1].replace(',', '.') : 2
     return { tur: 'boya_kullanim', mekan, oran: (o < 1 ? o * 100 : o) / 100 }
   }
+  // "depo sayım listesi / sayım formu excel ver": depodaki ürünler, koli ve adet, DEPO SAYIM FORMU şablonunda (sayım sütunları elle doldurulur)
+  if (/\bsayim\w*/.test(t) && /\b(depo\w*|stok\w*|stog\w*|form\w*|liste\w*|excel\w*|urun\w*|mamul\w*)\b/.test(t) && !/hammadde|boya|koli stok|kritik|ambalaj|etiket|kasa|banka|\bcek\b|senet|fatura|cari|kdv|maas|personel/.test(t)) return { tur: 'stok', mekan, sayim: true }
   // "ekim hammadde excel çıktısı ver": ay adı + hammadde, stok/alış sözü yoksa → o ayın SATIŞLARINA göre hammadde kullanımı
   if (/hammadde/.test(t) && /\b(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\b/.test(t) && !/stok|stog|depo|kalan|elimde|mevcut|alis|alim|aldi|satin|fiyat|siparis|tedarik|hareket|kritik|minimum|boya|koli|etiket/.test(t)) return { tur: 'hammadde', mekan }
   const hma = hmAlisNiyeti(t)
@@ -344,7 +346,7 @@ const MUH_AD: Record<string, string> = {
 const muhAd = (kod: string, ad: string) => MUH_AD[String(kod || '').toUpperCase()] || ad
 
 /* ─────────────── Mamul stok (iç / dış mekan) ─────────────── */
-async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
+async function stok(sb: SupabaseClient, mekan: Mekan, sayim = false): Promise<Sonuc> {
   // Muhasebe stok kodlarına göre (satis_kod_stok): iç mekan koli içi adetle koli + ürün adedi, dış mekan ürün adedi; yan yana
   const rows = (await sayfala(sb, 'satis_kod_stok', 'kod,ad,stok,mekan,koli_ici')).map((r: any) => ({ kod: String(r.kod || '').trim(), ad: String(r.ad || '').trim(), stok: +r.stok || 0, mekan: String(r.mekan), koli: +r.koli_ici > 0 ? +r.koli_ici : 0 }))
   const ic = rows.filter(r => r.mekan === 'ic').sort((a, b) => a.kod.localeCompare(b.kod, 'tr', { numeric: true }))
@@ -378,8 +380,9 @@ async function stok(sb: SupabaseClient, mekan: Mekan): Promise<Sonuc> {
   if (mekan !== 'dis' && ti.koliYok.length) govde.push(`Koli içi adedi tanımlı olmayan stoklu iç mekan kodları: ${ti.koliYok.slice(0, 8).map(x => `${x.kod} (${AD(x.stok)})`).join(', ')}${ti.koliYok.length > 8 ? '…' : ''}`)
   const eksi = [...(mekan !== 'dis' ? ti.eksi : []), ...(mekan !== 'ic' ? td.eksi : [])]
   if (eksi.length) govde.push(`Dikkat: ${eksi.length} kodda eksi stok var (${eksi.slice(0, 5).map(x => `${x.kod}: ${AD(x.stok)}`).join(', ')}) — sayım/giriş eksik olabilir.`)
-  govde.push('', `Depo giriş fişi şablonunda Excel (STOK KODU, ÜRÜN İSMİ, KOLİ ADETİ, ÜRÜN ADETİ, KOLİ İÇİ ADET, TOPLAM m3, BİRİM FİYAT, TUTAR, m3): /api/admin/stok-excel?mekan=${mekan}`)
-  return bitir(sb, `${mekan === 'hepsi' ? 'İç ve dış mekan' : mekanAd(mekan)} depo stokları`, sayfalar, govde, ['rapor_stok'])
+  if (sayim) govde.push('', `DEPO SAYIM FORMU şablonunda Excel (STOK KODU, ÜRÜN İSMİ, DEPO KOLİ ADETİ, DEPO STOK ADETİ, KOLİ İÇİ ADET, TOPLAM m3, BİRİM FİYAT, TUTAR, m3 + boş DEPO SAYIM KOLİ ADETİ ve formüllü DEPO SAYIM STOK ADETİ): /api/admin/stok-excel?mekan=${mekan}&form=sayim`)
+  else govde.push('', `Depo giriş fişi şablonunda Excel (STOK KODU, ÜRÜN İSMİ, KOLİ ADETİ, ÜRÜN ADETİ, KOLİ İÇİ ADET, TOPLAM m3, BİRİM FİYAT, TUTAR, m3): /api/admin/stok-excel?mekan=${mekan}`)
+  return bitir(sb, `${mekan === 'hepsi' ? 'İç ve dış mekan' : mekanAd(mekan)} depo ${sayim ? 'sayım listesi' : 'stokları'}`, sayfalar, govde, ['rapor_stok'])
 }
 
 /* ─────────────── Satış (yıl başından bu yana; iç / dış mekan) ─────────────── */
@@ -1282,7 +1285,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
     const r0 = await (async (): Promise<Sonuc | null> => {
     switch (n.tur) {
       case 'tahsilat': return await tahsilat(sb, n.mekan)
-      case 'stok': return await stok(sb, n.mekan)
+      case 'stok': return await stok(sb, n.mekan, n.sayim)
       case 'satis': return await satis(sb, n.mekan, n.donem)
       case 'urun': return await urunSatis(sb, n.kodlar, n.donem)
       case 'urun_ad': { const kk = await urunAdindanKodlar(sb, n.arama); return kk.length ? await urunSatis(sb, kk, n.donem) : null }
