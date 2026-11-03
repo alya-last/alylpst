@@ -56,18 +56,19 @@ export async function sosyalGorselUret(yonerge: string, format: SosyalFormat, ka
   return Buffer.from(b64, 'base64')
 }
 
-export type YayinSonuc = { ok: boolean; url?: string | null; bekliyor?: boolean; requestId?: string; hata?: string }
+export type YayinSonuc = { ok: boolean; url?: string | null; bekliyor?: boolean; requestId?: string; zamanlandi?: boolean; jobId?: string; hata?: string }
 
 /** Upload-Post'a tek platform için gönderir. Idempotency-Key ile aynı içeriğin çift paylaşımı engellenir. */
-export async function uploadPostGonder(o: { platform: 'linkedin' | 'instagram'; metin: string; baslik: string; gorsel: Buffer | null }): Promise<YayinSonuc> {
+export async function uploadPostGonder(o: { platform: 'linkedin' | 'instagram'; metin: string; baslik: string; gorsel: Buffer | null; zaman?: { tarih: string; saat: string } }): Promise<YayinSonuc> {
   const key = process.env.UPLOADPOST_API_KEY, user = process.env.UPLOADPOST_USER
   if (!key || !user) return { ok: false, hata: 'Upload-Post yapılandırılmamış (UPLOADPOST_API_KEY, UPLOADPOST_USER).' }
   if (o.platform === 'instagram' && !o.gorsel) return { ok: false, hata: 'Instagram paylaşımı için görsel gerekli.' }
   const form = new FormData()
   form.append('user', user); form.append('platform[]', o.platform); form.append('title', o.metin)
   if (o.platform === 'linkedin') { form.append('description', o.metin); form.append('linkedin_title', o.baslik.slice(0, 200)) }
+  if (o.zaman) { form.append('scheduled_date', `${o.zaman.tarih}T${o.zaman.saat}:00`); form.append('timezone', 'Europe/Istanbul') }
   if (o.gorsel) form.append('photos[]', new Blob([new Uint8Array(o.gorsel)], { type: 'image/png' }), 'gorsel.png')
-  const idem = crypto.createHash('sha256').update(`${o.platform}|${o.metin}|${o.gorsel ? crypto.createHash('sha256').update(o.gorsel).digest('hex') : ''}`).digest('hex').slice(0, 48)
+  const idem = crypto.createHash('sha256').update(`${o.platform}|${o.zaman ? o.zaman.tarih + 'T' + o.zaman.saat : ''}|${o.metin}|${o.gorsel ? crypto.createHash('sha256').update(o.gorsel).digest('hex') : ''}`).digest('hex').slice(0, 48)
   let res: Response
   try {
     res = await fetch(`https://api.upload-post.com/api/${o.gorsel ? 'upload_photos' : 'upload_text'}`, { method: 'POST', headers: { Authorization: `Apikey ${key}`, 'Idempotency-Key': idem }, body: form, signal: AbortSignal.timeout(58000) })
@@ -79,6 +80,7 @@ export async function uploadPostGonder(o: { platform: 'linkedin' | 'instagram'; 
     const msg = String(j?.message || j?.error || `HTTP ${res.status}`).slice(0, 240)
     return { ok: false, hata: res.status === 429 ? `Upload-Post aylık limiti doldu (${msg})` : res.status === 401 ? 'Upload-Post API anahtarı geçersiz.' : msg }
   }
+  if (j.job_id && !j.results) return { ok: true, zamanlandi: true, jobId: String(j.job_id).slice(0, 120) }
   if (j.request_id && !j.results) return { ok: true, bekliyor: true, requestId: String(j.request_id).slice(0, 80) }
   const r = j.results?.[o.platform]
   if (!r) return { ok: false, hata: 'Upload-Post sonucu okunamadı.' }
@@ -86,4 +88,17 @@ export async function uploadPostGonder(o: { platform: 'linkedin' | 'instagram'; 
   if (r.success === false) return { ok: false, hata: String(r.error || r.message || 'Paylaşım başarısız').slice(0, 240) }
   const url = typeof r.url === 'string' && /^https:\/\/[^\s]+$/.test(r.url) ? r.url.slice(0, 500) : null
   return { ok: true, url }
+}
+
+/** Zamanlanmış (henüz yayınlanmamış) paylaşımı Upload-Post'ta iptal eder. */
+export async function uploadPostIptal(jobId: string): Promise<{ ok: boolean; hata?: string }> {
+  const key = process.env.UPLOADPOST_API_KEY
+  if (!key) return { ok: false, hata: 'Upload-Post yapılandırılmamış.' }
+  if (!/^[\w-]{3,120}$/.test(jobId)) return { ok: false, hata: 'İş kimliği geçersiz.' }
+  try {
+    const res = await fetch(`https://api.upload-post.com/api/uploadposts/schedule/${encodeURIComponent(jobId)}`, { method: 'DELETE', headers: { Authorization: `Apikey ${key}` }, signal: AbortSignal.timeout(20000) })
+    if (res.ok) return { ok: true }
+    const j: any = await res.json().catch(() => null)
+    return { ok: false, hata: String(j?.message || j?.error || `HTTP ${res.status}`).slice(0, 200) }
+  } catch { return { ok: false, hata: 'Upload-Post’a ulaşılamadı.' } }
 }

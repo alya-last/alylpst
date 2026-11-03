@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { web } from '@/lib/web-data'
 import { Modal, Field, FormGrid } from '@/components/admin/erp/ui'
-import { Sparkles, Send, ImagePlus } from 'lucide-react'
+import { Sparkles, Send, ImagePlus, Rocket } from 'lucide-react'
 import { PLATFORM, etiketAyikla, etiketMetni, tamMetin, type Platform } from './ortak'
 
 type Toast = { show: (m: string, err?: boolean) => void }
@@ -19,6 +19,9 @@ export default function OnayModal({ r, urunler, toast, onKapat, onBitti }: { r: 
   const [hazir, setHazir] = useState<boolean | null>(null)
   const [uretiyor, setUretiyor] = useState(false)
   const [paylasiyor, setPaylasiyor] = useState(false)
+  const [tarih, setTarih] = useState<string>(r.planlanan_tarih || '')
+  const [saat, setSaat] = useState<string>(r.planlanan_saat || (r.platform === 'linkedin' ? '10:00' : '13:00'))
+  const zamanli = r.durum === 'zamanlandi'
   const pl = PLATFORM[r.platform as Platform], desteklenir = r.platform === 'linkedin' || r.platform === 'instagram'
   const urunAd = urunler.find(u => u.id === urunId)?.name as string | undefined
 
@@ -32,7 +35,7 @@ export default function OnayModal({ r, urunler, toast, onKapat, onBitti }: { r: 
     : `Clean, modern plastic manufacturing facility in Istanbul with neatly stacked colorful plastic planters and baskets, professional corporate photography, bright daylight, premium look suitable for global B2B wholesale marketing on ${pl.l}.`
 
   async function kaydet() {
-    const { error } = await web.from('sosyal_gonderiler').update({ metin: metin.trim(), hashtagler: etiketAyikla(etiket), urun_id: urunId || null, gorsel_yonerge: yonerge.trim() || null, updated_at: new Date().toISOString() }).eq('id', r.id)
+    const { error } = await web.from('sosyal_gonderiler').update({ metin: metin.trim(), hashtagler: etiketAyikla(etiket), urun_id: urunId || null, gorsel_yonerge: yonerge.trim() || null, planlanan_tarih: tarih || null, planlanan_saat: saat || null, updated_at: new Date().toISOString() }).eq('id', r.id)
     if (error) { toast.show(error.message, true); return false }
     return true
   }
@@ -62,17 +65,38 @@ export default function OnayModal({ r, urunler, toast, onKapat, onBitti }: { r: 
     } catch { toast.show('Sunucuya ulaşılamadı', true) } finally { setPaylasiyor(false) }
   }
 
+  async function zamanla(iptal = false) {
+    if (paylasiyor) return
+    if (!iptal) {
+      if (!tarih) return toast.show('Zamanlamak için tarih seçin', true)
+      if (r.platform === 'instagram' && !gorsel) return toast.show('Instagram için önce görsel üretin', true)
+      if (!confirm(`${pl.l} paylaşımı ${tarih.split('-').reverse().join('.')} ${saat} (İstanbul saati) için onaylansın mı? O tarihte kendiliğinden yayınlanır.`)) return
+    }
+    setPaylasiyor(true)
+    try {
+      if (!iptal && !(await kaydet())) return
+      const res = await fetch('/api/admin/sosyal-yayinla', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(iptal ? { id: r.id, iptal: true } : { id: r.id, zamanla: true }) })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) return toast.show(j.error || 'İşlem başarısız', true)
+      toast.show(iptal ? 'Zamanlama iptal edildi (taslağa döndü)' : (j.mesaj || 'Zamanlandı')); onBitti()
+    } catch { toast.show('Sunucuya ulaşılamadı', true) } finally { setPaylasiyor(false) }
+  }
   const boy = tamMetin(metin, etiketAyikla(etiket)).length
   return (
     <Modal open onClose={onKapat} width={760} title={`Onay ve paylaşım — ${pl.l}`}
       footer={<><button type="button" className="adm-btn-ghost" onClick={onKapat}>Kapat</button>
-        <button type="button" className="adm-btn" disabled={!desteklenir || !hazir || paylasiyor || boy > pl.limit || metin.trim().length < 5} onClick={paylas}><Send size={13} />{paylasiyor ? 'Paylaşılıyor…' : 'Onayla ve paylaş'}</button></>}>
+        {zamanli
+          ? <button type="button" className="adm-btn-danger" disabled={paylasiyor} onClick={() => zamanla(true)}>Zamanlamayı iptal et</button>
+          : <><button type="button" className="adm-btn-ghost" disabled={!desteklenir || !hazir || paylasiyor || boy > pl.limit || metin.trim().length < 5} onClick={() => zamanla(false)}><Rocket size={13} />Onayla ve zamanla</button>
+            <button type="button" className="adm-btn" disabled={!desteklenir || !hazir || paylasiyor || boy > pl.limit || metin.trim().length < 5} onClick={paylas}><Send size={13} />{paylasiyor ? 'Paylaşılıyor…' : 'Şimdi paylaş'}</button></>}</>}>
       {!desteklenir && <p style={{ color: 'var(--adm-amber)', fontSize: 12.5 }}>Otomatik paylaşım yalnızca LinkedIn ve Instagram için açık.</p>}
       {hazir === false && <p style={{ color: 'var(--adm-amber)', fontSize: 12.5 }}>Upload-Post bağlantısı henüz yapılandırılmamış; metin ve görseli hazırlayabilirsiniz, paylaşım butonu bağlantı kurulunca açılır.</p>}
       <FormGrid cols={3}>
         <Field label="Metin" span={3}><textarea className="adm-inp" rows={8} maxLength={3000} value={metin} onChange={e => setMetin(e.target.value)} /></Field>
         <Field label="Hashtagler" span={3} hint={`${boy} / ${pl.limit} karakter`}><input className="adm-inp" value={etiket} onChange={e => setEtiket(e.target.value)} placeholder="#plasticplanters #wholesale" /></Field>
         <Field label="Ürün (isteğe bağlı — seçilirse görsel ürün fotoğrafına göre üretilir)" span={2}><select className="adm-inp" value={urunId} onChange={e => setUrunId(e.target.value)}><option value="">— Ürün yok / genel görsel —</option>{urunler.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
+        <Field label="Paylaşım tarihi"><input type="date" className="adm-inp" value={tarih} onChange={e => setTarih(e.target.value)} /></Field>
+        <Field label="Saat (İstanbul)"><input type="time" className="adm-inp" value={saat} onChange={e => setSaat(e.target.value)} /></Field>
         <Field label="Görsel formatı"><select className="adm-inp" value={format} onChange={e => setFormat(e.target.value)}>{Object.entries(FORMATLAR).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
         <Field label="Görsel yönergesi (ChatGPT'ye ne çizeceğini anlatın; İngilizce yazarsanız daha iyi sonuç verir)" span={3}>
           <textarea className="adm-inp" rows={4} maxLength={1500} value={yonerge} onChange={e => setYonerge(e.target.value)} placeholder="Örn: Bright garden terrace with the selected planter, soft morning light, minimal style…" />

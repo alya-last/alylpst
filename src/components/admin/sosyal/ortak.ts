@@ -4,7 +4,7 @@ export const PLATFORM: Record<Platform, { l: string; renk: string; limit: number
   instagram: { l: 'Instagram', renk: '#c13584', limit: 2200 },
   facebook: { l: 'Facebook', renk: '#1877f2', limit: 63206 },
 }
-export const DURUM: Record<string, { l: string; tone: any }> = { taslak: { l: 'Taslak', tone: 'muted' }, planlandi: { l: 'Planlandı', tone: 'blue' }, paylasildi: { l: 'Paylaşıldı', tone: 'green' } }
+export const DURUM: Record<string, { l: string; tone: any }> = { taslak: { l: 'Taslak', tone: 'muted' }, planlandi: { l: 'Planlandı', tone: 'blue' }, zamanlandi: { l: 'Onaylandı (zamanlandı)', tone: 'green' }, paylasildi: { l: 'Paylaşıldı', tone: 'green' } }
 export const AMAC: Record<string, string> = { urun: 'Ürün tanıtımı', ihracat: 'İhracat', uretim: 'Üretim ve kalite', kurumsal: 'Kurumsal / tecrübe', ozel_siparis: 'Özel sipariş', fuar: 'Duyuru (fuar / katalog)' }
 export const bugunTR = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10)
 export const gunEkle = (t: string, n: number) => new Date(Date.parse(t + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10)
