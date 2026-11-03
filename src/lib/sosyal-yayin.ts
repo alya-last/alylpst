@@ -11,7 +11,20 @@ export type SosyalFormat = keyof typeof FORMAT
 export const FORMAT_AD: Record<SosyalFormat, string> = { kare: 'Kare 1:1 (Instagram)', dikey: 'Dikey 4:5 (Instagram)', linkedin: 'Yatay (LinkedIn)' }
 
 const KORU = 'CRITICAL: The product in the reference photo must stay exactly the same object — identical silhouette, proportions, color, surface texture, rim, base and every molded detail. Do not redraw, recolor or restyle the product itself; only change what is around it.'
-const GENEL = 'Photorealistic, professional B2B marketing photo for a global audience. Do NOT put any text, letters, numbers, logos, watermarks or captions inside the image.'
+const GENEL = 'Style: authentic documentary-style photograph, as if shot on a smartphone or 35mm lens by a real person at a real location — natural available light, slightly imperfect framing, subtle film grain, true-to-life colors, real textures and small everyday imperfections, lived-in surroundings with real plants and objects. AVOID: CGI/3D-render look, perfectly clean showroom or catalog staging, glossy studio lighting, oversaturated or dreamy colors, symmetrical stock-photo composition. Do NOT put any text, letters, numbers, logos, watermarks or captions inside the image.'
+
+/** Ürünün kendi fotoğrafını (https) indirir; yapay zeka kullanmadan olduğu gibi kullanmak için. */
+export async function urunFotografiIndir(url: string): Promise<{ bytes: Buffer; tip: 'image/png' | 'image/jpeg' | 'image/webp' }> {
+  const hedef = guvenliUrl(url)
+  if (!hedef) throw new AiHata('Ürün görsel adresi geçersiz.', 400)
+  const r = await fetch(hedef, { signal: AbortSignal.timeout(15000), redirect: 'error' }).catch(() => null)
+  if (!r || !r.ok) throw new AiHata('Ürün fotoğrafı indirilemedi.', 400)
+  const tip = (r.headers.get('content-type') || '').split(';')[0]
+  if (tip !== 'image/png' && tip !== 'image/jpeg' && tip !== 'image/webp') throw new AiHata('Ürün fotoğrafı png/jpeg/webp olmalı.', 400)
+  const buf = Buffer.from(await r.arrayBuffer())
+  if (buf.byteLength > 9 * 1024 * 1024) throw new AiHata('Ürün fotoğrafı çok büyük.', 400)
+  return { bytes: buf, tip }
+}
 
 export const uploadPostHazir = () => !!process.env.UPLOADPOST_API_KEY && !!process.env.UPLOADPOST_USER
 
@@ -59,7 +72,7 @@ export async function sosyalGorselUret(yonerge: string, format: SosyalFormat, ka
 export type YayinSonuc = { ok: boolean; url?: string | null; bekliyor?: boolean; requestId?: string; zamanlandi?: boolean; jobId?: string; hata?: string }
 
 /** Upload-Post'a tek platform için gönderir. Idempotency-Key ile aynı içeriğin çift paylaşımı engellenir. */
-export async function uploadPostGonder(o: { platform: 'linkedin' | 'instagram'; metin: string; baslik: string; gorsel: Buffer | null; zaman?: { tarih: string; saat: string } }): Promise<YayinSonuc> {
+export async function uploadPostGonder(o: { platform: 'linkedin' | 'instagram'; metin: string; baslik: string; gorsel: Buffer | null; gorselTip?: string; zaman?: { tarih: string; saat: string } }): Promise<YayinSonuc> {
   const key = process.env.UPLOADPOST_API_KEY, user = process.env.UPLOADPOST_USER
   if (!key || !user) return { ok: false, hata: 'Upload-Post yapılandırılmamış (UPLOADPOST_API_KEY, UPLOADPOST_USER).' }
   if (o.platform === 'instagram' && !o.gorsel) return { ok: false, hata: 'Instagram paylaşımı için görsel gerekli.' }
@@ -67,7 +80,7 @@ export async function uploadPostGonder(o: { platform: 'linkedin' | 'instagram'; 
   form.append('user', user); form.append('platform[]', o.platform); form.append('title', o.metin)
   if (o.platform === 'linkedin') { form.append('description', o.metin); form.append('linkedin_title', o.baslik.slice(0, 200)) }
   if (o.zaman) { form.append('scheduled_date', `${o.zaman.tarih}T${o.zaman.saat}:00`); form.append('timezone', 'Europe/Istanbul') }
-  if (o.gorsel) form.append('photos[]', new Blob([new Uint8Array(o.gorsel)], { type: 'image/png' }), 'gorsel.png')
+  if (o.gorsel) form.append('photos[]', new Blob([new Uint8Array(o.gorsel)], { type: o.gorselTip || 'image/png' }), `gorsel.${o.gorselTip === 'image/jpeg' ? 'jpg' : o.gorselTip === 'image/webp' ? 'webp' : 'png'}`)
   const idem = crypto.createHash('sha256').update(`${o.platform}|${o.zaman ? o.zaman.tarih + 'T' + o.zaman.saat : ''}|${o.metin}|${o.gorsel ? crypto.createHash('sha256').update(o.gorsel).digest('hex') : ''}`).digest('hex').slice(0, 48)
   let res: Response
   try {

@@ -16,6 +16,7 @@ export default function OnayModal({ r, urunler, toast, onKapat, onBitti }: { r: 
   const [format, setFormat] = useState<string>(r.platform === 'linkedin' ? 'linkedin' : 'kare')
   const [yonerge, setYonerge] = useState<string>(r.gorsel_yonerge || '')
   const [gorsel, setGorsel] = useState<string | null>(null)
+  const [kaynakTur, setKaynakTur] = useState<'ai' | 'urun'>('ai')
   const [hazir, setHazir] = useState<boolean | null>(null)
   const [uretiyor, setUretiyor] = useState(false)
   const [paylasiyor, setPaylasiyor] = useState(false)
@@ -31,8 +32,8 @@ export default function OnayModal({ r, urunler, toast, onKapat, onBitti }: { r: 
   }, [r.id])
 
   const onerilen = () => urunAd
-    ? `Professional product photo of "${urunAd}" by Alya Plastik (plastic planter / basket manufacturer), placed in a bright, tasteful modern home or garden setting, soft natural light, clean composition, premium look suitable for global B2B wholesale marketing on ${pl.l}.`
-    : `Clean, modern plastic manufacturing facility in Istanbul with neatly stacked colorful plastic planters and baskets, professional corporate photography, bright daylight, premium look suitable for global B2B wholesale marketing on ${pl.l}.`
+    ? `Real-life photo of "${urunAd}" (plastic planter / basket by Alya Plastik) in everyday use on a home balcony, garden or shop display, planted with real plants, authentic documentary-style photo, shot on a smartphone, natural daylight, slightly imperfect framing, real lived-in setting with real plants and everyday objects, true-to-life colors, not a polished catalog render; suitable for a ${pl.l} B2B wholesale post.`
+    : `Candid photo inside a working plastic planter factory warehouse in Istanbul, stacks of colorful planters and baskets on pallets, workers' tools nearby, authentic documentary-style photo, shot on a smartphone, natural daylight, slightly imperfect framing, real lived-in setting with real plants and everyday objects, true-to-life colors, not a polished catalog render; suitable for a ${pl.l} B2B wholesale post.`
 
   async function kaydet() {
     const { error } = await web.from('sosyal_gonderiler').update({ metin: metin.trim(), hashtagler: etiketAyikla(etiket), urun_id: urunId || null, gorsel_yonerge: yonerge.trim() || null, planlanan_tarih: tarih || null, planlanan_saat: saat || null, updated_at: new Date().toISOString() }).eq('id', r.id)
@@ -41,11 +42,12 @@ export default function OnayModal({ r, urunler, toast, onKapat, onBitti }: { r: 
   }
   async function gorselUret() {
     if (uretiyor) return
-    if (yonerge.trim().length < 10) return toast.show('Görsel yönergesini yazın (en az 10 karakter) ya da “Yönergeyi öner”e basın', true)
+    if (kaynakTur === 'urun' && !urunId) return toast.show('Ürünün kendi fotoğrafı için önce ürün seçin', true)
+    if (kaynakTur === 'ai' && yonerge.trim().length < 10) return toast.show('Görsel yönergesini yazın (en az 10 karakter) ya da “Yönergeyi öner”e basın', true)
     setUretiyor(true)
     try {
       if (!(await kaydet())) return
-      const res = await fetch('/api/admin/sosyal-gorsel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: r.id, yonerge, format }) })
+      const res = await fetch('/api/admin/sosyal-gorsel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: r.id, yonerge, format, kaynak: kaynakTur }) })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) return toast.show(j.error || 'Görsel üretilemedi', true)
       setGorsel(j.url); toast.show(j.urun_referansli ? 'Görsel hazır (ürün fotoğrafı referans alındı)' : 'Görsel hazır')
@@ -98,13 +100,14 @@ export default function OnayModal({ r, urunler, toast, onKapat, onBitti }: { r: 
         <Field label="Paylaşım tarihi"><input type="date" className="adm-inp" value={tarih} onChange={e => setTarih(e.target.value)} /></Field>
         <Field label="Saat (İstanbul)"><input type="time" className="adm-inp" value={saat} onChange={e => setSaat(e.target.value)} /></Field>
         <Field label="Görsel formatı"><select className="adm-inp" value={format} onChange={e => setFormat(e.target.value)}>{Object.entries(FORMATLAR).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+        <Field label="Görsel kaynağı" span={3}><select className="adm-inp" value={kaynakTur} onChange={e => setKaynakTur(e.target.value as 'ai' | 'urun')}><option value="ai">Yapay zeka üretsin (ChatGPT)</option><option value="urun">Ürünün kendi gerçek fotoğrafı (yapay zeka yok)</option></select></Field>
         <Field label="Görsel yönergesi (ChatGPT'ye ne çizeceğini anlatın; İngilizce yazarsanız daha iyi sonuç verir)" span={3}>
           <textarea className="adm-inp" rows={4} maxLength={1500} value={yonerge} onChange={e => setYonerge(e.target.value)} placeholder="Örn: Bright garden terrace with the selected planter, soft morning light, minimal style…" />
         </Field>
       </FormGrid>
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <button type="button" className="adm-btn-ghost" onClick={() => setYonerge(onerilen())}><Sparkles size={13} />Yönergeyi öner</button>
-        <button type="button" className="adm-btn" disabled={uretiyor} onClick={gorselUret}><ImagePlus size={13} />{uretiyor ? 'Görsel üretiliyor (≈30 sn)…' : gorsel ? 'Yeniden üret' : 'Görsel üret'}</button>
+        <button type="button" className="adm-btn" disabled={uretiyor} onClick={gorselUret}><ImagePlus size={13} />{uretiyor ? (kaynakTur === 'ai' ? 'Görsel üretiliyor (≈30 sn)…' : 'Yükleniyor…') : kaynakTur === 'urun' ? 'Ürün fotoğrafını kullan' : gorsel ? 'Yeniden üret' : 'Görsel üret'}</button>
       </div>
       {gorsel && <div style={{ marginTop: 12 }}><img src={gorsel} alt="Üretilen görsel" style={{ maxWidth: '100%', maxHeight: 420, borderRadius: 8, border: '1px solid var(--adm-bd)' }} /></div>}
       <p style={{ fontSize: 11.5, color: 'var(--adm-tx3)', marginTop: 10 }}>Yapay zeka çıktıları taslaktır: görseldeki ürün ve yazıdaki bilgileri paylaşmadan önce kontrol edin. “Onayla ve paylaş” gönderiyi hemen yayınlar.</p>
