@@ -3,7 +3,7 @@ import { modulGerekli } from '@/lib/yetki'
 import { oranSiniri } from '@/lib/rate-limit'
 import { supabaseAdmin } from '@/lib/notify'
 import { AiHata } from '@/lib/ai'
-import { FORMAT, sosyalGorselUret, type SosyalFormat } from '@/lib/sosyal-yayin'
+import { FORMAT, sosyalGorselUret, urunFotografiIndir, type SosyalFormat } from '@/lib/sosyal-yayin'
 
 export const maxDuration = 60
 const BUCKET = 'sosyal-gorseller'
@@ -32,19 +32,23 @@ export async function POST(req: NextRequest) {
   let b: any; try { b = await req.json() } catch { return NextResponse.json({ error: 'Geçersiz istek' }, { status: 400 }) }
   const id = String(b?.id || ''), yonerge = String(b?.yonerge || '').trim().slice(0, 1500), format = String(b?.format || '') as SosyalFormat
   if (!ID.test(id)) return NextResponse.json({ error: 'id geçersiz' }, { status: 400 })
-  if (yonerge.length < 10) return NextResponse.json({ error: 'Görsel yönergesi en az 10 karakter olmalı.' }, { status: 400 })
+  const urunFoto = b?.kaynak === 'urun'
+  if (!urunFoto && yonerge.length < 10) return NextResponse.json({ error: 'Görsel yönergesi en az 10 karakter olmalı.' }, { status: 400 })
   if (!(format in FORMAT)) return NextResponse.json({ error: 'Format geçersiz' }, { status: 400 })
   const { data: r } = await y.sb.from('sosyal_gonderiler').select('id,gorsel_yol,urun_id,products(image_url,images)').eq('id', id).maybeSingle()
   if (!r) return NextResponse.json({ error: 'Gönderi bulunamadı' }, { status: 404 })
   const p: any = Array.isArray((r as any).products) ? (r as any).products[0] : (r as any).products
   const kaynak = [p?.image_url, ...(p?.images || [])].find((u: any) => typeof u === 'string' && /^https:\/\//.test(u)) || null
   try {
-    const png = await sosyalGorselUret(yonerge, format, kaynak)
-    const sb = supabaseAdmin(), yol = `${id}/${Date.now()}.png`
-    const { error } = await sb.storage.from(BUCKET).upload(yol, png, { contentType: 'image/png', upsert: false })
+    if (urunFoto && !kaynak) return NextResponse.json({ error: 'Önce bir ürün seçin (ürünün fotoğrafı yok).' }, { status: 400 })
+    let png: Buffer, tip = 'image/png', uzanti = 'png'
+    if (urunFoto) { const f = await urunFotografiIndir(kaynak as string); png = f.bytes; tip = f.tip; uzanti = f.tip === 'image/jpeg' ? 'jpg' : f.tip === 'image/webp' ? 'webp' : 'png' }
+    else png = await sosyalGorselUret(yonerge, format, kaynak)
+    const sb = supabaseAdmin(), yol = `${id}/${Date.now()}.${uzanti}`
+    const { error } = await sb.storage.from(BUCKET).upload(yol, png, { contentType: tip, upsert: false })
     if (error) { console.error('[sosyal-gorsel] yükleme', error.message); return NextResponse.json({ error: 'Görsel kaydedilemedi.' }, { status: 500 }) }
     if (r.gorsel_yol) await sb.storage.from(BUCKET).remove([r.gorsel_yol]).catch(() => {})
-    const { error: ue } = await y.sb.from('sosyal_gonderiler').update({ gorsel_yol: yol, gorsel_yonerge: yonerge, updated_at: new Date().toISOString() }).eq('id', id)
+    const { error: ue } = await y.sb.from('sosyal_gonderiler').update({ gorsel_yol: yol, gorsel_yonerge: yonerge || null, updated_at: new Date().toISOString() }).eq('id', id)
     if (ue) return NextResponse.json({ error: 'Görsel gönderiye bağlanamadı.' }, { status: 500 })
     return NextResponse.json({ ok: true, url: await imzali(yol), urun_referansli: !!kaynak })
   } catch (e: any) {

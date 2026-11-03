@@ -44,13 +44,13 @@ export async function POST(req: NextRequest) {
   if (r.platform !== 'linkedin' && r.platform !== 'instagram') return NextResponse.json({ error: 'Yalnızca LinkedIn ve Instagram paylaşımı destekleniyor.' }, { status: 400 })
   const etiket = (r.hashtagler || []).map((h: string) => '#' + h).join(' '), tam = etiket ? `${r.metin}\n\n${etiket}` : r.metin
   const sb = supabaseAdmin()
-  let gorsel: Buffer | null = null
+  let gorsel: Buffer | null = null, gorselTip = 'image/png'
   if (r.gorsel_yol) {
     const { data, error } = await sb.storage.from('sosyal-gorseller').download(r.gorsel_yol)
     if (error || !data) return NextResponse.json({ error: 'Kayıtlı görsel okunamadı, yeniden üretin.' }, { status: 500 })
-    gorsel = Buffer.from(await data.arrayBuffer())
+    gorsel = Buffer.from(await data.arrayBuffer()); gorselTip = /\.jpe?g$/.test(r.gorsel_yol) ? 'image/jpeg' : /\.webp$/.test(r.gorsel_yol) ? 'image/webp' : 'image/png'
   }
-  const s = await uploadPostGonder({ platform: r.platform, metin: tam, baslik: r.baslik, gorsel, zaman })
+  const s = await uploadPostGonder({ platform: r.platform, metin: tam, baslik: r.baslik, gorsel, gorselTip, zaman })
   const simdi = new Date().toISOString(), z = simdi.slice(0, 16).replace('T', ' ')
   if (!s.ok) {
     await y.sb.from('sosyal_gonderiler').update({ notlar: [r.notlar, `[${z}] Paylaşım hatası: ${s.hata}`].filter(Boolean).join('\n').slice(-1000), updated_at: simdi }).eq('id', id)
