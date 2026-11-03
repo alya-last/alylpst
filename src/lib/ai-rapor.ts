@@ -29,7 +29,7 @@ type Niyet =
   | { tur: 'ihr_tahsilat' }
   | { tur: 'ihr_rakam'; yil: number }
   | { tur: 'pos' }
-  | { tur: 'gelir_tablosu'; yil: number; ay: number } // aylık gelir tablosu (satışlar/masraflar/üretim maliyeti/ciro/kar-zarar) görüntü + Excel
+  | { tur: 'gelir_tablosu'; yil: number; ay: number; yillik?: boolean } // aylık gelir tablosu (satışlar/masraflar/üretim maliyeti/ciro/kar-zarar) görüntü + Excel
   | { tur: 'kdv'; yil: number; ay: number }
   | { tur: 'odeme' }
   | { tur: 'ekstre'; arama: string; kod: string }
@@ -107,6 +107,9 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
   // "nisan ayı gider tablosu / nisan giderleri / nisan masrafları" da aynı çıktıyı ister: ALYA PLASTİK <YIL> <AY> GELİR TABLOSU (SATIŞLAR | MASRAFLAR | ÜRETİM MALİYETİ | CİRO | KAR-ZARAR). Ayrı, eksik bir gider listesi üretilmez.
   const AY_RE = /\b(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\b/
   const aylikGider = AY_RE.test(t) && /\b(gider\w*|masraf\w*)\b/.test(t) && t.split(' ').length <= 7 && !/kira|elektrik|personel|maas|nakliye|yemek|sgk|stopaj|vergi|kdv|hammadde|boya|koli|etiket|fatura|cari|banka|kasa|cek|senet|ihracat|fuar|kategori/.test(t)
+  if (/\b(yillik|yil basindan|yil basi|bu yil|2026 yili|senelik)\b/.test(t) && /gelir tablo|gelir gider tablo|kar zarar tablo|yonetim rapor|gider tablo|masraf tablo|tablo/.test(t) && !/urun|musteri|kdv|hammadde|boya|koli|ihracat/.test(t) && !AY_RE.test(t)) {
+    const bg = bugunISO(); return { tur: 'gelir_tablosu', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: +bg.slice(5, 7), yillik: true }
+  }
   if ((/gelir tablo|gelir gider tablo|kar zarar tablo|yonetim rapor|aylik rapor|gider tablo\w*|masraf tablo\w*/.test(t) || aylikGider) && !/kdv|hesaplanan|indirilecek/.test(t)) {
     const AYK = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik'], bg = bugunISO()
     const ayI = AYK.findIndex(a => new RegExp(`\\b${a}`).test(t))
@@ -1297,9 +1300,9 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
       case 'uretim': return await uretimRapor(sb, n.donem, kap)
       case 'hm_stok': return await hmStok(sb, n.grup, n.arama)
       case 'gelir_tablosu': {
-        const v = await gelirTablosuVeri(sb, n.yil, n.ay), ayk = `${n.yil}-${String(n.ay).padStart(2, '0')}`
-        if (!v.kayit) return { yanit: `${AYLAR[n.ay - 1]} ${n.yil} için gelir/gider kaydı bulunamadı.`, araclar: ['rapor_gelir_tablosu'] }
-        const g = [`${AYLAR[n.ay - 1].toUpperCase()} ${n.yil} GELİR TABLOSU`, '', `Net satışlar (ciro): ${TL(v.netSatis)} TL`, `Masraflar: ${TL(v.masrafToplam)} TL`, `Üretim maliyeti: ${TL(v.uretimToplam)} TL`, `Satışların maliyeti: ${TL(v.satisMaliyeti)} TL`, `Diğer gelirler: ${TL(v.digerToplam)} TL`, `KAR-ZARAR: ${TL(v.karZarar)} TL`, '', 'Kar-zarar = Ciro + Diğer gelirler − (Masraflar + Üretim maliyeti).', '', `/api/admin/gelir-tablosu?ay=${ayk}`, '', `/api/admin/gelir-tablosu?ay=${ayk}&format=xlsx`]
+        const v = await gelirTablosuVeri(sb, n.yil, n.ay, n.yillik ? 1 : undefined), ayk = n.yillik ? `${n.yil}-${String(n.ay).padStart(2, '0')}&yil=${n.yil}` : `${n.yil}-${String(n.ay).padStart(2, '0')}`
+        if (!v.kayit) return { yanit: `${n.yillik ? `${n.yil} yılı` : `${AYLAR[n.ay - 1]} ${n.yil}`} için gelir/gider kaydı bulunamadı.`, araclar: ['rapor_gelir_tablosu'] }
+        const g = [n.yillik ? `${n.yil} YILLIK GELİR TABLOSU (Ocak–${AYLAR[n.ay - 1]})` : `${AYLAR[n.ay - 1].toUpperCase()} ${n.yil} GELİR TABLOSU`, '', `Net satışlar (ciro): ${TL(v.netSatis)} TL`, `Masraflar: ${TL(v.masrafToplam)} TL`, `Üretim maliyeti: ${TL(v.uretimToplam)} TL`, `Satışların maliyeti: ${TL(v.satisMaliyeti)} TL`, `Diğer gelirler: ${TL(v.digerToplam)} TL`, `KAR-ZARAR: ${TL(v.karZarar)} TL`, '', 'Kar-zarar = Ciro + Diğer gelirler − (Masraflar + Üretim maliyeti).', '', `/api/admin/gelir-tablosu?ay=${ayk}`, '', `/api/admin/gelir-tablosu?ay=${ayk}&format=xlsx`]
         return { yanit: g.join('\n'), araclar: ['rapor_gelir_tablosu'] }
       }
       case 'boya_kg': { const b = n.kg * n.oran, yp = r2(n.oran * 100); return { yanit: `${AD(n.kg)} kg hammadde × %${yp} boya oranı = ${TL(b)} kg (${TL(b / 1000)} ton) boya.\nHesap: hammadde kg × oran. Tahmini hesaptır, gerçek boya kullanımı kayıtlı değildir. Dış mekanda boya kullanılmaz.`, araclar: ['rapor_boya_kg'] } }
