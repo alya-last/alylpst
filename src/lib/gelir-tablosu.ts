@@ -54,7 +54,7 @@ export async function gelirTablosuVeri(sb: SupabaseClient, yil: number, ay: numb
     if (OZEL.test(kat) || !t) continue
     if (x.tip === 'gelir' && kat === 'Ürün Satışı' && !/^\[Aylık tablo\]/.test(String(x.aciklama || '')) && aktarimAy.has(String(x.tarih || '').slice(0, 7))) continue
     // "[Aylık tablo] Ocak 2026 - KİRA GİDERLERİ" biçimindeki aktarım kayıtları kalem adıyla, diğerleri kategori adıyla gösterilir
-    const aktarim = /^\[Aylık tablo\][^-]*-\s*(.+)$/.exec(String(x.aciklama || '')), ad = (aktarim ? aktarim[1] : kat).trim()
+    const aktarim = /^\[Aylık tablo\][^-]*-\s*(.+)$/.exec(String(x.aciklama || '')), ad0 = (aktarim ? aktarim[1] : kat).trim(), ad = donem && x.tip === 'gider' && kat === 'Kullanılan Malzeme' ? ad0.replace(/\s*\([^)]*\)\s*$/, '').replace(/\s+-\s+.*$/, m => m).trim() : ad0
     kayit++
     if (x.tip === 'gelir') { if (kat === 'Ürün Satışı') ekle(satislar, aktarim ? ad : 'ÜRÜN SATIŞLARI', t); else ekle(diger, ad, t) }
     else if (x.tip === 'gider') { if (kat === 'Kullanılan Malzeme' || /\[Üretim\]/.test(String(x.aciklama || ''))) ekle(uretim, ad, t); else ekle(masraflar, ad, t) }
