@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { aiCagir, AiHata, veriBlok } from '@/lib/ai'
 import { veriTutarlilik, nakitTahmini, karlilikAnaliz } from '@/lib/ai-yonetim'
+import { decryptField } from '@/lib/field-crypto'
 import { gelirTablosuVeri, gelirTablosuSatirlar } from '@/lib/gelir-tablosu'
 
 // Muhasebe raporları: veri kullanıcının kendi oturumuyla (rpc_* içinde has_module kontrolü) okunur,
@@ -59,21 +60,29 @@ export async function raporUret(sb: SupabaseClient, tip: string, donem: string):
       .in('tip', ['alis', 'iade']).or('durum.in.(onaylandi,odendi),kdv_dahil.eq.true').gte('tarih', bas).lte('tarih', bit).order('tarih').order('no').limit(5000)
     if (error) throw new AiHata(/yetkisiz|permission|rls/i.test(error.message) ? 'Bu rapor için yetkin yok.' : `Veri okunamadı: ${error.message}`, 500)
     const l = (data || []) as any[]
+    const AYLAR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık']
+    const kdvDonemi = `${AYLAR[+donem.slice(5, 7) - 1]} ${donem.slice(0, 4)}`
     const satir = (x: any, i: number) => {
-      const c = Array.isArray(x.cari) ? x.cari[0] : x.cari, k = (Array.isArray(x.kalem) ? x.kalem : []).slice(0, 3).map((q: any) => `${q.urun_adi}${q.miktar ? ` (${q.miktar} ${q.birim || ''})` : ''}`).join(' + ')
-      return [i + 1, x.tarih, x.no, c?.ad || '—', c?.vergi_no || '', k, r2(x.ara_toplam), r2(x.kdv_tutari)]
+      const c = Array.isArray(x.cari) ? x.cari[0] : x.cari, kl = (Array.isArray(x.kalem) ? x.kalem : []) as any[]
+      const cins = kl.slice(0, 3).map(q => q.urun_adi).filter(Boolean).join(' + ')
+      const mik = kl.slice(0, 3).filter(q => q.miktar).map(q => `${q.miktar} ${q.birim || ''}`.trim()).join(' + ')
+      const m = /^([A-Za-zÇĞİÖŞÜçğıöşü]*)(.*)$/.exec(String(x.no || '')), kdv = r2(x.kdv_tutari)
+      // Şablon sırası: Sıra, Tarih, Seri, Sıra No'su, Ünvan, VKN, Cinsi, Miktarı, KDV Hariç, KDV, Tevkifatsız indirilen, 2 No'lu beyanname, Toplam indirilen, GGB, KDV dönemi
+      return [i + 1, x.tarih, m?.[1] || '', m?.[2] || '', c?.ad || '—', decryptField(c?.vergi_no) || '', cins, mik, r2(x.ara_toplam), kdv, kdv, 0, kdv, '', kdvDonemi]
     }
-    const kol = ['Sıra No', 'Fatura Tarihi', 'Fatura No', 'Satıcı / Müşteri Ünvanı', 'Vergi / TC Kimlik No', 'Mal ve/veya Hizmetin Cinsi', 'KDV Hariç Tutar (₺)', 'KDV (₺)']
-    const alis = l.filter(x => x.tip === 'alis' && Number(x.kdv_tutari) > 0), iade = l.filter(x => x.tip === 'iade')
+    const kol = ["Sıra No", 'Alış Faturasının Tarihi', 'Serisi', "Sıra No'su", 'Satıcının Adı / Ünvanı', 'VKN / TCKN', 'Cinsi', 'Miktarı', 'KDV Hariç Tutarı', "KDV'si", 'Tevkifata Tabi Olmayan ve Bu Dönemde İndirilen KDV', "2 Nolu Beyannamede Ödenen KDV", 'Toplam İndirilen KDV', 'GGB Tescil No', 'Belgenin İndirim Hakkının Kullanıldığı KDV Dönemi']
+    const alis = l.filter(x => x.tip === 'alis'), iade = l.filter(x => x.tip === 'iade')
     const top = (a: any[], f: string) => r2(a.reduce((t, x) => t + (Number(x[f]) || 0), 0))
+    const toplamSatir = (a: any[]) => ['', '', '', '', 'TOPLAM', '', '', '', top(a, 'ara_toplam'), top(a, 'kdv_tutari'), top(a, 'kdv_tutari'), 0, top(a, 'kdv_tutari'), '', '']
+    const sayi = [8, 9, 10, 11, 12]
     return {
       tip: 'kdv_liste', baslik: `İndirilecek KDV Listesi — ${donem}`, donem, bas, bit, olusturma,
       bolumler: [
-        { baslik: 'İndirilecek KDV Listesi (alış faturaları)', kolonlar: kol, sayisalKolonlar: [6, 7], satirlar: [...alis.map(satir), ['', '', '', 'TOPLAM', '', '', top(alis, 'ara_toplam'), top(alis, 'kdv_tutari')]] },
-        { baslik: 'Satışlardan İade', kolonlar: kol, sayisalKolonlar: [6, 7], satirlar: [...iade.map(satir), ['', '', '', 'TOPLAM', '', '', top(iade, 'ara_toplam'), top(iade, 'kdv_tutari')]] },
+        { baslik: 'İndirilecek KDV Listesi (alış faturaları)', kolonlar: kol, sayisalKolonlar: sayi, satirlar: [...alis.map(satir), toplamSatir(alis)] },
+        ...(iade.length ? [{ baslik: 'Satışlardan İade', kolonlar: kol, sayisalKolonlar: sayi, satirlar: [...iade.map(satir), toplamSatir(iade)] }] : []),
       ],
       notlar: [
-        'KDV tutarı sıfır olan alış faturaları (konaklama/nakliye istisnaları vb.) listeye alınmaz.',
+        'KDV tutarı sıfır olan alış faturaları (konaklama/nakliye istisnaları vb.) da listededir; KDV si 0 görünür.',
         'Eski programdan aktarılan faturalarda mal/hizmet cinsi ve vergi no sistemde yoksa boş görünür; beyan öncesi mali müşavir kontrolü gerekir.',
       ],
     }
