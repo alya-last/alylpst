@@ -6,6 +6,7 @@ import { excelKaydet, type Sayfa } from '@/lib/ai-excel'
 import { araciCalistir, hamCalistir, bugunISO } from '@/lib/ai-admin'
 import { aiJson, veriBlok } from '@/lib/ai'
 import { gelirTablosuVeri } from '@/lib/gelir-tablosu'
+import { imalatVeri } from '@/lib/imalat-analizi'
 
 type Mekan = 'ic' | 'dis' | 'hepsi'
 export type Donem = { bas: number; bit: number } // ay aralığı (1-12), bu yıl
@@ -30,6 +31,7 @@ type Niyet =
   | { tur: 'ihr_rakam'; yil: number }
   | { tur: 'pos' }
   | { tur: 'gelir_tablosu'; yil: number; ay: number; yillik?: boolean } // aylık gelir tablosu (satışlar/masraflar/üretim maliyeti/ciro/kar-zarar) görüntü + Excel
+  | { tur: 'imalat'; yil: number; bas: number; bit: number; saksi: boolean; ayAy: boolean } // muhasebe şablonlu İMALAT ANALİZİ (iç mekan üretim × reçete; canlı formüllü Excel)
   | { tur: 'kdv'; yil: number; ay: number }
   | { tur: 'odeme' }
   | { tur: 'ekstre'; arama: string; kod: string }
@@ -88,7 +90,7 @@ export function donemBul(soru: string, bugun: string = bugunISO()): Donem | null
 const donemAd = (d: Donem) => (d.bas === d.bit ? AYLAR[d.bas - 1] : `${AYLAR[d.bas - 1]}–${AYLAR[d.bit - 1]}`)
 /** Soruda dönem varsa niyete işler; dönemi destekleyen rapor yoksa ya yapay zekaya bırakır (null) ya da cevapta "ay bazlı değil" notu düşer. */
 function donemUygula(n: RaporNiyet | null, soru: string): RaporNiyet | null {
-  if (!n || n.tur === 'gelir_tablosu' || n.tur === 'kdv' || n.tur === 'boya_kg') return n
+  if (!n || n.tur === 'gelir_tablosu' || n.tur === 'imalat' || n.tur === 'kdv' || n.tur === 'boya_kg') return n
   if ('donem' in n && n.donem) return n
   const d = donemBul(soru)
   if (!d) return n
@@ -147,6 +149,10 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     return { tur: 'kdv', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: ayI >= 0 ? ayI + 1 : +bg.slice(5, 7) }
   }
   if (/\bk ?karti|kredi kart|\bpos\b/.test(t) && /tahsilat|liste|yat|bekle|ne kadar|rakam|excel/.test(t)) return { tur: 'pos' }
+  if (/imalat analiz/.test(t) && !/neden|niye|yorum/.test(t)) {
+    const bg = bugunISO(), d = donemBul(soru) || { bas: 1, bit: +bg.slice(5, 7) }, saksi = /saksi/.test(t) || !/\btum urun|\bic mekan/.test(t)
+    return { tur: 'imalat', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), bas: d.bas, bit: d.bit, saksi, ayAy: /\bay ay\b|\baylik\b|her ay|ayri ayri|aylara gore/.test(t) }
+  }
   const kodlar0 = kodlariBul(soru)
   // Üretim adedi (Mikro ÜRETİM fişleri): "ekim kaç adet üretim yaptık", "ALY-132 ne kadar üretildi", "polo saksı üretimi"
   if (/uretil|uretim|imalat/.test(t) && !/maliyet|hammadde|koli|boya|masterbatch|kullan|tuket|sarf|stok|stog|makine|durum|vardiya|verim|oee|fire|plan|recete|gramaj|fiyat|siparis|emri|kapasite/.test(t) && (/kac|ne kadar|adet|aded|miktar|toplam|liste|rapor|excel|goster|\bver\b|yaptik|yapildi|uretildi/.test(t) || kodlar0.length || !!donemBul(soru) || /^(\w+ ){0,3}uretim\w*$/.test(t))) return { tur: 'uretim' }
@@ -1279,7 +1285,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   const kap = ['hammadde', 'koli_kullanim', 'boya_kullanim', 'kullanim_ozet', 'uretim'].includes(n.tur) ? await urunKapsam(sb, soru).catch(() => null) : null
   if (kap?.yok) return { yanit: `"${kap.ad}" adında bir ürün satış/üretim kayıtlarında bulunamadı. Ürün kodunu (örn. ALY-651) ya da ürün adını farklı yazarak tekrar sorabilir misiniz? Yanlış rakam vermemek için tüm ürünlerin toplamını göstermedim.`, araclar: ['rapor_urun_yok'] }
   const uret = /uretim|uretil|imalat/.test(nrm(soru)) // "üretime göre" soruları satış yerine Mikro ÜRETİM fişlerinden hesaplanır
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], uretim: [], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], koli_kullanim: [], kullanim_ozet: ['satis_hammadde'], boya_kg: [], gramaj_liste: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], uretim: [], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], koli_kullanim: [], kullanim_ozet: ['satis_hammadde'], boya_kg: [], gramaj_liste: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], imalat: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     const r0 = await (async (): Promise<Sonuc | null> => {
@@ -1307,6 +1313,15 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
         if (!v.kayit) return { yanit: `${n.yillik ? `${n.yil} yılı` : `${AYLAR[n.ay - 1]} ${n.yil}`} için gelir/gider kaydı bulunamadı.`, araclar: ['rapor_gelir_tablosu'] }
         const g = [n.yillik ? `${n.yil} YILLIK GELİR TABLOSU (Ocak–${AYLAR[n.ay - 1]})` : `${AYLAR[n.ay - 1].toUpperCase()} ${n.yil} GELİR TABLOSU`, '', `Net satışlar (ciro): ${TL(v.netSatis)} TL`, `Masraflar: ${TL(v.masrafToplam)} TL`, `Üretim maliyeti: ${TL(v.uretimToplam)} TL`, `Satışların maliyeti: ${TL(v.satisMaliyeti)} TL`, `Diğer gelirler: ${TL(v.digerToplam)} TL`, `KAR-ZARAR: ${TL(v.karZarar)} TL`, '', 'Kar-zarar = Ciro + Diğer gelirler − (Masraflar + Üretim maliyeti).', '', `/api/admin/gelir-tablosu?ay=${ayk}`, '', `/api/admin/gelir-tablosu?ay=${ayk}&format=xlsx`]
         return { yanit: g.join('\n'), araclar: ['rapor_gelir_tablosu'] }
+      }
+      case 'imalat': {
+        const v = await imalatVeri(sb, n.yil, n.bas, n.bit, n.saksi), dy = n.bas === n.bit ? `${AYLAR[n.bas - 1]} ${n.yil}` : `${AYLAR[n.bas - 1]}–${AYLAR[n.bit - 1]} ${n.yil}`
+        if (!v.kayit) return { yanit: `${dy} için iç mekan ${n.saksi ? 'saksı ' : ''}üretim kaydı (Mikro ÜRETİM giriş fişi) bulunamadı; imalat analizi hazırlanamadı.`, araclar: ['rapor_imalat_analizi'] }
+        const t = v.toplam, g = [`${dy.toUpperCase()} İMALAT ANALİZİ (${v.urun}, iç mekan)`, '', `Üretim: ${AD(t.adet)} adet · ${TL(t.kg)} kg hammadde (${t.urunSay} ürün kodu)`, '', '| Malzeme | Olması gereken kg (A×B) | Alış kg | Ort. birim fiyat | Alış tutarı |', '|---|---:|---:|---:|---:|', ...t.satirlar.map(s => `| ${s.ad} | ${TL(s.g)} | ${TL(s.i)} | ${s.j ? TL(s.j) : '—'} | ${s.i && s.j ? TL(s.i * s.j) : '—'} |`)]
+        if (v.aylar.length > 1) g.push('', '| Ay | Üretim adet | Hammadde kg |', '|---|---:|---:|', ...v.aylar.map(a => `| ${AYLAR[a.ay - 1]} | ${AD(a.adet)} | ${TL(a.kg)} |`))
+        if (t.receteYok.length) g.push('', `Dikkat: ${t.receteYok.length} ürün kodunun reçetesi yok (${AD(t.receteYok.reduce((x, y) => x + y.adet, 0))} adet), olması gereken malzemeye girmedi.`)
+        g.push('', 'Not: Boya reçetede yoksa hammaddenin %2\'si (tahmin). Alışlar stok hareketlerindeki satın almalardan gelir; fatura kalemi kayıtlı olmayan alışlar 0 görünebilir.', '', `/api/admin/imalat-analizi?yil=${n.yil}&bas=${n.bas}&bit=${n.bit}${n.saksi ? '&urun=saksi' : ''}${n.ayAy ? '&ayay=1' : ''}&format=xlsx`)
+        return { yanit: g.join('\n'), araclar: ['rapor_imalat_analizi'] }
       }
       case 'boya_kg': { const b = n.kg * n.oran, yp = r2(n.oran * 100); return { yanit: `${AD(n.kg)} kg hammadde × %${yp} boya oranı = ${TL(b)} kg (${TL(b / 1000)} ton) boya.\nHesap: hammadde kg × oran. Tahmini hesaptır, gerçek boya kullanımı kayıtlı değildir. Dış mekanda boya kullanılmaz.`, araclar: ['rapor_boya_kg'] } }
       case 'koli_kullanim': {
