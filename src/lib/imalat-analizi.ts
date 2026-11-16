@@ -36,8 +36,8 @@ async function sayfala(sb: SupabaseClient, tablo: string, kolon: string, f?: (q:
   return out
 }
 
-export type ImalatSatir = { grup: GrupAd; ad: string; e: number; f: number; g: number; i: number; j: number }
-export type ImalatAy = { ay: number; adet: number; adetR: number; kg: number; satirlar: ImalatSatir[]; receteYok: { kod: string; ad: string; adet: number }[]; urunSay: number }
+export type ImalatSatir = { grup: GrupAd; ad: string; e: number; f: number; g: number; i: number; j: number; varsayim?: boolean } // varsayim: alış kaydı yok, i = olması gereken miktar, j = hammadde kartı ortalama maliyeti
+export type ImalatAy = { ay: number; mukerrer: number; adet: number; adetR: number; kg: number; satirlar: ImalatSatir[]; receteYok: { kod: string; ad: string; adet: number }[]; urunSay: number }
 export type ImalatVeri = { yil: number; bas: number; bit: number; urun: string; aylar: ImalatAy[]; toplam: ImalatAy; kayit: boolean }
 
 export async function imalatVeri(sb: SupabaseClient, yil: number, bas: number, bit: number, saksi: boolean): Promise<ImalatVeri> {
@@ -45,7 +45,7 @@ export async function imalatVeri(sb: SupabaseClient, yil: number, bas: number, b
   const [uret, ps, rs, rk, hm, hr] = await Promise.all([
     sayfala(sb, 'uretim_girisleri', 'tarih,kod,ad,mekan,adet', q => q.eq('mekan', 'ic').gte('tarih', d0).lt('tarih', d1)),
     sayfala(sb, 'products', 'id,code'), sayfala(sb, 'urun_receteleri', 'id,urun_id,aktif,notlar,versiyon'), sayfala(sb, 'recete_kalemleri', 'recete_id,hammadde_id,miktar'),
-    sayfala(sb, 'hammaddeler', 'id,kod,ad'),
+    sayfala(sb, 'hammaddeler', 'id,kod,ad,ortalama_maliyet'),
     sayfala(sb, 'stok_hareketleri', 'hammadde_id,tarih,tip,yon,miktar,birim_maliyet', q => q.eq('tip', 'satinalma').eq('yon', 'giris').gte('tarih', d0).lt('tarih', d1)),
   ])
   const pk = new Map<string, string>(ps.map((p: any) => [p.id, p.code])), hmAd = new Map<string, { kod: string; ad: string }>(hm.map((h: any) => [h.id, { kod: String(h.kod || ''), ad: String(h.ad || '') }]))
@@ -56,30 +56,39 @@ export async function imalatVeri(sb: SupabaseClient, yil: number, bas: number, b
     const k = /\[([^\]]+)\]/.exec(r.notlar || '')?.[1] || pk.get(r.urun_id)
     if (k && !rec.has(k)) rec.set(k, kal.get(r.id) as any)
   }
+  const fyG: Record<GrupAd, number[]> = { PP: [], KOP: [], KRI: [], BOYA: [], DIGER: [] }
+  for (const h of hm) { const f = +h.ortalama_maliyet || 0; if (f > 0) fyG[grupBul(String(h.kod || ''), String(h.ad || ''))].push(f) }
+  const fyOrt = (k: GrupAd) => fyG[k].length ? fyG[k].reduce((t, x) => t + x, 0) / fyG[k].length : 0
   const uygun = (ad: string) => !saksi || /saks[ıiİI]/i.test(ad)
   const rows = uret.filter((x: any) => uygun(String(x.ad || ''))).map((x: any) => ({ ay: +String(x.tarih).slice(5, 7), kod: String(x.kod || '').trim(), ad: String(x.ad || '').replace(/\s+/g, ' ').trim(), adet: +x.adet || 0 }))
+  const alisVar = new Set<GrupAd>() // dönemde en az bir satın alma kaydı olan malzeme grupları
+  for (const x of hr) { const h = hmAd.get(x.hammadde_id); if (h && !h.kod.replace(/\s+/g, '').startsWith('73') && (+x.miktar || 0) > 0) alisVar.add(grupBul(h.kod, h.ad)) }
   const aylar: ImalatAy[] = []
   for (let a = bas; a <= bit; a++) {
     const ar = rows.filter(r => r.ay === a), g: Record<GrupAd, number> = { PP: 0, KOP: 0, KRI: 0, BOYA: 0, DIGER: 0 }
-    const yok = new Map<string, { kod: string; ad: string; adet: number }>(); let adet = 0, adetR = 0
+    const yok = new Map<string, { kod: string; ad: string; adet: number }>(); let adet = 0, adetR = 0, mukerrer = 0
     for (const r of ar) {
       adet += r.adet
-      const k = rec.get(r.kod)
+      const bk = r.kod.replace(/^((?:ALYG|ALY)-\d+)[A-Z]{1,3}$/, '$1'), parca = /(T|WT)$/.test(r.kod.slice(bk.length)) && bk !== r.kod // tabak/teker parçası: ana ürün reçetesi uygulanmaz
+      const k = rec.get(r.kod) || (!parca && bk !== r.kod ? rec.get(bk) : undefined) // renk ekli kodlar (ALY-906A) ana kod reçetesini kullanır
       if (!k) { const o = yok.get(r.kod) || { kod: r.kod, ad: r.ad, adet: 0 }; o.adet += r.adet; yok.set(r.kod, o); continue }
       adetR += r.adet
       for (const p of k) g[p.g] += p.kg * r.adet
     }
     if (!g.BOYA) g.BOYA = (g.PP + g.KOP + g.KRI + g.DIGER) * BOYA_ORAN
     const al: Record<GrupAd, { kg: number; tl: number; pkg: number }> = { PP: { kg: 0, tl: 0, pkg: 0 }, KOP: { kg: 0, tl: 0, pkg: 0 }, KRI: { kg: 0, tl: 0, pkg: 0 }, BOYA: { kg: 0, tl: 0, pkg: 0 }, DIGER: { kg: 0, tl: 0, pkg: 0 } }
+    const gorulen = new Set<string>()
     for (const x of hr) {
       if (+String(x.tarih).slice(5, 7) !== a || String(x.tarih).slice(0, 4) !== String(yil)) continue
       const h = hmAd.get(x.hammadde_id); if (!h) continue
       const gk = grupBul(h.kod, h.ad); if (h.kod.replace(/\s+/g, '').startsWith('73')) continue // koli/etiket ana malzeme değil
-      const kg = +x.miktar || 0, fy = +x.birim_maliyet || 0
+      const kg = +x.miktar || 0, fy = +x.birim_maliyet || 0, anahtar = `${x.hammadde_id}|${x.tarih}|${kg}|${fy}`
+      if (fy > 0 && gorulen.has(anahtar)) { mukerrer++; continue } // aynı gün/miktar/fiyatlı mükerrer satın alma kaydı bir kez sayılır
+      gorulen.add(anahtar)
       al[gk].kg += kg; if (fy > 0) { al[gk].tl += kg * fy; al[gk].pkg += kg }
     }
-    const satirlar = GRUPLAR.filter(x => x.k !== 'DIGER' || g.DIGER > 0 || al.DIGER.kg > 0).map(x => ({ grup: x.k, ad: x.ad, e: adetR ? g[x.k] / adetR : 0, f: adetR, g: g[x.k], i: al[x.k].kg, j: al[x.k].pkg ? al[x.k].tl / al[x.k].pkg : 0 }))
-    aylar.push({ ay: a, adet, adetR, kg: g.PP + g.KOP + g.KRI + g.DIGER, satirlar, receteYok: [...yok.values()].sort((p, q) => q.adet - p.adet), urunSay: new Set(ar.map(r => r.kod)).size })
+    const satirlar = GRUPLAR.filter(x => x.k !== 'DIGER' || g.DIGER > 0 || al.DIGER.kg > 0).map(x => ({ grup: x.k, ad: x.ad, e: adetR ? g[x.k] / adetR : 0, f: adetR, g: g[x.k], i: alisVar.has(x.k) ? al[x.k].kg : g[x.k], j: alisVar.has(x.k) ? (al[x.k].pkg ? al[x.k].tl / al[x.k].pkg : 0) : fyOrt(x.k), ...(alisVar.has(x.k) ? {} : { varsayim: true }) }))
+    aylar.push({ ay: a, adet, adetR, kg: g.PP + g.KOP + g.KRI + g.DIGER, satirlar, mukerrer, receteYok: [...yok.values()].sort((p, q) => q.adet - p.adet), urunSay: new Set(ar.map(r => r.kod)).size })
   }
   // Toplam: miktarlar toplanır, birim fiyat alış kg ağırlıklı
   const adetT = aylar.reduce((t, x) => t + x.adet, 0), adetRT = aylar.reduce((t, x) => t + x.adetR, 0), tl = (gk: GrupAd) => aylar.reduce((t, x) => { const s = x.satirlar.find(y => y.grup === gk); return t + (s ? s.i * s.j : 0) }, 0), pks = (gk: GrupAd) => aylar.reduce((t, x) => { const s = x.satirlar.find(y => y.grup === gk); return t + (s && s.j > 0 ? s.i : 0) }, 0)
@@ -87,11 +96,11 @@ export async function imalatVeri(sb: SupabaseClient, yil: number, bas: number, b
     const ss = aylar.map(a => a.satirlar.find(y => y.grup === x.k)).filter(Boolean) as ImalatSatir[]
     if (!ss.length) return null
     const g = ss.reduce((t, s) => t + s.g, 0), i = ss.reduce((t, s) => t + s.i, 0)
-    return { grup: x.k, ad: x.ad, e: adetRT ? g / adetRT : 0, f: adetRT, g, i, j: pks(x.k) ? tl(x.k) / pks(x.k) : 0 } as ImalatSatir
+    return { grup: x.k, ad: x.ad, e: adetRT ? g / adetRT : 0, f: adetRT, g, i, j: pks(x.k) ? tl(x.k) / pks(x.k) : ss.every(z => z.varsayim) ? ss[0].j : 0, ...(ss.some(z => z.varsayim) ? { varsayim: true } : {}) } as ImalatSatir
   }).filter(Boolean) as ImalatSatir[]
   const yokT = new Map<string, { kod: string; ad: string; adet: number }>()
   for (const a of aylar) for (const y of a.receteYok) { const o = yokT.get(y.kod) || { ...y, adet: 0 }; o.adet += y.adet; yokT.set(y.kod, o) }
-  const toplam: ImalatAy = { ay: 0, adet: adetT, adetR: adetRT, kg: aylar.reduce((t, x) => t + x.kg, 0), satirlar: topSat, receteYok: [...yokT.values()].sort((p, q) => q.adet - p.adet), urunSay: new Set(rows.map(r => r.kod)).size }
+  const toplam: ImalatAy = { ay: 0, mukerrer: aylar.reduce((t, x) => t + x.mukerrer, 0), adet: adetT, adetR: adetRT, kg: aylar.reduce((t, x) => t + x.kg, 0), satirlar: topSat, receteYok: [...yokT.values()].sort((p, q) => q.adet - p.adet), urunSay: new Set(rows.map(r => r.kod)).size }
   return { yil, bas, bit, urun: saksi ? 'SAKSI' : 'İÇ MEKAN ÜRÜNLERİ', aylar, toplam, kayit: adetT > 0 }
 }
 
