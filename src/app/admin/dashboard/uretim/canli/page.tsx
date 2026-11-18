@@ -96,14 +96,14 @@ export default function CanliUretimPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>
                 {[...d.makineler.map((m: any) => ({ id: m.id, ad: m.ad, panel: m, mes: mes.byPanel[m.id] || null })), ...mes.list.filter(x => !x.panelId).map(x => ({ id: 'mes' + x.id, ad: x.ad, panel: null, mes: x }))].map((r: any) => {
                   const m = r.panel, x = r.mes, e = m ? aktif.find((z: any) => z.makine_id === m.id) : null
-                  // MES verisi varsa durum sayaçtan: taze+çalışıyor = Üretimde; çalışıyor ama kayıt eski = belirsiz; duruyor = Duruyor
-                  const s = x ? (x.durum === 1 ? (x.taze ? MAKINE_DURUM.uretimde : { l: 'Son kayıt: çalışıyor', color: 'var(--adm-blue)' }) : { l: 'Duruyor', color: 'var(--adm-amber)' }) : (MAKINE_DURUM[m?.durum] || MAKINE_DURUM.musait)
+                  // MES verisi varsa durum son sinyalden: taze+çalışıyor = Üretimde; taze+duruyor = Duruyor; sinyal 15 dk'dan eskiyse = Sinyal yok
+                  const s = x ? (!x.taze ? { l: 'Sinyal yok', color: 'var(--adm-tx3)' } : x.durum === 1 ? MAKINE_DURUM.uretimde : { l: 'Duruyor', color: 'var(--adm-amber)' }) : (MAKINE_DURUM[m?.durum] || MAKINE_DURUM.musait)
                   const calisiyor = x ? x.durum === 1 && x.taze : m?.durum === 'uretimde'
                   return (
                   <div key={r.id} style={{ padding: 10, borderRadius: 10, background: s.color + '14', border: `1px solid ${s.color}40` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700 }}><Cog size={13} style={{ color: s.color, animation: calisiyor ? 'admSpin 6s linear infinite' : undefined }} />{r.ad}</div>
                     <div style={{ fontSize: 11, color: s.color, fontWeight: 600, marginTop: 2 }}>{s.l}</div>
-                    {x && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginTop: 2 }}>{x.son ? `${dkYaz(x.son)} önce · ` : ''}{fmtInt(x.uretimBugun)} adet bugün (MES)</div>}
+                    {x && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginTop: 2 }}>{x.son ? `son sinyal ${dkYaz(x.son)} önce · ` : ''}{fmtInt(x.uretimBugun)} adet bugün (MES)</div>}
                     {e && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginTop: 2 }}>{e.no} · %{fmtN(yuzde(+e.uretilen_miktar, +e.planlanan_miktar), 0)}</div>}
                   </div>) })}
               </div>)}

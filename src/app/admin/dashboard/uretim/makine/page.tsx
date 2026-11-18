@@ -142,7 +142,7 @@ export default function MakinePage() {
 
                   {m._mes && (
                     <div style={{ padding: 8, borderRadius: 8, background: 'var(--adm-s2)', marginBottom: 10, fontSize: 11.5, lineHeight: 1.6 }}>
-                      <b>Makine sistemi (MES):</b> {m._mes.durum === 1 ? 'son kayıt çalışıyor' : 'son kayıt duruyor'}{m._mes.son ? ` · ${dkYaz(m._mes.son)} önce` : ''}{m._mes.durum === 1 && !m._mes.taze ? ' (kayıt eski, şu an durmuş olabilir)' : ''}
+                      <b>Makine sistemi (MES):</b> {!m._mes.taze ? 'sinyal yok' : m._mes.durum === 1 ? 'şu an çalışıyor' : 'şu an duruyor'}{m._mes.son ? ` · son sinyal ${dkYaz(m._mes.son)} önce` : ''}
                       <br />Bugün: çalışma {fmtN(m._mes.calSn / 3600, 1)} sa · duruş {fmtN(m._mes.durSn / 3600, 1)} sa · {fmtInt(m._mes.uretimBugun)} adet
                     </div>
                   )}

@@ -3,9 +3,10 @@ import { useEffect, useState } from 'react'
 import { erp } from '@/lib/erp-client'
 
 // Fabrika makine sistemi (MES) → panel makine eşlemesi ve bugünkü/aylık özet. Salt okunur; 60 sn'de bir yenilenir.
-// MES kayıtları çalışma/duruş bölümü bitince yazıldığı için "son kayıt" gecikmeli olabilir: TAZE = son kayıt ≤ 90 dk.
+// MES kaydı bir çalışma/duruş BÖLÜMÜDÜR: zaman = bölümün başlangıcı, sure_sn = şimdiye kadarki süresi (sürüyorsa her senkronda uzar).
+// Son sinyal = zaman + sure_sn. TAZE = son sinyal ≤ 15 dk önce (3 dk'lık senkron + pay); değilse makineden sinyal gelmiyor demektir.
 export type MesM = { id: number; ad: string; panelId: string | null; son: string | null; durum: number | null; calSn: number; durSn: number; uretimBugun: number; uretimAy: number; calAySn: number; durAySn: number; taze: boolean }
-export const TAZE_DK = 90
+export const TAZE_DK = 15
 const trGun = (ms = Date.now()) => new Date(ms + 3 * 3600000).toISOString().slice(0, 10)
 
 export function useMesPanel() {
@@ -27,13 +28,14 @@ export function useMesPanel() {
         const o: MesM[] = mk.map((m: any) => {
           const k = dk.filter((x: any) => x.makine_id === m.id), s = k[k.length - 1]
           const ugM = ug.filter((x: any) => x.makine_id === m.id), dgM = dg.filter((x: any) => x.makine_id === m.id)
-          const son = s?.zaman || null
+          const sonMs = s ? +new Date(s.zaman) + (+s.sure_sn || 0) * 1000 : null
+          const son = sonMs ? new Date(sonMs).toISOString() : null
           return {
             id: m.id, ad: m.ad || m.kod, panelId: m.panel_makine_id || null, son, durum: s ? +s.durum : null,
             calSn: topla(k.filter((x: any) => +x.durum === 1), 'sure_sn'), durSn: topla(k.filter((x: any) => +x.durum !== 1), 'sure_sn'),
             uretimBugun: topla(ugM.filter((x: any) => String(x.tarih) === bugun), 'uretim_adedi'), uretimAy: topla(ugM, 'uretim_adedi'),
             calAySn: topla(dgM, 'calisma_sn'), durAySn: topla(dgM, 'durus_sn'),
-            taze: !!son && (Date.now() - +new Date(son)) / 60000 <= TAZE_DK,
+            taze: !!sonMs && (Date.now() - sonMs) / 60000 <= TAZE_DK,
           }
         }).filter((x: MesM) => x.son || x.uretimAy > 0 || x.calAySn > 0)
         setList(o); setHazir(true)
