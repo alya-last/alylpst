@@ -6,6 +6,7 @@ import { erp } from '@/lib/erp-client'
 import { fmtN, fmtInt, todayISO } from '@/lib/fmt'
 import { useUretim, byId, MAKINE_DURUM, yuzde, fireOrani, emirIhtiyac, varyantEtiket } from '@/lib/uretim-utils'
 import { sum } from '@/lib/muh-utils'
+import MesMakineKart from '@/components/admin/MesMakineKart'
 import { Page, PageHead, Kpi, KpiGrid, Card, Badge, Empty, useToast } from '@/components/admin/erp/ui'
 import { TrendChart } from '@/components/admin/erp/charts'
 import { Activity, Send, Pause, CheckCircle2, Cog, AlertTriangle, Factory, Gauge, Timer, Flame, ExternalLink } from 'lucide-react'
@@ -65,6 +66,8 @@ export default function CanliUretimPage() {
         <PageHead title="Üretim Hattı — Canlı"
           sub={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--adm-green)', animation: 'admPulse 1.6s infinite' }} />10 sn’de bir yenilenir · {now.toLocaleTimeString('tr-TR')}</span> as any}
           actions={<Link href="/admin/dashboard/uretim/emirler" className="adm-btn-ghost" style={{ textDecoration: 'none' }}><ExternalLink size={13} />Tüm emirler</Link>} />
+
+        <div style={{ marginBottom: 16 }}><MesMakineKart /></div>
 
         <KpiGrid min={170}>
           <Kpi label="Hatta Çalışan Emir" value={aktif.length} Icon={Activity} color="var(--adm-blue)" sub={`${calisan}/${d.makineler.length} makine çalışıyor`} />

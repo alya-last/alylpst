@@ -6,6 +6,7 @@ import AdminTopBar from '@/components/admin/TopBar'
 import { erp } from '@/lib/erp-client'
 import { fmtN, fmtInt, fmtDateTime } from '@/lib/fmt'
 import { useUretim, byId, MAKINE_DURUM, EMIR_DURUM, yuzde, fireOrani } from '@/lib/uretim-utils'
+import MesMakineKart from '@/components/admin/MesMakineKart'
 import { Page, PageHead, Kpi, KpiGrid, Badge, Tabs, Drawer, Modal, Field, FormGrid, InfoRow, Divider, Empty, useToast } from '@/components/admin/erp/ui'
 import { Plus, Pencil, Trash2, Cog, Activity, Wrench, AlertTriangle, Gauge, AlertCircle, ExternalLink } from 'lucide-react'
 
@@ -83,6 +84,8 @@ export default function MakinePage() {
       <AdminTopBar title="Makine Yönetimi" />
       <Page>
         <PageHead title="Makine Parkı" sub="Anlık durum, çalışan iş emri, bu ayki performans" actions={<button className="adm-btn" onClick={openNew}><Plus size={14} />Makine Ekle</button>} />
+
+        <div style={{ marginBottom: 16 }}><MesMakineKart /></div>
 
         <KpiGrid min={170}>
           <Kpi label="Toplam Makine" value={d.makineler.length} Icon={Cog} color="var(--adm-ac)" sub={`${aktifMakine} aktif`} />
