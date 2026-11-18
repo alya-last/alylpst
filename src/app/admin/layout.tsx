@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./admin.css";
 import TruncationBanner from "@/components/admin/erp/TruncationBanner";
 
@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "Alya Admin", statusBarStyle: "black-translucent" },
   icons: { apple: "/admin/ikon-192.png" },
 };
+
+export const viewport: Viewport = { themeColor: "#0f172a", viewportFit: "cover" };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return <div className="adm">{children}<TruncationBanner /></div>;

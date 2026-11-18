@@ -1,6 +1,17 @@
-// Alya Admin — yalnızca bildirim servis çalışanı (önbellek/çevrimdışı yok)
-self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', e => e.waitUntil(self.clients.claim()))
+// Alya Admin — bildirim + çevrimdışı uyarı sayfası.
+// GÜVENLİK: Yalnızca statik çevrimdışı sayfası ve ikon önbelleğe alınır. Sayfa/API/veri yanıtları ASLA saklanmaz.
+const V = 'alya-admin-v2'
+const STATIK = ['/admin/cevrimdisi.html', '/admin/ikon-192.png']
+self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(STATIK)).then(() => self.skipWaiting())) })
+self.addEventListener('activate', e => e.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k !== V) await caches.delete(k)
+  await self.clients.claim()
+})()))
+self.addEventListener('fetch', e => {
+  const r = e.request
+  if (r.method !== 'GET' || r.mode !== 'navigate') return
+  e.respondWith(fetch(r).catch(async () => (await caches.match('/admin/cevrimdisi.html')) || Response.error()))
+})
 self.addEventListener('push', e => {
   e.waitUntil((async () => {
     let b = { baslik: 'Alya Admin', metin: 'Yeni bildirim var.', url: '/admin/dashboard' }
