@@ -155,7 +155,7 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
     return { tur: 'imalat', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), bas: d.bas, bit: d.bit, saksi, ayAy: /\bay ay\b|\baylik\b|her ay|ayri ayri|aylara gore/.test(t) }
   }
   // Makine sistemi (MES): duruş / makine üretimi / kalıp göz sayısı — varsayılan dönem BUGÜN
-  if (!/kalip bakim|bakim/.test(t) && (/\bdurus\w*|\bdurdu\w*|\bdurma\w*|\bcalismiyor|\bcalisma (suresi|orani)/.test(t) || (/\bmakine\w*/.test(t) && /uretim|uretil|uretti|calis|verim/.test(t)) || (/\bkalip\w*/.test(t) && /\bgoz\b|goz sayi|kac goz|hangi urun|hangi kalip|kalip(ta|lar)/.test(t)))) {
+  if (!/kalip bakim|bakim/.test(t) && (/\bdurus\w*|\bdurdu\w*|\bdurma\w*|\bcalismiyor|\bcalisma (suresi|orani)/.test(t) || (/\bmakine\w*/.test(t) && /uretim|uretil|uretti|calis|verim/.test(t) && !/maliyet|fiyat|gider|hammadde|koli|boya|recete|gramaj|stok|satis|alis|fatura/.test(t)) || (/\bkalip\w*/.test(t) && /\bgoz\b|goz sayi|kac goz|hangi urun|hangi kalip|kalip(ta|lar)/.test(t)))) {
     const konu = /\bkalip\w*/.test(t) && !/durus|durdu/.test(t) ? 'kalip' : /durus|durdu|durma|calismiyor|calisma/.test(t) ? 'durus' : 'uretim'
     const aralik = /\bdun\b/.test(t) ? 'dun' : /son (7|yedi) gun|bu hafta|haftalik|gecen hafta|son hafta/.test(t) ? 'son7' : /\bbu ay\b|aylik/.test(t) ? 'ay' : 'bugun'
     return { tur: 'mes', konu, aralik, kodlar: kodlariBul(soru) }

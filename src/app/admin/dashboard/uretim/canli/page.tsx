@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import AdminTopBar from '@/components/admin/TopBar'
 import { erp } from '@/lib/erp-client'
-import { fmtN, fmtInt, todayISO } from '@/lib/fmt'
+import { fmtN, fmtInt } from '@/lib/fmt'
 import { useUretim, byId, MAKINE_DURUM, yuzde, fireOrani, emirIhtiyac, varyantEtiket } from '@/lib/uretim-utils'
 import { sum } from '@/lib/muh-utils'
 import MesMakineKart from '@/components/admin/MesMakineKart'
@@ -30,8 +30,10 @@ export default function CanliUretimPage() {
   const emirNo = useMemo(() => byId(d.emirler), [d.emirler])
   const aktif = d.emirler.filter((e: any) => e.durum === 'uretimde')
 
-  const bugun = todayISO()
-  const bh = d.hareketler.filter((h: any) => (h.tarih || '').startsWith(bugun))
+  // Türkiye saatine göre bugün (UTC'ye göre alınırsa gece 00:00–03:00 arası dünün kayıtları görünür)
+  const trGun = (t: any) => new Date(+new Date(t) + 3 * 3600000).toISOString().slice(0, 10)
+  const bugun = trGun(Date.now())
+  const bh = d.hareketler.filter((h: any) => h.tarih && trGun(h.tarih) === bugun)
   const bUretim = sum(bh, (h: any) => h.uretilen_adet), bFire = sum(bh, (h: any) => h.fire_adet)
   const saatlik = useMemo(() => Array.from({ length: 24 }, (_, s) => sum(bh.filter((h: any) => new Date(h.tarih).getHours() === s), (h: any) => h.uretilen_adet)), [bh])
   const ilk = Math.max(0, Math.min(saatlik.findIndex(x => x > 0), new Date().getHours() - 8 < 0 ? 0 : new Date().getHours() - 8)), son = Math.max(new Date().getHours(), ilk + 5)
