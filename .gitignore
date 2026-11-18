@@ -42,3 +42,6 @@ next-env.d.ts
 
 # ornek env dosyasi repoda tutulur
 !.env.example
+
+# Veritabanı kurulum dosyaları depoda tutulmaz (özel yedekte saklanır)
+/supabase/*.sql
