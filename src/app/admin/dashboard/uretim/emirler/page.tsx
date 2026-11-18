@@ -8,6 +8,7 @@ import { muh } from '@/lib/muhasebe-client'
 import { fmt, fmtK, fmtN, fmtInt, fmtDate, fmtDateTime, todayISO, daysBetween } from '@/lib/fmt'
 import { useUretim, byId, EMIR_DURUM, MAKINE_DURUM, yuzde, fireOrani, receteMaliyet, emirIhtiyac } from '@/lib/uretim-utils'
 import { sum } from '@/lib/muh-utils'
+import MesEmirKart from '@/components/admin/MesEmirKart'
 import { Page, PageHead, Kpi, KpiGrid, Badge, Tabs, Drawer, Modal, Field, FormGrid, InfoRow, Divider, Empty, useToast } from '@/components/admin/erp/ui'
 import { DataGrid, type Col } from '@/components/admin/erp/DataGrid'
 import TopluDuzenle from '@/components/admin/TopluDuzenle'
@@ -256,6 +257,8 @@ export default function UretimEmirleriPage() {
             <button className="adm-btn" style={{ padding: '4px 12px', fontSize: 12 }} onClick={() => setMrp(true)}>İncele</button>
           </div>
         )}
+
+        <div style={{ marginBottom: 16 }}><MesEmirKart /></div>
 
         <div style={{ marginBottom: 12 }}>
           <Tabs value={tab} onChange={setTab} tabs={[{ v: 'acik', l: 'Açık', n: cnt(acikMi) }, { v: 'planlandi', l: 'Planlı', n: cnt(e => e.durum === 'planlandi') }, { v: 'uretimde', l: 'Üretimde', n: cnt(e => e.durum === 'uretimde') }, { v: 'durduruldu', l: 'Durdurulan', n: cnt(e => e.durum === 'durduruldu') }, { v: 'geciken', l: 'Geciken', n: cnt(gec) }, { v: 'tamamlandi', l: 'Tamamlanan', n: cnt(e => e.durum === 'tamamlandi') }, { v: 'iptal', l: 'İptal', n: cnt(e => e.durum === 'iptal') }, { v: 'hepsi', l: 'Tümü', n: d.emirler.length }]} />
