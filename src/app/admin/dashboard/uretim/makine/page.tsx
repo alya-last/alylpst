@@ -7,6 +7,7 @@ import { erp } from '@/lib/erp-client'
 import { fmtN, fmtInt, fmtDateTime } from '@/lib/fmt'
 import { useUretim, byId, MAKINE_DURUM, EMIR_DURUM, yuzde, fireOrani } from '@/lib/uretim-utils'
 import MesMakineKart from '@/components/admin/MesMakineKart'
+import { useMesPanel, dkYaz } from '@/lib/mes-canli'
 import { Page, PageHead, Kpi, KpiGrid, Badge, Tabs, Drawer, Modal, Field, FormGrid, InfoRow, Divider, Empty, useToast } from '@/components/admin/erp/ui'
 import { Plus, Pencil, Trash2, Cog, Activity, Wrench, AlertTriangle, Gauge, AlertCircle, ExternalLink } from 'lucide-react'
 
@@ -22,6 +23,9 @@ export default function MakinePage() {
   const [form, setForm] = useState<any>(bos)
   const [busy, setBusy] = useState(false)
 
+  const mes = useMesPanel()
+  // Makine sistemi (MES) ile eşleşen makinelerde durum sayaçtan gelir: son kayıt taze ve "çalışıyor" ise Üretimde. Panel kaydı değiştirilmez.
+  const makineler = useMemo(() => d.makineler.map((m: any) => { const x = mes.byPanel[m.id]; return x ? { ...m, durum: x.durum === 1 && x.taze ? 'uretimde' : m.durum, _mes: x } : m }), [d.makineler, mes.byPanel])
   const kalip = useMemo(() => byId(d.kaliplar), [d.kaliplar])
   const urun = useMemo(() => byId(d.products), [d.products])
   const ay = new Date().toISOString().slice(0, 7)
@@ -29,7 +33,7 @@ export default function MakinePage() {
   // Makine başına canlı özet
   const M = useMemo(() => {
     const o: Record<string, any> = {}
-    d.makineler.forEach((m: any) => {
+    makineler.forEach((m: any) => {
       const emirler = d.emirler.filter((e: any) => e.makine_id === m.id)
       const aktif = emirler.find((e: any) => e.durum === 'uretimde') || null
       const ids = new Set(emirler.map((e: any) => e.id))
@@ -37,16 +41,16 @@ export default function MakinePage() {
       const uretilen = hay.reduce((s: number, h: any) => s + (+h.uretilen_adet || 0), 0), fire = hay.reduce((s: number, h: any) => s + (+h.fire_adet || 0), 0)
       const saat = emirler.filter((e: any) => e.baslangic && ['uretimde', 'tamamlandi', 'durduruldu'].includes(e.durum) && (e.baslangic || '').startsWith(ay))
         .reduce((s: number, e: any) => s + (((e.bitis ? +new Date(e.bitis) : Date.now()) - +new Date(e.baslangic)) / 3600000), 0)
-      o[m.id] = { emirler, aktif, uretilen, fire, saat, tutarsiz: (m.durum === 'uretimde' && !aktif) || (!!aktif && m.durum !== 'uretimde') }
+      o[m.id] = { emirler, aktif, uretilen, fire, saat, tutarsiz: !m._mes && ((m.durum === 'uretimde' && !aktif) || (!!aktif && m.durum !== 'uretimde')) }
     })
     return o
-  }, [d.makineler, d.emirler, d.hareketler, ay])
+  }, [makineler, d.emirler, d.hareketler, ay])
 
-  const cnt = (k: string) => d.makineler.filter((m: any) => m.durum === k).length
-  const aktifMakine = d.makineler.filter((m: any) => !['durduruldu'].includes(m.durum)).length
+  const cnt = (k: string) => makineler.filter((m: any) => m.durum === k).length
+  const aktifMakine = makineler.filter((m: any) => !['durduruldu'].includes(m.durum)).length
   const kullanim = aktifMakine ? (cnt('uretimde') / aktifMakine) * 100 : 0
-  const tutarsiz = d.makineler.filter((m: any) => M[m.id]?.tutarsiz)
-  const liste = d.makineler.filter((m: any) => tab === 'hepsi' || m.durum === tab)
+  const tutarsiz = makineler.filter((m: any) => M[m.id]?.tutarsiz)
+  const liste = makineler.filter((m: any) => tab === 'hepsi' || m.durum === tab)
 
   async function durum(m: any, yeni: string) {
     if (['bakimda', 'arizali', 'durduruldu'].includes(yeni) && M[m.id]?.aktif && !confirm(`${m.ad} üzerinde “${M[m.id].aktif.no}” emri üretimde. Yine de ${MAKINE_DURUM[yeni].l.toLowerCase()} durumuna alınsın mı?\n(Emir otomatik durdurulmaz.)`)) return
@@ -88,11 +92,11 @@ export default function MakinePage() {
         <div style={{ marginBottom: 16 }}><MesMakineKart /></div>
 
         <KpiGrid min={170}>
-          <Kpi label="Toplam Makine" value={d.makineler.length} Icon={Cog} color="var(--adm-ac)" sub={`${aktifMakine} aktif`} />
+          <Kpi label="Toplam Makine" value={makineler.length} Icon={Cog} color="var(--adm-ac)" sub={`${aktifMakine} aktif`} />
           <Kpi label="Üretimde" value={cnt('uretimde')} Icon={Activity} color="var(--adm-blue)" sub={`%${fmtN(kullanim, 0)} kullanım`} onClick={() => setTab('uretimde')} />
           <Kpi label="Müsait" value={cnt('musait')} Icon={Gauge} color="var(--adm-green)" sub="iş atanabilir" onClick={() => setTab('musait')} />
           <Kpi label="Bakım / Arıza" value={cnt('bakimda') + cnt('arizali')} Icon={Wrench} color={cnt('arizali') ? 'var(--adm-red)' : 'var(--adm-amber)'} sub={`${cnt('arizali')} arızalı · ${cnt('bakimda')} bakımda`} />
-          <Kpi label="Bu Ay Üretim" value={fmtInt(Object.values(M).reduce((s: number, m: any) => s + m.uretilen, 0))} Icon={Activity} color="var(--adm-green)" sub={`fire %${fmtN(fireOrani(Object.values(M).reduce((s: number, m: any) => s + m.uretilen, 0), Object.values(M).reduce((s: number, m: any) => s + m.fire, 0)), 1)}`} />
+          <Kpi label="Bu Ay Üretim" value={fmtInt(mes.uretimAy || Object.values(M).reduce((s: number, m: any) => s + m.uretilen, 0))} Icon={Activity} color="var(--adm-green)" sub={mes.uretimAy ? 'makine sayaçlarından (MES)' : `fire %${fmtN(fireOrani(Object.values(M).reduce((s: number, m: any) => s + m.uretilen, 0), Object.values(M).reduce((s: number, m: any) => s + m.fire, 0)), 1)}`} />
         </KpiGrid>
 
         {tutarsiz.length > 0 && (
@@ -102,11 +106,11 @@ export default function MakinePage() {
         )}
 
         <div style={{ marginBottom: 14 }}>
-          <Tabs value={tab} onChange={setTab} tabs={[{ v: 'hepsi', l: 'Tümü', n: d.makineler.length }, ...Object.entries(MAKINE_DURUM).map(([k, v]) => ({ v: k, l: v.l, n: cnt(k) }))]} />
+          <Tabs value={tab} onChange={setTab} tabs={[{ v: 'hepsi', l: 'Tümü', n: makineler.length }, ...Object.entries(MAKINE_DURUM).map(([k, v]) => ({ v: k, l: v.l, n: cnt(k) }))]} />
         </div>
 
         {loading ? null : liste.length === 0 ? (
-          <div className="adm-card"><Empty icon={<Cog size={34} />} title={d.makineler.length ? 'Bu durumda makine yok' : 'Henüz makine tanımlı değil'} sub="Enjeksiyon, üfleme, ekstrüzyon makinelerini ekle; üretim emirlerine ata." action={!d.makineler.length && <button className="adm-btn" onClick={openNew}><Plus size={14} />İlk Makineyi Ekle</button>} /></div>
+          <div className="adm-card"><Empty icon={<Cog size={34} />} title={makineler.length ? 'Bu durumda makine yok' : 'Henüz makine tanımlı değil'} sub="Enjeksiyon, üfleme, ekstrüzyon makinelerini ekle; üretim emirlerine ata." action={!makineler.length && <button className="adm-btn" onClick={openNew}><Plus size={14} />İlk Makineyi Ekle</button>} /></div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(310px,1fr))', gap: 14 }}>
             {liste.map((m: any) => {
@@ -136,8 +140,14 @@ export default function MakinePage() {
                     </div>
                   )}
 
+                  {m._mes && (
+                    <div style={{ padding: 8, borderRadius: 8, background: 'var(--adm-s2)', marginBottom: 10, fontSize: 11.5, lineHeight: 1.6 }}>
+                      <b>Makine sistemi (MES):</b> {m._mes.durum === 1 ? 'son kayıt çalışıyor' : 'son kayıt duruyor'}{m._mes.son ? ` · ${dkYaz(m._mes.son)} önce` : ''}{m._mes.durum === 1 && !m._mes.taze ? ' (kayıt eski, şu an durmuş olabilir)' : ''}
+                      <br />Bugün: çalışma {fmtN(m._mes.calSn / 3600, 1)} sa · duruş {fmtN(m._mes.durSn / 3600, 1)} sa · {fmtInt(m._mes.uretimBugun)} adet
+                    </div>
+                  )}
                   <div style={{ display: 'flex', gap: 14, fontSize: 11.5, color: 'var(--adm-tx3)' }}>
-                    <span>Ay: <b style={{ color: 'var(--adm-tx)' }}>{fmtInt(y.uretilen)}</b> adet</span><span>Fire: <b style={{ color: y.fire ? 'var(--adm-red)' : 'var(--adm-tx)' }}>%{fmtN(fireOrani(y.uretilen, y.fire), 1)}</b></span><span>Çalışma: <b style={{ color: 'var(--adm-tx)' }}>{fmtN(y.saat, 0)}</b> sa</span>
+                    <span>Ay: <b style={{ color: 'var(--adm-tx)' }}>{fmtInt(m._mes ? m._mes.uretimAy : y.uretilen)}</b> adet</span><span>Fire: <b style={{ color: y.fire ? 'var(--adm-red)' : 'var(--adm-tx)' }}>%{fmtN(fireOrani(y.uretilen, y.fire), 1)}</b></span><span>Çalışma: <b style={{ color: 'var(--adm-tx)' }}>{fmtN(m._mes ? m._mes.calAySn / 3600 : y.saat, 0)}</b> sa</span>
                   </div>
                 </div>
               )

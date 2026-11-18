@@ -7,6 +7,7 @@ import { fmtN, fmtInt, todayISO } from '@/lib/fmt'
 import { useUretim, byId, MAKINE_DURUM, yuzde, fireOrani, emirIhtiyac, varyantEtiket } from '@/lib/uretim-utils'
 import { sum } from '@/lib/muh-utils'
 import MesMakineKart from '@/components/admin/MesMakineKart'
+import { useMesPanel, dkYaz } from '@/lib/mes-canli'
 import { Page, PageHead, Kpi, KpiGrid, Card, Badge, Empty, useToast } from '@/components/admin/erp/ui'
 import { TrendChart } from '@/components/admin/erp/charts'
 import { Activity, Send, Pause, CheckCircle2, Cog, AlertTriangle, Factory, Gauge, Timer, Flame, ExternalLink } from 'lucide-react'
@@ -21,6 +22,7 @@ export default function CanliUretimPage() {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
 
+  const mes = useMesPanel()
   const urun = useMemo(() => byId(d.products), [d.products])
   const makine = useMemo(() => byId(d.makineler), [d.makineler])
   const kalip = useMemo(() => byId(d.kaliplar), [d.kaliplar])
@@ -33,7 +35,12 @@ export default function CanliUretimPage() {
   const bUretim = sum(bh, (h: any) => h.uretilen_adet), bFire = sum(bh, (h: any) => h.fire_adet)
   const saatlik = useMemo(() => Array.from({ length: 24 }, (_, s) => sum(bh.filter((h: any) => new Date(h.tarih).getHours() === s), (h: any) => h.uretilen_adet)), [bh])
   const ilk = Math.max(0, Math.min(saatlik.findIndex(x => x > 0), new Date().getHours() - 8 < 0 ? 0 : new Date().getHours() - 8)), son = Math.max(new Date().getHours(), ilk + 5)
-  const calisan = d.makineler.filter((m: any) => m.durum === 'uretimde').length
+  // Makine sistemi (MES) verisi varsa durum/üretim oradan; yoksa panelin elle girilen kayıtları
+  const panelCalisan = d.makineler.filter((m: any) => m.durum === 'uretimde' && !mes.byPanel[m.id]).length
+  const calisan = panelCalisan + mes.calisan
+  const toplamMakine = d.makineler.length + mes.list.filter(m => !m.panelId).length
+  const uretimGoster = mes.uretimBugun > 0 ? mes.uretimBugun : bUretim
+  const mesGrafik = mes.uretimBugun > 0 && bUretim === 0 ? mes.list.filter(m => m.uretimBugun > 0).sort((a, b) => b.uretimBugun - a.uretimBugun) : null
   const sorunlu = d.makineler.filter((m: any) => ['arizali', 'bakimda'].includes(m.durum))
 
   const F = (id: string) => formlar[id] || { u: '', f: '0', c: '', n: '', v: '' }
@@ -70,21 +77,31 @@ export default function CanliUretimPage() {
         <div style={{ marginBottom: 16 }}><MesMakineKart /></div>
 
         <KpiGrid min={170}>
-          <Kpi label="Hatta Çalışan Emir" value={aktif.length} Icon={Activity} color="var(--adm-blue)" sub={`${calisan}/${d.makineler.length} makine çalışıyor`} />
-          <Kpi label="Bugün Üretim" value={fmtInt(bUretim)} Icon={Factory} color="var(--adm-green)" sub={`${bh.length} kayıt`} />
+          <Kpi label="Çalışan Makine" value={calisan} Icon={Activity} color="var(--adm-blue)" sub={`${toplamMakine} makineden · ${aktif.length} açık panel emri${mes.list.length ? ' · MES sinyaline göre' : ''}`} />
+          <Kpi label="Bugün Üretim" value={fmtInt(uretimGoster)} Icon={Factory} color="var(--adm-green)" sub={mes.uretimBugun > 0 ? 'makine sayaçlarından (MES)' : `${bh.length} kayıt`} />
           <Kpi label="Bugün Fire" value={`%${fmtN(fireOrani(bUretim, bFire), 1)}`} Icon={Flame} color={fireOrani(bUretim, bFire) > 5 ? 'var(--adm-red)' : 'var(--adm-amber)'} sub={`${fmtInt(bFire)} adet`} />
           <Kpi label="Arıza / Bakım" value={sorunlu.length} Icon={AlertTriangle} color={sorunlu.length ? 'var(--adm-red)' : 'var(--adm-green)'} sub={sorunlu.length ? sorunlu.map((m: any) => m.ad).join(', ') : 'Tüm makineler sağlam'} />
         </KpiGrid>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(100%,420px),1fr))', gap: 16, marginBottom: 16 }}>
-          <Card title="Bugünkü Saatlik Üretim" pad={16}><TrendChart type="bar" height={180} labels={Array.from({ length: son - ilk + 1 }, (_, i) => `${String(ilk + i).padStart(2, '0')}:00`)} series={[{ name: 'Üretilen adet', color: '#2f7dd6', data: saatlik.slice(ilk, son + 1) }]} format={n => fmtInt(n)} /></Card>
+          {mesGrafik ? (
+            <Card title="Bugünkü Üretim — Makineye Göre (MES)" pad={16}><TrendChart type="bar" height={180} labels={mesGrafik.map(m => m.ad)} series={[{ name: 'Üretilen adet', color: '#2f7dd6', data: mesGrafik.map(m => m.uretimBugun) }]} format={n => fmtInt(n)} /></Card>
+          ) : (
+            <Card title="Bugünkü Saatlik Üretim" pad={16}><TrendChart type="bar" height={180} labels={Array.from({ length: son - ilk + 1 }, (_, i) => `${String(ilk + i).padStart(2, '0')}:00`)} series={[{ name: 'Üretilen adet', color: '#2f7dd6', data: saatlik.slice(ilk, son + 1) }]} format={n => fmtInt(n)} /></Card>
+          )}
           <Card title={<><Cog size={14} />Makine Durumu</>} pad={14}>
-            {d.makineler.length === 0 ? <Empty title="Makine tanımlı değil" /> : (
+            {d.makineler.length === 0 && mes.list.length === 0 ? <Empty title="Makine tanımlı değil" /> : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>
-                {d.makineler.map((m: any) => { const s = MAKINE_DURUM[m.durum] || MAKINE_DURUM.musait; const e = aktif.find((x: any) => x.makine_id === m.id); return (
-                  <div key={m.id} style={{ padding: 10, borderRadius: 10, background: s.color + '14', border: `1px solid ${s.color}40` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700 }}><Cog size={13} style={{ color: s.color, animation: m.durum === 'uretimde' ? 'admSpin 6s linear infinite' : undefined }} />{m.ad}</div>
+                {[...d.makineler.map((m: any) => ({ id: m.id, ad: m.ad, panel: m, mes: mes.byPanel[m.id] || null })), ...mes.list.filter(x => !x.panelId).map(x => ({ id: 'mes' + x.id, ad: x.ad, panel: null, mes: x }))].map((r: any) => {
+                  const m = r.panel, x = r.mes, e = m ? aktif.find((z: any) => z.makine_id === m.id) : null
+                  // MES verisi varsa durum sayaçtan: taze+çalışıyor = Üretimde; çalışıyor ama kayıt eski = belirsiz; duruyor = Duruyor
+                  const s = x ? (x.durum === 1 ? (x.taze ? MAKINE_DURUM.uretimde : { l: 'Son kayıt: çalışıyor', color: 'var(--adm-blue)' }) : { l: 'Duruyor', color: 'var(--adm-amber)' }) : (MAKINE_DURUM[m?.durum] || MAKINE_DURUM.musait)
+                  const calisiyor = x ? x.durum === 1 && x.taze : m?.durum === 'uretimde'
+                  return (
+                  <div key={r.id} style={{ padding: 10, borderRadius: 10, background: s.color + '14', border: `1px solid ${s.color}40` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700 }}><Cog size={13} style={{ color: s.color, animation: calisiyor ? 'admSpin 6s linear infinite' : undefined }} />{r.ad}</div>
                     <div style={{ fontSize: 11, color: s.color, fontWeight: 600, marginTop: 2 }}>{s.l}</div>
+                    {x && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginTop: 2 }}>{x.son ? `${dkYaz(x.son)} önce · ` : ''}{fmtInt(x.uretimBugun)} adet bugün (MES)</div>}
                     {e && <div style={{ fontSize: 10.5, color: 'var(--adm-tx3)', marginTop: 2 }}>{e.no} · %{fmtN(yuzde(+e.uretilen_miktar, +e.planlanan_miktar), 0)}</div>}
                   </div>) })}
               </div>)}
