@@ -8,7 +8,7 @@ import { muh } from '@/lib/muhasebe-client'
 import { fmt, fmtK, fmtN, fmtInt, fmtDate, fmtDateTime, todayISO, daysBetween } from '@/lib/fmt'
 import { useUretim, byId, EMIR_DURUM, MAKINE_DURUM, yuzde, fireOrani, receteMaliyet, emirIhtiyac } from '@/lib/uretim-utils'
 import { sum } from '@/lib/muh-utils'
-import MesEmirKart from '@/components/admin/MesEmirKart'
+import { useMesEmirler, useMesPanel } from '@/lib/mes-canli'
 import { Page, PageHead, Kpi, KpiGrid, Badge, Tabs, Drawer, Modal, Field, FormGrid, InfoRow, Divider, Empty, useToast } from '@/components/admin/erp/ui'
 import { DataGrid, type Col } from '@/components/admin/erp/DataGrid'
 import TopluDuzenle from '@/components/admin/TopluDuzenle'
@@ -21,6 +21,7 @@ const girisBos = { uretilen: '', fire: '0', cevrim: '', neden: '', variant: '' }
 export default function UretimEmirleriPage() {
   const toast = useToast()
   const { d, loading, reload } = useUretim(['emirler', 'products', 'variants', 'hammaddeler', 'makineler', 'kaliplar', 'receteler', 'receteKalemleri', 'siparisler', 'siparisKalemleri', 'hareketler', 'cariler'])
+  const mesE = useMesEmirler(), mesP = useMesPanel() // makine sistemi (MES) emirleri: salt okunur satırlar
   const [tab, setTab] = useState('acik')
   const [detay, setDetay] = useState<any>(null)
   const [dTab, setDTab] = useState('ozet')
@@ -47,11 +48,12 @@ export default function UretimEmirleriPage() {
   const acikMi = (e: any) => ['planlandi', 'uretimde', 'durduruldu'].includes(e.durum)
   const gec = (e: any) => acikMi(e) && termin(e) && termin(e) < todayISO()
 
-  const cnt = (f: (e: any) => boolean) => d.emirler.filter(f).length
+  const tumEmirler = useMemo(() => [...mesE, ...d.emirler], [mesE, d.emirler])
+  const cnt = (f: (e: any) => boolean) => tumEmirler.filter(f).length
   const ay = todayISO().slice(0, 7)
   const ayHareket = d.hareketler.filter((h: any) => (h.tarih || '').startsWith(ay))
-  const ayUretim = sum(ayHareket, (h: any) => h.uretilen_adet), ayFire = sum(ayHareket, (h: any) => h.fire_adet)
-  const liste = d.emirler.filter((e: any) => tab === 'hepsi' ? true : tab === 'acik' ? acikMi(e) : tab === 'geciken' ? gec(e) : e.durum === tab)
+  const ayUretim = mesP.uretimAy || sum(ayHareket, (h: any) => h.uretilen_adet), ayFire = sum(ayHareket, (h: any) => h.fire_adet)
+  const liste = tumEmirler.filter((e: any) => tab === 'hepsi' ? true : tab === 'acik' ? acikMi(e) : tab === 'geciken' ? gec(e) : e.durum === tab)
 
   /* ── Hammadde ihtiyacı (MRP) ── */
   const ihtiyac = useMemo(() => {
@@ -206,13 +208,13 @@ export default function UretimEmirleriPage() {
 
   const ilerleme = (e: any) => yuzde(+e.uretilen_miktar, +e.planlanan_miktar)
   const cols: Col<any>[] = [
-    { key: 'no', label: 'Emir', sort: e => e.no, render: e => <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: 9, background: (EMIR_DURUM[e.durum]?.color || '#999') + '1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Factory size={15} style={{ color: EMIR_DURUM[e.durum]?.color }} /></div><div><b style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 12.5 }}>{e.no}</b><div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>{urun[e.urun_id]?.name || '—'}</div></div></div> },
-    { key: 'makine', label: 'Makine / Kalıp', sort: e => makine[e.makine_id]?.ad || '', render: e => <div>{makine[e.makine_id]?.ad || <span style={{ color: 'var(--adm-tx3)' }}>Atanmadı</span>}<div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>{kalip[e.kalip_id]?.ad || ''}</div></div>, hideSm: true },
+    { key: 'no', label: 'Emir', sort: e => e.no, render: e => <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ width: 32, height: 32, borderRadius: 9, background: (EMIR_DURUM[e.durum]?.color || '#999') + '1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Factory size={15} style={{ color: EMIR_DURUM[e.durum]?.color }} /></div><div><b style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 12.5 }}>{e.no}</b><div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>{e._mes ? (e._urun ? `${e._urun.ad} (${e._urun.kod})` : '—') : (urun[e.urun_id]?.name || '—')}</div></div></div> },
+    { key: 'makine', label: 'Makine / Kalıp', sort: e => (e._mes ? e._makine : makine[e.makine_id]?.ad) || '', render: e => e._mes ? <div>{e._makine}<div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>makine sistemi</div></div> : <div>{makine[e.makine_id]?.ad || <span style={{ color: 'var(--adm-tx3)' }}>Atanmadı</span>}<div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>{kalip[e.kalip_id]?.ad || ''}</div></div>, hideSm: true },
     { key: 'ilerleme', label: 'İlerleme', width: 190, sort: e => ilerleme(e), render: e => <div><div style={{ height: 6, borderRadius: 4, background: 'var(--adm-s2)', overflow: 'hidden' }}><div style={{ width: `${ilerleme(e)}%`, height: '100%', background: e.durum === 'tamamlandi' ? 'var(--adm-green)' : 'var(--adm-blue)' }} /></div><div style={{ fontSize: 11, color: 'var(--adm-tx3)', marginTop: 3 }}>{fmtInt(e.uretilen_miktar)} / {fmtInt(e.planlanan_miktar)} · %{fmtN(ilerleme(e), 0)}</div></div> },
     { key: 'fire', label: 'Fire', align: 'right', sort: e => fireOrani(+e.uretilen_miktar, +e.fire_miktar), render: e => +e.fire_miktar ? <span style={{ color: 'var(--adm-red)', fontWeight: 600 }}>%{fmtN(fireOrani(+e.uretilen_miktar, +e.fire_miktar), 1)}</span> : <span style={{ color: 'var(--adm-tx3)' }}>—</span>, hideSm: true },
     { key: 'termin', label: 'Termin', sort: e => termin(e) || '9999', render: e => termin(e) ? <div>{fmtDate(termin(e))}{gec(e) && <div style={{ fontSize: 10.5, color: 'var(--adm-red)', fontWeight: 700 }}>{daysBetween(termin(e))} gün gecikti</div>}</div> : <span style={{ color: 'var(--adm-tx3)' }}>—</span>, hideSm: true },
-    { key: 'durum', label: 'Durum', width: 110, sort: e => e.durum, render: e => <Badge tone={EMIR_DURUM[e.durum]?.tone}>{EMIR_DURUM[e.durum]?.l}</Badge> },
-    { key: 'act', label: '', width: 150, align: 'right', render: e => (
+    { key: 'durum', label: 'Durum', width: 110, sort: e => e.durum, render: e => <Badge tone={EMIR_DURUM[e.durum]?.tone}>{e._mes ? 'MES · ' : ''}{EMIR_DURUM[e.durum]?.l}</Badge> },
+    { key: 'act', label: '', width: 150, align: 'right', render: e => e._mes ? null : (
       <span style={{ display: 'inline-flex', gap: 4 }} onClick={ev => ev.stopPropagation()}>
         {['planlandi', 'durduruldu'].includes(e.durum) && <button className="adm-btn" style={{ padding: '4px 10px', fontSize: 11.5 }} disabled={busy} onClick={() => durumDegis(e, 'uretimde')}><Play size={12} />{e.durum === 'durduruldu' ? 'Devam' : 'Başlat'}</button>}
         {e.durum === 'uretimde' && <><button className="adm-btn-ghost" style={{ padding: '4px 8px' }} title="Duraklat" disabled={busy} onClick={() => durumDegis(e, 'durduruldu')}><Pause size={12} /></button><button className="adm-btn" style={{ padding: '4px 10px', fontSize: 11.5, background: 'var(--adm-green)' }} disabled={busy} onClick={() => durumDegis(e, 'tamamlandi')}><CheckCircle2 size={12} />Bitir</button></>}
@@ -258,13 +260,11 @@ export default function UretimEmirleriPage() {
           </div>
         )}
 
-        <div style={{ marginBottom: 16 }}><MesEmirKart /></div>
-
         <div style={{ marginBottom: 12 }}>
           <Tabs value={tab} onChange={setTab} tabs={[{ v: 'acik', l: 'Açık', n: cnt(acikMi) }, { v: 'planlandi', l: 'Planlı', n: cnt(e => e.durum === 'planlandi') }, { v: 'uretimde', l: 'Üretimde', n: cnt(e => e.durum === 'uretimde') }, { v: 'durduruldu', l: 'Durdurulan', n: cnt(e => e.durum === 'durduruldu') }, { v: 'geciken', l: 'Geciken', n: cnt(gec) }, { v: 'tamamlandi', l: 'Tamamlanan', n: cnt(e => e.durum === 'tamamlandi') }, { v: 'iptal', l: 'İptal', n: cnt(e => e.durum === 'iptal') }, { v: 'hepsi', l: 'Tümü', n: d.emirler.length }]} />
         </div>
 
-        <DataGrid rows={liste} cols={cols} rowKey={e => e.id} loading={loading} csvName="uretim-emirleri" storageKey="emirler" onRowClick={e => { setDetay(e); setDTab('ozet'); setGiris(girisBos) }} activeKey={detay?.id} selectable bulkActions={(sel) => <button className="adm-btn-ghost" style={{ padding: '3px 12px', fontSize: 12 }} onClick={() => setToplu(sel)}><ListChecks size={12} />Toplu düzenle</button>}
+        <DataGrid rows={liste} cols={cols} rowKey={e => e.id} loading={loading} csvName="uretim-emirleri" storageKey="emirler" onRowClick={e => { if (e._mes) return; setDetay(e); setDTab('ozet'); setGiris(girisBos) }} activeKey={detay?.id} selectable bulkActions={(sel) => <button className="adm-btn-ghost" style={{ padding: '3px 12px', fontSize: 12 }} onClick={() => { const p = sel.filter((e: any) => !e._mes); if (p.length) setToplu(p) }}><ListChecks size={12} />Toplu düzenle</button>}
           searchText={e => `${e.no} ${urun[e.urun_id]?.name || ''} ${makine[e.makine_id]?.ad || ''}`} searchPlaceholder="Emir no, ürün, makine..." emptyTitle="Emir bulunamadı" emptySub="Yeni Emir ile üretimi planla" />
       </Page>
 
