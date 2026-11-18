@@ -11,6 +11,8 @@ const th: React.CSSProperties = { textAlign: 'left', padding: '8px 12px', fontSi
 const thR: React.CSSProperties = { ...th, textAlign: 'right' }
 const td: React.CSSProperties = { padding: '8px 12px', fontSize: 12.5, borderBottom: '1px solid var(--adm-bd)' }
 const tdR: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'JetBrains Mono,monospace' }
+const bugunTR = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10)
+const gunEkle = (iso: string, n: number) => new Date(+new Date(iso + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10)
 const gunFarki = (iso: string) => Math.floor((Date.now() - +new Date(iso + 'T12:00:00')) / 86400000)
 
 export default function MesPage() {
@@ -22,20 +24,30 @@ export default function MesPage() {
   const [dr, setDr] = useState<any[]>([])
   const [em, setEm] = useState<any[]>([])
   const [sk, setSk] = useState<any>(null)
-  const [donem, setDonem] = useState('tum')
+  const [dk, setDk] = useState<any[]>([])
+  const [dn, setDn] = useState<any[]>([])
+  const [kl, setKl] = useState<any[]>([])
+  const [uk, setUk] = useState<any[]>([])
+  const [rc, setRc] = useState<any[]>([])
+  const [donem, setDonem] = useState('bugun')
   const [tab, setTab] = useState('makine')
 
   useEffect(() => {
     let iptal = false
     ;(async () => {
       try {
-        const [a, b, c, d, e, f] = await Promise.all([
+        const dkBas = gunEkle(bugunTR(), -62)
+        const [a, b, c, d, e, f, g1, g2, g3, g4, g5] = await Promise.all([
           erp.all('mes_makine', '*', (q: any) => q.order('id', { ascending: true })), erp.all('mes_urun', '*', (q: any) => q.order('id', { ascending: true })),
           erp.all('mes_uretim_gunluk', '*', (q: any) => q.order('anahtar', { ascending: true })), erp.all('mes_durum_gunluk', '*', (q: any) => q.order('anahtar', { ascending: true })),
           erp.all('mes_is_emri_satir', '*', (q: any) => q.order('id', { ascending: true })), erp.all('mes_senkron', '*', (q: any) => q.eq('basarili', true).order('calisma_zamani', { ascending: false }).limit(1)),
+          erp.all('mes_durus_kaydi', 'zaman,sure_sn,durum,makine_id,durus_nedeni_id,aciklama', (q: any) => q.gte('zaman', dkBas).order('zaman', { ascending: true })),
+          erp.all('mes_durus_nedeni', '*', (q: any) => q.order('id', { ascending: true })),
+          erp.all('mes_kalip', '*', (q: any) => q.order('kod', { ascending: true })), erp.all('mes_urun_kalip', '*', (q: any) => q.order('id', { ascending: true })),
+          erp.all('mes_recete', '*', (q: any) => q.order('id', { ascending: true })),
         ])
         if (iptal) return
-        setMk(a); setUr(b); setGn(c); setDr(d); setEm(e); setSk(f[0] || null)
+        setMk(a); setUr(b); setGn(c); setDr(d); setEm(e); setSk(f[0] || null); setDk(g1); setDn(g2); setKl(g3); setUk(g4); setRc(g5)
       } catch (x: any) { if (!iptal) setHata(String(x?.message || x)) } finally { if (!iptal) setYuk(false) }
     })()
     return () => { iptal = true }
@@ -50,7 +62,8 @@ export default function MesPage() {
     return { son, gun: son ? gunFarki(son) : null }
   }, [gn])
 
-  const inDonem = (t: string) => donem === 'tum' || String(t).startsWith(donem)
+  const bugun = bugunTR()
+  const inDonem = (t: string) => { const x = String(t).slice(0, 10); return donem === 'tum' || (donem === 'bugun' ? x === bugun : donem === 'son7' ? x >= gunEkle(bugun, -6) && x <= bugun : x.startsWith(donem)) }
   const G = useMemo(() => gn.filter(g => inDonem(g.tarih)), [gn, donem]) // eslint-disable-line react-hooks/exhaustive-deps
   const D = useMemo(() => dr.filter(g => inDonem(g.tarih)), [dr, donem]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -83,6 +96,31 @@ export default function MesPage() {
     return Object.values(o).filter(x => inDonem(x.bas || '')).sort((a, b) => String(b.bas || '').localeCompare(String(a.bas || '')))
   }, [em, donem]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const nedenAd = useMemo(() => Object.fromEntries(dn.map(x => [x.id, x.ad])), [dn])
+  const urunKod = (id: number) => urBy[id]?.kod || `#${id}`
+  const durusSatir = useMemo(() => {
+    const o: Record<string, any> = {}
+    dk.forEach(r => {
+      const gun = new Date(+new Date(r.zaman) + 3 * 3600000).toISOString().slice(0, 10)
+      if (!inDonem(gun)) return
+      const x = (o[r.makine_id] ||= { id: r.makine_id, cal: 0, dur: 0, kes: 0, neden: {} as Record<string, number> })
+      if (+r.durum === 1) x.cal += +r.sure_sn || 0
+      else { x.dur += +r.sure_sn || 0; x.kes++; const k = r.durus_nedeni_id ? (nedenAd[r.durus_nedeni_id] || `#${r.durus_nedeni_id}`) : 'Neden girilmemiş'; x.neden[k] = (x.neden[k] || 0) + (+r.sure_sn || 0) }
+    })
+    return Object.values(o).sort((a: any, b: any) => b.dur - a.dur)
+  }, [dk, donem, nedenAd]) // eslint-disable-line react-hooks/exhaustive-deps
+  const kalipSatir = useMemo(() => {
+    const kb = Object.fromEntries(kl.map(k => [k.id, k]))
+    const o: Record<string, any> = {}
+    uk.forEach(r => { const k = kb[r.kalip_id]; if (!k) return; (o[k.id] ||= { ...k, urunler: [] as string[] }).urunler.push(urunKod(r.urun_id)) })
+    kl.forEach(k => { if (!o[k.id]) o[k.id] = { ...k, urunler: [] } })
+    return Object.values(o).sort((a: any, b: any) => String(a.kod).localeCompare(String(b.kod)))
+  }, [kl, uk, urBy]) // eslint-disable-line react-hooks/exhaustive-deps
+  const receteSatir = useMemo(() => {
+    const o: Record<string, any> = {}
+    rc.forEach(r => { (o[r.urun_id] ||= { id: r.urun_id, kalem: [] as any[] }).kalem.push(r) })
+    return Object.values(o).sort((a: any, b: any) => String(urunKod(a.id)).localeCompare(String(urunKod(b.id))))
+  }, [rc, urBy]) // eslint-disable-line react-hooks/exhaustive-deps
   const yuzde = calSn + durSn ? (calSn / (calSn + durSn)) * 100 : 0
 
   return (
@@ -92,6 +130,8 @@ export default function MesPage() {
         <PageHead title="Makine Takip Sistemi Verisi" sub="Fabrikadaki makine sayaçlarından gelen üretim ve çalışma verisi — yalnızca okunur, her 3 dakikada güncellenir"
           actions={
             <select value={donem} onChange={e => setDonem(e.target.value)} className="adm-input" style={{ minWidth: 150 }}>
+              <option value="bugun">Bugün</option>
+              <option value="son7">Son 7 gün</option>
               <option value="tum">Tüm dönem</option>
               {aylar.map(a => <option key={a} value={a}>{a}</option>)}
             </select>
@@ -121,7 +161,7 @@ export default function MesPage() {
             </KpiGrid>
 
             <Tabs style={{ margin: '16px 0 12px' }} value={tab} onChange={setTab}
-              tabs={[{ v: 'makine', l: 'Makineler', n: makineSatir.length }, { v: 'urun', l: 'Ürünler (ilk 40)', n: urunSatir.length }, { v: 'emir', l: 'İş emirleri', n: emirSatir.length }]} />
+              tabs={[{ v: 'makine', l: 'Makineler', n: makineSatir.length }, { v: 'urun', l: 'Ürünler (ilk 40)', n: urunSatir.length }, { v: 'emir', l: 'İş emirleri', n: emirSatir.length }, { v: 'durus', l: 'Duruşlar', n: durusSatir.length }, { v: 'kalip', l: 'Kalıplar', n: kalipSatir.length }, { v: 'recete', l: 'Reçeteler', n: receteSatir.length }]} />
 
             {tab === 'makine' && (
               <Card pad={0}>
@@ -158,6 +198,53 @@ export default function MesPage() {
                       <thead><tr><th style={th}>Emir no</th><th style={th}>Makine</th><th style={th}>Ürün</th><th style={thR}>Hedef</th><th style={thR}>Üretilen</th><th style={th}>Başlangıç</th><th style={th}>Panel emri</th></tr></thead>
                       <tbody>{emirSatir.slice(0, 300).map(e => (
                         <tr key={e.no}><td style={td}>{e.no}{e.acik ? ' · açık' : ''}</td><td style={td}>{mkAd[e.makine] || '-'}</td><td style={td}>{urBy[e.urun]?.ad || '-'}</td><td style={tdR}>{fmtInt(e.hedef)}</td><td style={tdR}>{fmtInt(e.uretilen)}</td><td style={td}>{fmtDate(e.bas)}</td><td style={td}>{e.panel || '-'}</td></tr>
+                      ))}</tbody>
+                    </table></div>
+                  </>
+                )}
+              </Card>
+            )}
+
+            {tab === 'durus' && (
+              <Card pad={0}>
+                {durusSatir.length === 0 ? <Empty icon={<Timer size={28} />} title="Bu dönemde duruş kaydı yok" /> : (
+                  <>
+                    <div style={{ padding: '10px 14px', fontSize: 11.5, color: 'var(--adm-tx3)' }}>Duruş nedenleri makinede operatör tarafından seçilmezse “Neden girilmemiş” görünür. Duruş süresi sayaç sinyali gelmeyen süredir (planlı bekleme, vardiya dışı süre dahil).</div>
+                    <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead><tr><th style={th}>Makine</th><th style={thR}>Çalışma (sa)</th><th style={thR}>Duruş (sa)</th><th style={thR}>Duruş sayısı</th><th style={th}>Duruş nedenleri (sa)</th></tr></thead>
+                      <tbody>{durusSatir.map((m: any) => (
+                        <tr key={m.id}><td style={td}>{mkAd[m.id] || `#${m.id}`}</td><td style={tdR}>{fmtN(m.cal / 3600, 1)}</td><td style={tdR}>{fmtN(m.dur / 3600, 1)}</td><td style={tdR}>{fmtInt(m.kes)}</td>
+                          <td style={td}>{Object.entries(m.neden).sort((a: any, b: any) => b[1] - a[1]).map(([k, v]: any) => `${k}: ${fmtN(v / 3600, 1)}`).join(' · ')}</td></tr>
+                      ))}</tbody>
+                    </table></div>
+                  </>
+                )}
+              </Card>
+            )}
+
+            {tab === 'kalip' && (
+              <Card pad={0}>
+                {kalipSatir.length === 0 ? <Empty icon={<Cog size={28} />} title="Kalıp kaydı yok" /> : (
+                  <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr><th style={th}>Kalıp</th><th style={thR}>Göz sayısı</th><th style={thR}>Takma (dk)</th><th style={thR}>Sökme (dk)</th><th style={th}>Ürünler</th></tr></thead>
+                    <tbody>{kalipSatir.map((k: any) => (
+                      <tr key={k.id}><td style={td}>{k.ad || k.kod}<div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>{k.kod}</div></td><td style={tdR}>{k.goz_sayisi ?? '-'}</td><td style={tdR}>{k.takma_dk ?? '-'}</td><td style={tdR}>{k.sokme_dk ?? '-'}</td><td style={td}>{k.urunler.join(', ') || '-'}</td></tr>
+                    ))}</tbody>
+                  </table></div>
+                )}
+              </Card>
+            )}
+
+            {tab === 'recete' && (
+              <Card pad={0}>
+                {receteSatir.length === 0 ? <Empty icon={<Cog size={28} />} title="Reçete kaydı yok" /> : (
+                  <>
+                    <div style={{ padding: '10px 14px', fontSize: 11.5, color: 'var(--adm-tx3)' }}>Makine sistemindeki reçeteler. Muhasebe/maliyet için esas kaynak Mikro reçetesidir; bu liste karşılaştırma içindir.</div>
+                    <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead><tr><th style={th}>Ürün</th><th style={th}>Bileşenler (adet / miktar)</th></tr></thead>
+                      <tbody>{receteSatir.slice(0, 400).map((r: any) => (
+                        <tr key={r.id}><td style={td}>{urBy[r.id]?.ad || `#${r.id}`}<div style={{ fontSize: 11, color: 'var(--adm-tx3)' }}>{urBy[r.id]?.kod}</div></td>
+                          <td style={td}>{r.kalem.map((k: any) => `${urBy[k.alt_urun_id]?.kod || '#' + k.alt_urun_id}: ${k.adet ?? '-'} adet / ${k.miktar ?? '-'}`).join(' · ')}</td></tr>
                       ))}</tbody>
                     </table></div>
                   </>

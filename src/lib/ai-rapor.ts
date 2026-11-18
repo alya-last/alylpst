@@ -32,6 +32,7 @@ type Niyet =
   | { tur: 'pos' }
   | { tur: 'gelir_tablosu'; yil: number; ay: number; yillik?: boolean } // aylık gelir tablosu (satışlar/masraflar/üretim maliyeti/ciro/kar-zarar) görüntü + Excel
   | { tur: 'imalat'; yil: number; bas: number; bit: number; saksi: boolean; ayAy: boolean } // muhasebe şablonlu İMALAT ANALİZİ (iç mekan üretim × reçete; canlı formüllü Excel)
+  | { tur: 'mes'; konu: 'durus' | 'uretim' | 'kalip'; aralik: 'bugun' | 'dun' | 'son7' | 'ay'; kodlar: string[] } // fabrika makine sistemi (MES): duruş, makine üretimi, kalıp-ürün göz sayısı; varsayılan BUGÜN
   | { tur: 'kdv'; yil: number; ay: number }
   | { tur: 'odeme' }
   | { tur: 'ekstre'; arama: string; kod: string }
@@ -90,7 +91,7 @@ export function donemBul(soru: string, bugun: string = bugunISO()): Donem | null
 const donemAd = (d: Donem) => (d.bas === d.bit ? AYLAR[d.bas - 1] : `${AYLAR[d.bas - 1]}–${AYLAR[d.bit - 1]}`)
 /** Soruda dönem varsa niyete işler; dönemi destekleyen rapor yoksa ya yapay zekaya bırakır (null) ya da cevapta "ay bazlı değil" notu düşer. */
 function donemUygula(n: RaporNiyet | null, soru: string): RaporNiyet | null {
-  if (!n || n.tur === 'gelir_tablosu' || n.tur === 'imalat' || n.tur === 'kdv' || n.tur === 'boya_kg') return n
+  if (!n || n.tur === 'gelir_tablosu' || n.tur === 'imalat' || n.tur === 'mes' || n.tur === 'kdv' || n.tur === 'boya_kg') return n
   if ('donem' in n && n.donem) return n
   const d = donemBul(soru)
   if (!d) return n
@@ -152,6 +153,12 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
   if (/imalat analiz/.test(t) && !/neden|niye|yorum/.test(t)) {
     const bg = bugunISO(), d = donemBul(soru) || { bas: 1, bit: +bg.slice(5, 7) }, saksi = /saksi/.test(t) || !/\btum urun|\bic mekan/.test(t)
     return { tur: 'imalat', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), bas: d.bas, bit: d.bit, saksi, ayAy: /\bay ay\b|\baylik\b|her ay|ayri ayri|aylara gore/.test(t) }
+  }
+  // Makine sistemi (MES): duruş / makine üretimi / kalıp göz sayısı — varsayılan dönem BUGÜN
+  if (!/kalip bakim|bakim/.test(t) && (/\bdurus\w*|\bdurdu\w*|\bdurma\w*|\bcalismiyor|\bcalisma (suresi|orani)/.test(t) || (/\bmakine\w*/.test(t) && /uretim|uretil|uretti|calis|verim/.test(t)) || (/\bkalip\w*/.test(t) && /\bgoz\b|goz sayi|kac goz|hangi urun|hangi kalip|kalip(ta|lar)/.test(t)))) {
+    const konu = /\bkalip\w*/.test(t) && !/durus|durdu/.test(t) ? 'kalip' : /durus|durdu|durma|calismiyor|calisma/.test(t) ? 'durus' : 'uretim'
+    const aralik = /\bdun\b/.test(t) ? 'dun' : /son (7|yedi) gun|bu hafta|haftalik|gecen hafta|son hafta/.test(t) ? 'son7' : /\bbu ay\b|aylik/.test(t) ? 'ay' : 'bugun'
+    return { tur: 'mes', konu, aralik, kodlar: kodlariBul(soru) }
   }
   const kodlar0 = kodlariBul(soru)
   // Üretim adedi (Mikro ÜRETİM fişleri): "ekim kaç adet üretim yaptık", "ALY-132 ne kadar üretildi", "polo saksı üretimi"
@@ -1277,6 +1284,39 @@ export function baglamliSoru(gecmis: { role: string; content: string }[]): strin
   return son
 }
 
+const gunTR = (ms: number) => new Date(ms + 3 * 3600000).toISOString().slice(0, 10)
+/** Fabrika makine sistemi (MES) raporu. Varsayılan dönem BUGÜN; veri makine sistemindeki sayaçlardan gelir, 3 dakikada bir güncellenir. */
+async function mesRapor(sb: SupabaseClient, n: Extract<RaporNiyet, { tur: 'mes' }>): Promise<Sonuc> {
+  const bugun = gunTR(Date.now()), ay = bugun.slice(0, 7)
+  const aralik = n.aralik === 'dun' ? { b: gunTR(Date.now() - 86400000), s: gunTR(Date.now() - 86400000), ad: 'Dün' } : n.aralik === 'son7' ? { b: gunTR(Date.now() - 6 * 86400000), s: bugun, ad: 'Son 7 gün' } : n.aralik === 'ay' ? { b: ay + '-01', s: bugun, ad: 'Bu ay' } : { b: bugun, s: bugun, ad: 'Bugün' }
+  const mk = await sayfala(sb, 'mes_makine', 'id,kod,ad,aktif'), mkAd = Object.fromEntries(mk.map((m: any) => [m.id, m.ad || m.kod]))
+  if (n.konu === 'kalip') {
+    const [kl, uk, ur] = await Promise.all([sayfala(sb, 'mes_kalip', 'id,kod,ad,goz_sayisi,takma_dk,sokme_dk'), sayfala(sb, 'mes_urun_kalip', 'id,urun_id,kalip_id'), sayfala(sb, 'mes_urun', 'id,kod,ad')])
+    const urB = Object.fromEntries(ur.map((u: any) => [u.id, u])), klB = Object.fromEntries(kl.map((k: any) => [k.id, k]))
+    const ist = n.kodlar
+    const sat = uk.map((x: any) => ({ u: urB[x.urun_id], k: klB[x.kalip_id] })).filter((x: any) => x.u && x.k && (!ist.length || ist.some(c => kodEslesir(String(x.u.kod || ''), c))))
+    if (ist.length && !sat.length) return { yanit: `${ist.join(', ')} için makine sisteminde kalıp eşleşmesi bulunamadı.`, araclar: ['rapor_mes_kalip'] }
+    const g = [ist.length ? `KALIP – ÜRÜN EŞLEŞMESİ (${ist.join(', ')})` : `KALIPLAR (makine sistemi): ${kl.length} kalıp, ${uk.length} ürün eşleşmesi`, '', '| Ürün | Kalıp | Göz sayısı | Takma (dk) | Sökme (dk) |', '|---|---|---:|---:|---:|', ...sat.slice(0, 60).map((x: any) => `| ${x.u.kod} ${x.u.ad || ''} | ${x.k.ad || x.k.kod} | ${x.k.goz_sayisi ?? '—'} | ${x.k.takma_dk ?? '—'} | ${x.k.sokme_dk ?? '—'} |`)]
+    if (sat.length > 60) g.push('', `(ilk 60 satır gösterildi, toplam ${sat.length})`)
+    return { yanit: g.join('\n'), araclar: ['rapor_mes_kalip'] }
+  }
+  if (n.konu === 'uretim') {
+    const r = await sayfala(sb, 'mes_uretim_gunluk', 'anahtar,tarih,makine_id,uretim_adedi', (q: any) => q.gte('tarih', aralik.b).lte('tarih', aralik.s))
+    const o: Record<string, number> = {}; r.forEach((x: any) => { o[x.makine_id] = (o[x.makine_id] || 0) + (+x.uretim_adedi || 0) })
+    const l = Object.entries(o).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+    if (!l.length) return { yanit: `${aralik.ad} için makine sisteminde üretim sayacı kaydı yok (makine çalışmıyor, iş emri açılmamış ya da veri henüz gelmemiş olabilir).`, araclar: ['rapor_mes_uretim'] }
+    return { yanit: [`${aralik.ad.toUpperCase()} MAKİNE ÜRETİMİ (sayaç tabanlı)`, '', `Toplam: ${AD(l.reduce((t, x) => t + x[1], 0))} adet`, '', '| Makine | Üretim (adet) |', '|---|---:|', ...l.map(([id, v]) => `| ${mkAd[id] || '#' + id} | ${AD(v)} |`), '', 'Not: Sayaç değeridir; fire bu sistemde girilmediği için 0 görünür. Resmi üretim Mikro ÜRETİM fişlerindedir.'].join('\n'), araclar: ['rapor_mes_uretim'] }
+  }
+  const [dk, dn] = await Promise.all([sayfala(sb, 'mes_durus_kaydi', 'id,zaman,sure_sn,durum,makine_id,durus_nedeni_id', (q: any) => q.gte('zaman', `${aralik.b}T00:00:00+03:00`).lt('zaman', `${gunTR(+new Date(aralik.s + 'T12:00:00Z') + 86400000)}T00:00:00+03:00`)), sayfala(sb, 'mes_durus_nedeni', 'id,ad')])
+  const nAd = Object.fromEntries(dn.map((x: any) => [x.id, x.ad]))
+  const o: Record<string, any> = {}
+  dk.forEach((r: any) => { const x = (o[r.makine_id] ||= { c: 0, d: 0, k: 0, ne: {} as Record<string, number> }); if (+r.durum === 1) x.c += +r.sure_sn || 0; else { x.d += +r.sure_sn || 0; x.k++; const a = r.durus_nedeni_id ? (nAd[r.durus_nedeni_id] || '#' + r.durus_nedeni_id) : 'neden girilmemiş'; x.ne[a] = (x.ne[a] || 0) + (+r.sure_sn || 0) } })
+  const l = Object.entries(o).sort((a, b) => b[1].d - a[1].d)
+  if (!l.length) return { yanit: `${aralik.ad} için makine sisteminde duruş/çalışma kaydı bulunamadı.`, araclar: ['rapor_mes_durus'] }
+  const sa = (v: number) => TL(v / 3600), tc = l.reduce((t, x) => t + x[1].c, 0), td = l.reduce((t, x) => t + x[1].d, 0)
+  return { yanit: [`${aralik.ad.toUpperCase()} MAKİNE ÇALIŞMA / DURUŞ (makine sistemi)`, '', `Toplam çalışma ${sa(tc)} sa, duruş ${sa(td)} sa (çalışma oranı %${TL(tc + td ? tc / (tc + td) * 100 : 0)})`, '', '| Makine | Çalışma (sa) | Duruş (sa) | Çalışma % | Duruş sayısı | Duruş nedeni |', '|---|---:|---:|---:|---:|---|', ...l.map(([id, x]) => `| ${mkAd[id] || '#' + id} | ${sa(x.c)} | ${sa(x.d)} | ${TL(x.c + x.d ? x.c / (x.c + x.d) * 100 : 0)} | ${x.k} | ${Object.entries(x.ne).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map(([k, v]: any) => `${k} ${sa(v)} sa`).join(', ') || '—'} |`), '', `Not: ${aralik.ad === 'Bugün' ? 'Gün henüz bitmediği için süreler günün şu ana kadarki kısmıdır. ' : ''}Duruş, sayaçtan sinyal gelmeyen süredir (planlı bekleme ve vardiya dışı süre dahil). Duruş nedeni makinede operatör tarafından seçilmediği için çoğunlukla “neden girilmemiş” görünür.`].join('\n'), araclar: ['rapor_mes_durus'] }
+}
+
 export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set<string>): Promise<Sonuc | null> {
   let n0 = raporNiyeti(soru)
   if (!n0) { try { n0 = donemUygula(await niyetSinifla(soru), soru) } catch (e: any) { console.error('[ai-rapor] sinifla', e?.message) } }
@@ -1285,7 +1325,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
   const kap = ['hammadde', 'koli_kullanim', 'boya_kullanim', 'kullanim_ozet', 'uretim'].includes(n.tur) ? await urunKapsam(sb, soru).catch(() => null) : null
   if (kap?.yok) return { yanit: `"${kap.ad}" adında bir ürün satış/üretim kayıtlarında bulunamadı. Ürün kodunu (örn. ALY-651) ya da ürün adını farklı yazarak tekrar sorabilir misiniz? Yanlış rakam vermemek için tüm ürünlerin toplamını göstermedim.`, araclar: ['rapor_urun_yok'] }
   const uret = /uretim|uretil|imalat/.test(nrm(soru)) // "üretime göre" soruları satış yerine Mikro ÜRETİM fişlerinden hesaplanır
-  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], uretim: [], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], koli_kullanim: [], kullanim_ozet: ['satis_hammadde'], boya_kg: [], gramaj_liste: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], imalat: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
+  const gerek: Record<RaporNiyet['tur'], string[]> = { tahsilat: ['cari_mekan_ekstre'], stok: ['stok_durumu'], satis: ['urun_satis', 'musteri_satis'], urun: ['urun_satis'], urun_ad: ['urun_satis'], hammadde: ['satis_hammadde'], uretim: [], hm_stok: [], hm_alis: [], stok_kg: [], boya_kullanim: [], koli_kullanim: [], kullanim_ozet: ['satis_hammadde'], boya_kg: [], gramaj_liste: [], gramaj_kontrol: [], ihr_tahsilat: ['ihracat_gecmis'], ihr_rakam: ['ihracat_gecmis'], pos: ['pos_bekleyen'], gelir_tablosu: [], imalat: [], mes: [], kdv: ['kdv_ozet'], odeme: ['cari_ara'], ekstre: [], fiyat: [] }
   if (n.tur === 'ekstre' ? !(izinli.has('cari_ara') || izinli.has('cari_ekstre') || izinli.has('cari_mekan_ekstre')) : !gerek[n.tur].every(a => izinli.has(a))) return null
   try {
     const r0 = await (async (): Promise<Sonuc | null> => {
@@ -1323,6 +1363,7 @@ export async function detayliRapor(sb: SupabaseClient, soru: string, izinli: Set
         g.push('', `Not: Boya reçetede yoksa hammaddenin %2'si (tahmin). Kullanılan malzeme (miktar, fiyat) gelir tablosundaki kayıtlı kullanımdan alınır; kaydı olmayan malzemede stok alışları kullanılır.${t.satirlar.some(s => s.varsayim) ? ' * ile işaretli malzemede alış kaydı yok: miktar olması gereken kadar, fiyat hammadde kartı ortalama maliyeti alındı.' : ''}${t.mukerrer ? ` ${t.mukerrer} mükerrer görünen satın alma kaydı bir kez sayıldı.` : ''}`, '', `/api/admin/imalat-analizi?yil=${n.yil}&bas=${n.bas}&bit=${n.bit}${n.saksi ? '&urun=saksi' : ''}${n.ayAy ? '&ayay=1' : ''}&format=xlsx`)
         return { yanit: g.join('\n'), araclar: ['rapor_imalat_analizi'] }
       }
+      case 'mes': return await mesRapor(sb, n)
       case 'boya_kg': { const b = n.kg * n.oran, yp = r2(n.oran * 100); return { yanit: `${AD(n.kg)} kg hammadde × %${yp} boya oranı = ${TL(b)} kg (${TL(b / 1000)} ton) boya.\nHesap: hammadde kg × oran. Tahmini hesaptır, gerçek boya kullanımı kayıtlı değildir. Dış mekanda boya kullanılmaz.`, araclar: ['rapor_boya_kg'] } }
       case 'koli_kullanim': {
         const nq = nrm(soru)
