@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { erp } from '@/lib/erp-client'
 
 // Fabrika makine sistemi (MES) → panel makine eşlemesi ve bugünkü/aylık özet. Salt okunur; 60 sn'de bir yenilenir.
@@ -55,6 +55,7 @@ export const dkYaz = (iso: string) => { const dk = Math.max(0, Math.round((Date.
 // Önceki aylar deneme verisi sayıldığı için yalnız bu ay (Türkiye saatine göre ayın 1'inden itibaren).
 export function useMesEmirler() {
   const [rows, setRows] = useState<any[]>([])
+  const { list: makineler } = useMesPanel()
   useEffect(() => {
     let iptal = false
     const yukle = async () => {
@@ -72,7 +73,7 @@ export function useMesEmirler() {
         ug.forEach((x: any) => { if (x.is_emri_no == null) return; say[x.is_emri_no] = (say[x.is_emri_no] || 0) + (+x.uretim_adedi || 0); if (String(x.tarih) === bugun) sayBugun[x.is_emri_no] = (sayBugun[x.is_emri_no] || 0) + (+x.uretim_adedi || 0) })
         const o: Record<string, any> = {}
         em.forEach((r: any) => {
-          const x = (o[r.is_emri_no] ||= { _mes: true, id: `mes-${r.is_emri_no}`, no: `MES-${r.is_emri_no}`, mesNo: r.is_emri_no, _makine: mkAd[r.makine_id] || '-', _urun: urB[r.urun_id], planlanan_miktar: 0, uretilen_miktar: 0, fire_miktar: 0, baslangic: r.baslangic, acik: false })
+          const x = (o[r.is_emri_no] ||= { _mes: true, id: `mes-${r.is_emri_no}`, no: `MES-${r.is_emri_no}`, mesNo: r.is_emri_no, makineId: r.makine_id, _makine: mkAd[r.makine_id] || '-', _urun: urB[r.urun_id], planlanan_miktar: 0, uretilen_miktar: 0, fire_miktar: 0, baslangic: r.baslangic, acik: false })
           x.planlanan_miktar = Math.max(x.planlanan_miktar, +r.hedef_adet || 0); x.uretilen_miktar = Math.max(x.uretilen_miktar, +r.uretilen_adet || 0)
           if (r.baslangic && r.baslangic < x.baslangic) x.baslangic = r.baslangic
           if (!r.bitis) x.acik = true
@@ -88,5 +89,14 @@ export function useMesEmirler() {
     const t = setInterval(yukle, 60000)
     return () => { iptal = true; clearInterval(t) }
   }, [])
-  return rows
+  // Açık emrin makinesinden son 15 dk içinde sinyal gelmediyse "Üretimde" denmez: "Sinyal yok"
+  return useMemo(() => {
+    const mk = new Map(makineler.map(m => [m.id, m]))
+    return rows.map(x => {
+      if (x.durum !== 'uretimde') return x
+      const m = mk.get(x.makineId)
+      if (!m) return x
+      return !m.taze ? { ...x, durum: 'sinyalyok' } : m.durum === 1 ? x : { ...x, durum: 'durduruldu' }
+    })
+  }, [rows, makineler])
 }

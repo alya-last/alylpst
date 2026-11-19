@@ -69,7 +69,7 @@ export const KALIP_DURUM: Record<string, { l: string; tone: any; color: string }
 }
 export const EMIR_DURUM: Record<string, { l: string; tone: any; color: string }> = {
   planlandi: { l: 'Planlandı', tone: 'muted', color: 'var(--adm-tx3)' }, uretimde: { l: 'Üretimde', tone: 'blue', color: 'var(--adm-blue)' }, durduruldu: { l: 'Durduruldu', tone: 'amber', color: 'var(--adm-amber)' },
-  tamamlandi: { l: 'Tamamlandı', tone: 'green', color: 'var(--adm-green)' }, iptal: { l: 'İptal', tone: 'red', color: 'var(--adm-red)' },
+  sinyalyok: { l: 'Sinyal yok', tone: 'muted', color: 'var(--adm-tx3)' }, tamamlandi: { l: 'Tamamlandı', tone: 'green', color: 'var(--adm-green)' }, iptal: { l: 'İptal', tone: 'red', color: 'var(--adm-red)' },
 }
 
 /* ───── Hesaplar ───── */
