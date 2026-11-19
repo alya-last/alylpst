@@ -85,7 +85,7 @@ export function useMesEmirler() {
           if (!r.bitis) x.acik = true
         })
         setRows(Object.values(o).map((x: any) => ({
-          ...x, uretilen_miktar: Math.max(x.uretilen_miktar, say[x.mesNo] || 0),
+          ...x, uretilen_miktar: Math.max(x.uretilen_miktar, say[x.mesNo] || 0), uretimBugun: sayBugun[x.mesNo] || 0,
           // Açık ve bugün sayaç üretimi varsa "üretimde"; açık ama bugün üretim yoksa "durduruldu" (gerçek durum olmayabilir); kapalıysa "tamamlandı"
           durum: x.acik ? ((sayBugun[x.mesNo] || 0) > 0 ? 'uretimde' : 'durduruldu') : 'tamamlandi',
         })).sort((a: any, b: any) => String(b.baslangic).localeCompare(String(a.baslangic))))

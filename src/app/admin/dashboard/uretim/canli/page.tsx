@@ -7,7 +7,7 @@ import { fmtN, fmtInt } from '@/lib/fmt'
 import { useUretim, byId, MAKINE_DURUM, yuzde, fireOrani, emirIhtiyac, varyantEtiket } from '@/lib/uretim-utils'
 import { sum } from '@/lib/muh-utils'
 import MesMakineKart from '@/components/admin/MesMakineKart'
-import { useMesPanel, dkYaz } from '@/lib/mes-canli'
+import { useMesPanel, useMesEmirler, dkYaz } from '@/lib/mes-canli'
 import { Page, PageHead, Kpi, KpiGrid, Card, Badge, Empty, useToast } from '@/components/admin/erp/ui'
 import { TrendChart } from '@/components/admin/erp/charts'
 import { Activity, Send, Pause, CheckCircle2, Cog, AlertTriangle, Factory, Gauge, Timer, Flame, ExternalLink } from 'lucide-react'
@@ -23,6 +23,9 @@ export default function CanliUretimPage() {
   useEffect(() => { const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t) }, [])
 
   const mes = useMesPanel()
+  const mesE = useMesEmirler()
+  const mesAktif = mesE.filter((e: any) => e.durum === 'uretimde')
+  const mesBugun = mesE.filter((e: any) => e.uretimBugun > 0).sort((a: any, b: any) => b.uretimBugun - a.uretimBugun)
   const urun = useMemo(() => byId(d.products), [d.products])
   const makine = useMemo(() => byId(d.makineler), [d.makineler])
   const kalip = useMemo(() => byId(d.kaliplar), [d.kaliplar])
@@ -110,10 +113,28 @@ export default function CanliUretimPage() {
           </Card>
         </div>
 
-        {loading ? null : aktif.length === 0 ? (
+        {loading ? null : aktif.length === 0 && mesAktif.length === 0 ? (
           <div className="adm-card"><Empty icon={<Activity size={34} />} title="Şu anda hatta çalışan emir yok" sub="Üretim Emirleri sayfasından bir emri başlat." action={<Link href="/admin/dashboard/uretim/emirler" className="adm-btn" style={{ textDecoration: 'none' }}>Üretim emirlerine git</Link>} /></div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(360px,1fr))', gap: 16 }}>
+            {mesAktif.map((e: any) => {
+              const y = yuzde(+e.uretilen_miktar, +e.planlanan_miktar), r = 44, c = 2 * Math.PI * r, kalan = Math.max(+e.planlanan_miktar - +e.uretilen_miktar, 0)
+              return (
+                <div key={e.id} className="adm-card" style={{ borderTop: '3px solid var(--adm-blue)' }}>
+                  <div style={{ padding: '14px 16px', display: 'flex', gap: 14, alignItems: 'center' }}>
+                    <div style={{ position: 'relative', width: 100, height: 100, flexShrink: 0 }}>
+                      <svg width="100" height="100" style={{ transform: 'rotate(-90deg)' }}><circle cx="50" cy="50" r={r} fill="none" stroke="var(--adm-s2)" strokeWidth="9" /><circle cx="50" cy="50" r={r} fill="none" stroke={y >= 100 ? 'var(--adm-green)' : 'var(--adm-blue)'} strokeWidth="9" strokeLinecap="round" strokeDasharray={`${(y / 100) * c} ${c}`} /></svg>
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}><b style={{ fontSize: 20, fontFamily: 'JetBrains Mono,monospace' }}>{fmtN(y, 0)}%</b><span style={{ fontSize: 9.5, color: 'var(--adm-tx3)' }}>tamamlandı</span></div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}><b style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: 13 }}>{e.no}</b><Badge tone="blue"><Cog size={10} style={{ marginRight: 3 }} />{e._makine}</Badge><Badge tone="muted">MES</Badge></div>
+                      <div style={{ fontSize: 14, fontWeight: 700, margin: '3px 0' }}>{e._urun?.ad || '—'}</div>
+                      <div style={{ fontSize: 12, color: 'var(--adm-tx3)' }}>{fmtInt(e.uretilen_miktar)} / {fmtInt(e.planlanan_miktar)} adet · kalan {fmtInt(kalan)}</div>
+                      <div style={{ fontSize: 12, color: 'var(--adm-tx3)' }}>Bugün {fmtInt(e.uretimBugun)} adet (makine sayacı)</div>
+                    </div>
+                  </div>
+                </div>)
+            })}
             {aktif.map((e: any) => {
               const y = yuzde(+e.uretilen_miktar, +e.planlanan_miktar), m = makine[e.makine_id], f = F(e.id)
               const sure = e.baslangic ? (Date.now() - +new Date(e.baslangic)) / 3600000 : 0, hiz = sure > 0.02 ? +e.uretilen_miktar / sure : 0
@@ -170,7 +191,7 @@ export default function CanliUretimPage() {
 
         <div style={{ marginTop: 16 }}>
           <Card title={<><Timer size={14} />Son Üretim Hareketleri</>} right={<span style={{ fontSize: 11.5, color: 'var(--adm-tx3)' }}>son 30</span>}>
-            {d.hareketler.length === 0 ? <Empty icon={<Gauge size={28} />} title="Hareket yok" /> : d.hareketler.slice(0, 30).map((h: any) => {
+            {d.hareketler.length === 0 && mesBugun.length === 0 ? <Empty icon={<Gauge size={28} />} title="Hareket yok" /> : d.hareketler.slice(0, 30).map((h: any) => {
               const em = emirNo[h.uretim_emri_id]
               return (
                 <div key={h.id} className="adm-row" style={{ padding: '9px 16px' }}>
@@ -180,6 +201,12 @@ export default function CanliUretimPage() {
                   {+h.fire_adet > 0 && <b style={{ color: 'var(--adm-red)', fontFamily: 'JetBrains Mono,monospace', fontSize: 12 }}>fire {fmtInt(h.fire_adet)}</b>}
                 </div>)
             })}
+            {mesBugun.length > 0 && <div style={{ padding: '8px 16px', fontSize: 10.5, fontWeight: 700, color: 'var(--adm-tx3)', textTransform: 'uppercase', background: 'var(--adm-s2)' }}>Makine sistemi (MES) — bugünkü üretim</div>}
+            {mesBugun.map((e: any) => (
+              <div key={e.id} className="adm-row" style={{ padding: '9px 16px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12.5, fontWeight: 600 }}>{e.no} <span style={{ fontWeight: 400, color: 'var(--adm-tx3)' }}>· {e._urun?.ad || '—'} · {e._makine}</span></div></div>
+                <b style={{ color: 'var(--adm-green)', fontFamily: 'JetBrains Mono,monospace', fontSize: 13 }}>+{fmtInt(e.uretimBugun)}</b>
+              </div>))}
           </Card>
         </div>
       </Page>
