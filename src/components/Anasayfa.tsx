@@ -50,7 +50,7 @@ export default async function Anasayfa({ dil }: { dil: Dil }) {
   const vitrin = (yeniler.length ? yeniler : featured.length ? featured : gorunenler).slice(0, 14);
   const ilk = (mekan: "ic" | "dis") => gorunenler.find(p => p.mekan === mekan)?.image_url;
   const kat = Object.entries(gorunenler.reduce<Record<string, number>>((a, p) => { if (p.category) a[p.category] = (a[p.category] || 0) + 1; return a; }, {})).map(([k, adet]) => ({ k, adet, gorsel: gorunenler.find(p => p.category === k)?.image_url })).sort((x, y) => y.adet - x.adet);
-  const slaytGorsel = [img.hero2, img.fikir, img.ufo];
+  const slaytGorsel = ["/slider/slayt-1.jpg", img.fikir, img.ufo];
 
   return (
     <div className={`yt ${outfit.className}`}>
