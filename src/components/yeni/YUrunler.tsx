@@ -7,8 +7,6 @@ import { type Dil, urunLinki, ad, kurumsalYolu } from "@/lib/diller";
 import { kategoriGoster } from "@/lib/site-metin";
 import { Y } from "./metin";
 
-const TON = ["#e6eee3", "#f7e4dc", "#efe8da", "#e1eaf1", "#ebebeb"];
-
 export default function YUrunler({ products, dil = "tr" }: { products: Product[]; dil?: Dil }) {
   const t = Y[dil].yeni;
   const ref = useRef<HTMLDivElement>(null);
@@ -29,7 +27,6 @@ export default function YUrunler({ products, dil = "tr" }: { products: Product[]
         .yu-kart:hover .yu-kemer{transform:translateY(-10px);box-shadow:0 26px 40px -22px rgba(0,0,0,.35)}
         .yu-kart .yu-ok{opacity:0;transform:translate(-6px,6px) scale(.8);transition:all .35s}
         .yu-kart:hover .yu-ok{opacity:1;transform:none}
-        .yu-kart img{mix-blend-mode:multiply}
         .yu-ok2{width:46px;height:46px;border-radius:14px;border:1px solid rgba(0,0,0,.2);display:flex;align-items:center;justify-content:center;transition:all .2s;background:#fff}
         .yu-ok2:hover{background:var(--yt-accent);border-color:var(--yt-accent);color:#fff}
         @media (prefers-reduced-motion:reduce){.yu-kart .yu-kemer,.yu-kart .yu-ok{transition:none}}
@@ -49,14 +46,16 @@ export default function YUrunler({ products, dil = "tr" }: { products: Product[]
           </div>
         </div>
 
-        <div ref={ref} onScroll={guncelle} className="flex gap-6 overflow-x-auto snap-x snap-mandatory pt-2 pb-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div ref={ref} onScroll={guncelle} className="flex gap-6 overflow-x-auto snap-x snap-mandatory pt-4 pb-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {products.map((p, k) => (
             <Link key={p.id} href={urunLinki(p, dil)} className={`yu-kart group snap-start shrink-0 w-[62%] sm:w-[34%] lg:w-[calc(20%-19.2px)] text-center ${k % 2 ? "lg:mt-10" : ""}`}>
-              <div className="yu-kemer relative aspect-[4/5] flex items-center justify-center overflow-hidden" style={{ background: TON[k % TON.length], borderRadius: "999px 999px 22px 22px" }}>
-                <span className="absolute top-3 left-4 text-[13px] font-bold tracking-widest text-black/30 tabular-nums">{String(k + 1).padStart(2, "0")}</span>
-                {p.is_new && <span className="absolute top-[14%] right-3 z-10 w-14 h-14 rounded-full bg-[var(--yt-accent)] text-white text-[11px] font-bold tracking-wider flex items-center justify-center rotate-12 shadow-md">{t.yeni}</span>}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.image_url} alt={ad(p, dil)} loading="lazy" className="w-full h-full object-contain px-5 pt-[22%] pb-8 transition-transform duration-500 group-hover:scale-[1.06]" />
+              <div className="yu-kemer relative aspect-[5/6]">
+                <div className="absolute inset-0 overflow-hidden bg-[#efede8]" style={{ borderRadius: "999px 999px 22px 22px" }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.image_url} alt={ad(p, dil)} loading="lazy" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.06]" />
+                </div>
+                <span className="absolute top-[3%] left-1/2 -translate-x-1/2 text-[12px] font-bold tracking-widest text-black/35 tabular-nums">{String(k + 1).padStart(2, "0")}</span>
+                {p.is_new && <span className="absolute top-[13%] right-1 z-10 w-[58px] h-[58px] rounded-full bg-[var(--yt-accent)] text-white text-[12px] font-bold tracking-wider flex items-center justify-center rotate-12 shadow-lg ring-4 ring-white">{t.yeni}</span>}
                 <span className="yu-ok absolute bottom-3 right-3 w-10 h-10 rounded-full bg-black text-white flex items-center justify-center"><ArrowUpRight size={18} /></span>
               </div>
               <h3 className="mt-5 text-[18px] font-semibold">{ad(p, dil)}</h3>
