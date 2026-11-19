@@ -7,23 +7,29 @@ import { erp } from '@/lib/erp-client'
 // Son sinyal = zaman + sure_sn. TAZE = son sinyal ≤ 15 dk önce (3 dk'lık senkron + pay); değilse makineden sinyal gelmiyor demektir.
 export type MesM = { id: number; ad: string; panelId: string | null; son: string | null; durum: number | null; calSn: number; durSn: number; uretimBugun: number; uretimAy: number; calAySn: number; durAySn: number; taze: boolean }
 export const TAZE_DK = 15
+// TEK KURAL: makinenin durumu yalnız son sinyalden bulunur (tüm ekranlar bunu kullanır)
+export type MesDurum = 'calisiyor' | 'duruyor' | 'sinyalyok'
+export const mesDurum = (m?: { durum: number | null; taze: boolean } | null): MesDurum => (!m || !m.taze ? 'sinyalyok' : m.durum === 1 ? 'calisiyor' : 'duruyor')
 const trGun = (ms = Date.now()) => new Date(ms + 3 * 3600000).toISOString().slice(0, 10)
 
 export function useMesPanel() {
   const [list, setList] = useState<MesM[]>([])
   const [hazir, setHazir] = useState(false)
+  const [senkron, setSenkron] = useState<{ dk: number | null; basarili: boolean }>({ dk: null, basarili: true })
   useEffect(() => {
     let iptal = false
     const yukle = async () => {
       try {
         const bugun = trGun(), ayBas = bugun.slice(0, 8) + '01'
-        const [mk, dk, ug, dg] = await Promise.all([
+        const [mk, dk, ug, dg, sk] = await Promise.all([
           erp.all('mes_makine', 'id,ad,kod,panel_makine_id', (q: any) => q.order('id', { ascending: true })),
           erp.all('mes_durus_kaydi', 'zaman,sure_sn,durum,makine_id', (q: any) => q.gte('zaman', `${bugun}T00:00:00+03:00`).order('zaman', { ascending: true })),
           erp.all('mes_uretim_gunluk', 'anahtar,tarih,makine_id,uretim_adedi', (q: any) => q.gte('tarih', ayBas)),
           erp.all('mes_durum_gunluk', 'anahtar,tarih,makine_id,calisma_sn,durus_sn', (q: any) => q.gte('tarih', ayBas)),
+          erp.all('mes_senkron', 'calisma_zamani,basarili', (q: any) => q.gte('calisma_zamani', new Date(Date.now() - 6 * 3600000).toISOString()).order('calisma_zamani', { ascending: false })),
         ])
         if (iptal) return
+        const sn = sk[0]; setSenkron({ dk: sn ? Math.max(0, Math.round((Date.now() - +new Date(sn.calisma_zamani)) / 60000)) : null, basarili: sn ? sn.basarili !== false : true })
         const topla = (a: any[], k: string) => a.reduce((t, x) => t + (+x[k] || 0), 0)
         const o: MesM[] = mk.map((m: any) => {
           const k = dk.filter((x: any) => x.makine_id === m.id), s = k[k.length - 1]
@@ -47,7 +53,7 @@ export function useMesPanel() {
   }, [])
   const byPanel: Record<string, MesM> = {}
   list.forEach(m => { if (m.panelId) byPanel[m.panelId] = m })
-  return { list, byPanel, hazir, calisan: list.filter(m => m.durum === 1 && m.taze).length, uretimBugun: list.reduce((t, m) => t + m.uretimBugun, 0), uretimAy: list.reduce((t, m) => t + m.uretimAy, 0) }
+  return { list, byPanel, hazir, senkron, calisan: list.filter(m => m.durum === 1 && m.taze).length, uretimBugun: list.reduce((t, m) => t + m.uretimBugun, 0), uretimAy: list.reduce((t, m) => t + m.uretimAy, 0) }
 }
 export const dkYaz = (iso: string) => { const dk = Math.max(0, Math.round((Date.now() - +new Date(iso)) / 60000)); return dk < 60 ? `${dk} dk` : `${Math.floor(dk / 60)} sa ${dk % 60} dk` }
 
@@ -96,7 +102,8 @@ export function useMesEmirler() {
       if (x.durum !== 'uretimde') return x
       const m = mk.get(x.makineId)
       if (!m) return x
-      return !m.taze ? { ...x, durum: 'sinyalyok' } : m.durum === 1 ? x : { ...x, durum: 'durduruldu' }
+      const d = mesDurum(m)
+      return d === 'sinyalyok' ? { ...x, durum: 'sinyalyok' } : d === 'calisiyor' ? x : { ...x, durum: 'durduruldu' }
     })
   }, [rows, makineler])
 }
