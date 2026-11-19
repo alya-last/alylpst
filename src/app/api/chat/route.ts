@@ -17,7 +17,7 @@ async function baglam() {
   if (onbellek && Date.now() - onbellek.t < 5 * 60 * 1000) return onbellek
   const [urunler, ayar] = await Promise.all([getAllProducts().catch(() => []), getSettings().catch(() => null)])
   const katalog = urunler.slice(0, 120).map(p => {
-    const spec = Object.entries(p.specs || {}).slice(0, 6).map(([k, v]) => `${k}: ${v}`).join(', ')
+    const spec = Object.entries(p.specs || {}).filter(([k]) => k.toLowerCase() !== "kaynak").slice(0, 6).map(([k, v]) => `${k}: ${v}`).join(', ')
     return `- ${p.name} (${p.code}) | kategori: ${p.category}${p.subcategory ? '/' + p.subcategory : ''}${spec ? ' | ' + spec : ''}${p.description ? ' | ' + String(p.description).slice(0, 160) : ''}`
   }).join('\n').slice(0, 18000)
   const iletisim = [

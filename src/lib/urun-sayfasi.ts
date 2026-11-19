@@ -76,7 +76,7 @@ export const jsonLdMetni = (o: unknown) => JSON.stringify(o).replace(/</g, "\\u0
 
 export function urunJsonLd(u: UrunKaydi, d: Dil, kategori?: string) {
   const resimler = [u.image_url, ...(u.images || [])].filter((x, i, a) => typeof x === "string" && x.startsWith("https://") && a.indexOf(x) === i);
-  const ozellik = Object.entries(u.specs || {}).slice(0, 20).map(([k, v]) => ({ "@type": "PropertyValue", name: ozellikEtiketi(String(k), d).slice(0, 80), value: String(v).slice(0, 200) }));
+  const ozellik = Object.entries(u.specs || {}).filter(([k]) => k.toLowerCase() !== "kaynak").slice(0, 20).map(([k, v]) => ({ "@type": "PropertyValue", name: ozellikEtiketi(String(k), d).slice(0, 80), value: String(v).slice(0, 200) }));
   return {
     "@context": "https://schema.org",
     "@graph": [

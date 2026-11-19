@@ -15,7 +15,7 @@ export default function UrunSayfasi({ urun, dil, settings, benzer, kategoriler =
   const resimler = [urun.image_url, ...(urun.images || [])].filter((x, i, a) => typeof x === "string" && x.startsWith("https://") && a.indexOf(x) === i);
   const kareler360 = (urun.gorunum_360 || []).filter(x => typeof x === "string" && x.startsWith("https://"));
   const metin = aciklama(urun, dil);
-  const ozellikler = Object.entries(urun.specs || {});
+  const ozellikler = Object.entries(urun.specs || {}).filter(([k]) => k.toLowerCase() !== "kaynak");
   const diller = mevcutDiller(urun);
   const urunAdi = ad(urun, dil);
   // Dil değiştirici bu ürünün sayfasında kalmalı: her zaman aynı ürünün o dildeki sayfasına gider
