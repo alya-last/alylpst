@@ -110,6 +110,15 @@ function raporNiyetiHam(soru: string): RaporNiyet | null {
   // "nisan ayı gider tablosu / nisan giderleri / nisan masrafları" da aynı çıktıyı ister: ALYA PLASTİK <YIL> <AY> GELİR TABLOSU (SATIŞLAR | MASRAFLAR | ÜRETİM MALİYETİ | CİRO | KAR-ZARAR). Ayrı, eksik bir gider listesi üretilmez.
   const AY_RE = /\b(ocak|subat|mart|nisan|mayis|haziran|temmuz|agustos|eylul|ekim|kasim|aralik)\b/
   const aylikGider = AY_RE.test(t) && /\b(gider\w*|masraf\w*)\b/.test(t) && t.split(' ').length <= 7 && !/kira|elektrik|personel|maas|nakliye|yemek|sgk|stopaj|vergi|kdv|hammadde|boya|koli|etiket|fatura|cari|banka|kasa|cek|senet|ihracat|fuar|kategori/.test(t)
+  // "ocak ve ekim dahil gelir tablosu / ocak ayından ekim ayına kar / ocaktan ekime kadar gelir tablosu": Ocak'tan söylenen son aya kadar tek yıllık tablo (yalnızca ilk ayı vermez)
+  {
+    const AYK2 = ['ocak', 'subat', 'mart', 'nisan', 'mayis', 'haziran', 'temmuz', 'agustos', 'eylul', 'ekim', 'kasim', 'aralik']
+    const gec = AYK2.map((a, i) => ({ i, k: t.search(new RegExp(`\\b${a}`)) })).filter(x => x.k >= 0)
+    if (gec.length >= 2 && gec.some(x => x.i === 0) && /gelir tablo|gelir gider tablo|kar zarar|yonetim rapor|\bkar\b|gider tablo|masraf tablo/.test(t) && !/urun|musteri|kdv|hammadde|boya|koli|ihracat|imalat|stok|cek|senet|kategori/.test(t)) {
+      const bg2 = bugunISO(), son = Math.max(...gec.map(x => x.i)) + 1
+      return { tur: 'gelir_tablosu', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg2.slice(0, 4), ay: son, yillik: true }
+    }
+  }
   if (/\b(yillik|yil basindan|yil basi|bu yil|2026 yili|senelik)\b/.test(t) && /gelir tablo|gelir gider tablo|kar zarar tablo|yonetim rapor|gider tablo|masraf tablo|tablo/.test(t) && !/urun|musteri|kdv|hammadde|boya|koli|ihracat/.test(t) && !AY_RE.test(t)) {
     const bg = bugunISO(); return { tur: 'gelir_tablosu', yil: +(/\b(20\d\d)\b/.exec(t)?.[1] || 0) || +bg.slice(0, 4), ay: +bg.slice(5, 7), yillik: true }
   }
