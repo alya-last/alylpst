@@ -33,7 +33,7 @@ function DilSecici({ dil, altDiller }: { dil: Dil; altDiller?: Partial<Record<Di
               {d === dil ? (
                 <span className="flex items-center gap-2.5 px-3.5 py-2.5 font-semibold"><span className="text-[17px]">{BAYRAK[d]}</span><span className="flex-1">{DIL_AD[d]}</span><Check size={15} className="text-[var(--yt-accent)]" /></span>
               ) : (
-                <Link href={altDiller?.[d] ?? dilYolu(d)} hrefLang={HREFLANG[d]} onClick={() => setAcik(false)} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-black/[0.05]"><span className="text-[17px]">{BAYRAK[d]}</span><span>{DIL_AD[d]}</span></Link>
+                <Link href={altDiller?.[d] ?? dilYolu(d)} hrefLang={HREFLANG[d]} onClick={() => { document.cookie = `dil=${d}; path=/; max-age=31536000; samesite=lax`; setAcik(false); }} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-black/[0.05]"><span className="text-[17px]">{BAYRAK[d]}</span><span>{DIL_AD[d]}</span></Link>
               )}
             </li>
           ))}
