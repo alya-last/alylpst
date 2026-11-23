@@ -1,19 +1,21 @@
 import type { MetadataRoute } from "next";
 import { DILLER, HREFLANG, SITE_URL, getTumUrunler, mevcutDiller, urunUrl } from "@/lib/urun-sayfasi";
+import { kurumsalYolu } from "@/lib/diller";
 
 export const revalidate = 3600;
 
-// Türkçe'ye özel, dil dışı statik kurumsal sayfalar (yalnızca tr-TR + x-default).
+// Kurumsal sayfalar: her dil için ayrı adres + karşılıklı hreflang + x-default (Türkçe).
 const STATIK_SAYFALAR = ["hakkimizda", "uretim-sureci", "sertifikalar", "kvkk", "urunler", "iletisim"];
 
 // Ana sayfa + statik sayfalar + her ürün sayfası. Yabancı dil adresleri yalnızca çevirisi girilmiş ürünler için listelenir (hreflang karşılıklı).
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const anaDiller = Object.fromEntries(DILLER.map(d => [HREFLANG[d], d === "tr" ? SITE_URL : `${SITE_URL}/${d}`]));
   const kok: MetadataRoute.Sitemap = DILLER.map(d => ({ url: d === "tr" ? SITE_URL : `${SITE_URL}/${d}`, lastModified: new Date(), changeFrequency: "weekly" as const, priority: d === "tr" ? 1 : 0.9, alternates: { languages: anaDiller } }));
-  const statik: MetadataRoute.Sitemap = STATIK_SAYFALAR.map(yol => ({
-    url: `${SITE_URL}/${yol}`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: 0.4,
-    alternates: { languages: { "tr-TR": `${SITE_URL}/${yol}`, "x-default": `${SITE_URL}/${yol}` } },
-  }));
+  const statik: MetadataRoute.Sitemap = STATIK_SAYFALAR.flatMap(yol => {
+    const languages: Record<string, string> = Object.fromEntries(DILLER.map(d => [HREFLANG[d], `${SITE_URL}${kurumsalYolu(d, yol)}`]));
+    languages["x-default"] = `${SITE_URL}/${yol}`;
+    return DILLER.map(d => ({ url: `${SITE_URL}${kurumsalYolu(d, yol)}`, lastModified: new Date(), changeFrequency: "monthly" as const, priority: d === "tr" ? 0.4 : 0.3, alternates: { languages } }));
+  });
   try {
     const urunler = await getTumUrunler();
     const liste: MetadataRoute.Sitemap = [];

@@ -29,17 +29,17 @@ export const kategoriAdi = (slug: string | null | undefined, harita: Record<stri
 
 /** Teknik özellik anahtarları (veride ASCII, ör. "cap", "agirlik") için görünen etiketler. */
 const OZ: Record<string, Record<Dil, string>> = {
-  cap: { tr: "Çap", en: "Diameter", ru: "Диаметр", zh: "直径" },
-  hacim: { tr: "Hacim", en: "Volume", ru: "Объём", zh: "容积" },
-  agirlik: { tr: "Ağırlık", en: "Weight", ru: "Вес", zh: "重量" },
-  malzeme: { tr: "Malzeme", en: "Material", ru: "Материал", zh: "材质" },
-  yukseklik: { tr: "Yükseklik", en: "Height", ru: "Высота", zh: "高度" },
-  genislik: { tr: "Genişlik", en: "Width", ru: "Ширина", zh: "宽度" },
-  uzunluk: { tr: "Uzunluk", en: "Length", ru: "Длина", zh: "长度" },
-  renk: { tr: "Renk", en: "Colour", ru: "Цвет", zh: "颜色" },
-  boyut: { tr: "Boyut", en: "Size", ru: "Размер", zh: "尺寸" },
-  kapasite: { tr: "Kapasite", en: "Capacity", ru: "Вместимость", zh: "容量" },
-  ebat: { tr: "Ebat", en: "Dimensions", ru: "Размеры", zh: "规格" },
+  cap: { tr: "Çap", en: "Diameter", ru: "Диаметр", zh: "直径", ar: "القطر", de: "Durchmesser", fr: "Diamètre" },
+  hacim: { tr: "Hacim", en: "Volume", ru: "Объём", zh: "容积", ar: "الحجم", de: "Volumen", fr: "Volume" },
+  agirlik: { tr: "Ağırlık", en: "Weight", ru: "Вес", zh: "重量", ar: "الوزن", de: "Gewicht", fr: "Poids" },
+  malzeme: { tr: "Malzeme", en: "Material", ru: "Материал", zh: "材质", ar: "المادة", de: "Material", fr: "Matériau" },
+  yukseklik: { tr: "Yükseklik", en: "Height", ru: "Высота", zh: "高度", ar: "الارتفاع", de: "Höhe", fr: "Hauteur" },
+  genislik: { tr: "Genişlik", en: "Width", ru: "Ширина", zh: "宽度", ar: "العرض", de: "Breite", fr: "Largeur" },
+  uzunluk: { tr: "Uzunluk", en: "Length", ru: "Длина", zh: "长度", ar: "الطول", de: "Länge", fr: "Longueur" },
+  renk: { tr: "Renk", en: "Colour", ru: "Цвет", zh: "颜色", ar: "اللون", de: "Farbe", fr: "Couleur" },
+  boyut: { tr: "Boyut", en: "Size", ru: "Размер", zh: "尺寸", ar: "الحجم", de: "Größe", fr: "Taille" },
+  kapasite: { tr: "Kapasite", en: "Capacity", ru: "Вместимость", zh: "容量", ar: "السعة", de: "Fassungsvermögen", fr: "Capacité" },
+  ebat: { tr: "Ebat", en: "Dimensions", ru: "Размеры", zh: "规格", ar: "الأبعاد", de: "Abmessungen", fr: "Dimensions" },
 };
 const anahtar = (k: string) => k.toLocaleLowerCase("tr-TR").replace(/[çğıöşü]/g, c => ({ ç: "c", ğ: "g", ı: "i", ö: "o", ş: "s", ü: "u" } as Record<string, string>)[c]).replace(/[^a-z0-9]/g, "");
 export const ozellikEtiketi = (k: string, d: Dil) => OZ[anahtar(k)]?.[d] || (k.charAt(0).toLocaleUpperCase(d === "tr" ? "tr-TR" : undefined) + k.slice(1));
@@ -69,6 +69,12 @@ export const UI: Record<Dil, { anasayfa: string; urunler: string; kod: string; k
     paketBaslik: "Информация о товаре", paketKod: "Код", paketAdet: "Кол-во в коробке", paketKutuHacmi: "Объём коробки (м³)", paketKutuAgirligi: "Вес коробки (кг)", paketOlculer: "Размеры (см)", paketHacim: "Объём (л)" },
   zh: { anasayfa: "首页", urunler: "产品", kod: "产品编号", kategori: "类别", ozellikler: "规格参数", etiketler: "标签", teklif: "获取报价", whatsapp: "通过 WhatsApp 咨询", benzer: "相关产品", b2b: "获取批发与出口价格及运输信息。", yeni: "新品", dil: "语言", wamesaj: (a, k) => `您好，我想获取 ${a}（${k}）的批发报价。`,
     paketBaslik: "产品信息", paketKod: "编号", paketAdet: "每箱数量", paketKutuHacmi: "箱体积 (m³)", paketKutuAgirligi: "箱重 (kg)", paketOlculer: "尺寸 (cm)", paketHacim: "容积 (L)" },
+  de: { anasayfa: "Startseite", urunler: "Produkte", kod: "Produktcode", kategori: "Kategorie", ozellikler: "Eigenschaften", etiketler: "Schlagwörter", teklif: "Angebot anfordern", whatsapp: "Per WhatsApp fragen", benzer: "Ähnliche Produkte", b2b: "Erhalten Sie Großhandels- und Exportpreise sowie Versandinformationen.", yeni: "Neu", dil: "Sprache", wamesaj: (a, k) => `Hallo, ich möchte ein Großhandelsangebot für ${a} (${k}) erhalten.`,
+    paketBaslik: "Produktinformationen", paketKod: "Code", paketAdet: "Stück pro Karton", paketKutuHacmi: "Kartonvolumen (m³)", paketKutuAgirligi: "Kartongewicht (kg)", paketOlculer: "Abmessungen (cm)", paketHacim: "Volumen (L)" },
+  fr: { anasayfa: "Accueil", urunler: "Produits", kod: "Référence", kategori: "Catégorie", ozellikler: "Caractéristiques", etiketler: "Mots-clés", teklif: "Demander un devis", whatsapp: "Poser une question sur WhatsApp", benzer: "Produits similaires", b2b: "Obtenez les tarifs de gros et d'export ainsi que les informations d'expédition.", yeni: "Nouveau", dil: "Langue", wamesaj: (a, k) => `Bonjour, je souhaite recevoir un devis de gros pour ${a} (${k}).`,
+    paketBaslik: "Informations produit", paketKod: "Code", paketAdet: "Pièces par carton", paketKutuHacmi: "Volume du carton (m³)", paketKutuAgirligi: "Poids du carton (kg)", paketOlculer: "Dimensions (cm)", paketHacim: "Volume (L)" },
+  ar: { anasayfa: "الرئيسية", urunler: "المنتجات", kod: "رمز المنتج", kategori: "الفئة", ozellikler: "المواصفات", etiketler: "الوسوم", teklif: "اطلب عرض سعر", whatsapp: "اسأل عبر واتساب", benzer: "منتجات مشابهة", b2b: "احصل على أسعار الجملة والتصدير ومعلومات الشحن.", yeni: "جديد", dil: "اللغة", wamesaj: (a, k) => `مرحبًا، أودّ الحصول على عرض سعر بالجملة للمنتج ${a} (${k}).`,
+    paketBaslik: "معلومات المنتج", paketKod: "الرمز", paketAdet: "عدد القطع في الكرتونة", paketKutuHacmi: "حجم الكرتونة (م³)", paketKutuAgirligi: "وزن الكرتونة (كغ)", paketOlculer: "الأبعاد (سم)", paketHacim: "الحجم (لتر)" },
 };
 
 /** JSON-LD içine gömülürken HTML kapatma karakterlerini kaçırır (XSS önlemi). */

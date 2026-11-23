@@ -11,13 +11,16 @@ function ayniKaynakDegil(request: NextRequest) {
 }
 
 
-// --- Ziyaretçi dili: ana sayfa ("/") ilk açılışta tarayıcı diline (Accept-Language), olmazsa ülkeye göre /en, /ru, /zh'e yönlenir. ---
+// --- Ziyaretçi dili: ana sayfa ("/") ilk açılışta tarayıcı diline (Accept-Language), olmazsa ülkeye göre /en, /ru, /zh, /ar, /de, /fr'e yönlenir. ---
 // Kullanıcı dil menüsünden seçim yaptığında "dil" çerezi yazılır (YHeader) ve bir daha otomatik yönlendirme yapılmaz.
-const DESTEKLI = ['tr', 'en', 'ru', 'zh'] as const
+const DESTEKLI = ['tr', 'en', 'ru', 'zh', 'ar', 'de', 'fr'] as const
 type DilKodu = (typeof DESTEKLI)[number]
 const BOT = /bot|crawl|spider|slurp|facebookexternalhit|bingpreview|lighthouse|pagespeed|headless|preview|whatsapp|telegram/i
 const RU_ULKE = new Set(['RU', 'BY', 'KZ', 'KG', 'UZ', 'TJ', 'AM', 'AZ', 'MD'])
 const ZH_ULKE = new Set(['CN', 'HK', 'MO', 'TW', 'SG'])
+const AR_ULKE = new Set(['SA', 'AE', 'EG', 'IQ', 'JO', 'KW', 'QA', 'BH', 'OM', 'LB', 'SY', 'YE', 'LY', 'DZ', 'MA', 'TN', 'SD', 'PS'])
+const DE_ULKE = new Set(['DE', 'AT', 'CH', 'LI'])
+const FR_ULKE = new Set(['FR', 'BE', 'LU', 'MC'])
 
 function tarayiciDili(al: string | null): DilKodu | null {
   if (!al) return null
@@ -40,6 +43,9 @@ function ziyaretciDili(request: NextRequest): DilKodu {
   if (!ulke || ulke === 'TR') return 'tr'
   if (RU_ULKE.has(ulke)) return 'ru'
   if (ZH_ULKE.has(ulke)) return 'zh'
+  if (AR_ULKE.has(ulke)) return 'ar'
+  if (DE_ULKE.has(ulke)) return 'de'
+  if (FR_ULKE.has(ulke)) return 'fr'
   return 'en'
 }
 

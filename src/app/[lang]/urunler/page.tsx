@@ -5,7 +5,7 @@ import { UM } from "@/components/yeni/urunler-metin";
 import { DILLER, HREFLANG, SITE_URL, isDil, kurumsalYolu } from "@/lib/diller";
 
 export const revalidate = 300;
-const LOCALE: Record<string, string> = { en: "en_US", ru: "ru_RU", zh: "zh_CN" };
+const LOCALE: Record<string, string> = { en: "en_US", ru: "ru_RU", zh: "zh_CN", ar: "ar_AR", de: "de_DE", fr: "fr_FR" };
 
 export function generateStaticParams() {
   return DILLER.filter(d => d !== "tr").map(d => ({ lang: d }));

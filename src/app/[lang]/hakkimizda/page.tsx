@@ -7,7 +7,7 @@ import { HAKKIMIZDA } from "@/lib/kurumsal-metin";
 import KurumsalSayfa from "@/components/kurumsal/KurumsalSayfa";
 
 export const revalidate = 3600;
-const LOCALE: Record<string, string> = { en: "en_US", ru: "ru_RU", zh: "zh_CN" };
+const LOCALE: Record<string, string> = { en: "en_US", ru: "ru_RU", zh: "zh_CN", ar: "ar_AR", de: "de_DE", fr: "fr_FR" };
 
 export function generateStaticParams() {
   return DILLER.filter(d => d !== "tr").map(d => ({ lang: d }));
