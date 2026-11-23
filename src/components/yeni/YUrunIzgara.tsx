@@ -11,6 +11,9 @@ const T: Record<Dil, { incele: string; baslik: string; alt: string; btn: string 
   en: { incele: "View", baslik: "Can't find the model you need?", alt: "We'll prepare a custom quote for size, colour and quantity.", btn: "Request a quote" },
   ru: { incele: "Смотреть", baslik: "Не нашли нужную модель?", alt: "Подготовим индивидуальное предложение по размеру, цвету и количеству.", btn: "Запросить цену" },
   zh: { incele: "查看", baslik: "没找到合适的型号？", alt: "我们可根据尺寸、颜色和数量为您定制报价。", btn: "获取报价" },
+  de: { incele: "Ansehen", baslik: "Das gesuchte Modell nicht gefunden?", alt: "Wir erstellen Ihnen ein individuelles Angebot für Größe, Farbe und Menge.", btn: "Angebot anfordern" },
+  fr: { incele: "Voir", baslik: "Vous ne trouvez pas le modèle recherché ?", alt: "Nous préparons un devis sur mesure selon la taille, la couleur et la quantité.", btn: "Demander un devis" },
+  ar: { incele: "عرض", baslik: "لم تجد الطراز الذي تبحث عنه؟", alt: "نُعدّ لك عرض سعر خاصًا حسب الحجم واللون والكمية.", btn: "اطلب عرض سعر" },
 };
 
 // Üç ürün grubundan birini büyük "vitrin" karosu yapan, araya teklif kartı giren mozaik ızgara.

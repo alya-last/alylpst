@@ -7,7 +7,7 @@ import { KATALOG } from "@/lib/kurumsal-metin";
 import KatalogGoruntuleyici from "@/components/katalog/KatalogGoruntuleyici";
 
 export const revalidate = 300;
-const LOCALE: Record<string, string> = { en: "en_US", ru: "ru_RU", zh: "zh_CN" };
+const LOCALE: Record<string, string> = { en: "en_US", ru: "ru_RU", zh: "zh_CN", ar: "ar_AR", de: "de_DE", fr: "fr_FR" };
 
 export function generateStaticParams() {
   return DILLER.filter(d => d !== "tr").map(d => ({ lang: d }));

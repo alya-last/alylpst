@@ -4,6 +4,9 @@ export const UM: Record<Dil, { etiket: string; baslik: string; aciklama: string;
   en: { etiket: "PRODUCTS", baslik: "All our products", aciklama: "Garden first, then home: explore our outdoor and indoor collections.", ara: "Search by product name or code", tumu: "All", ic: "Indoor", dis: "Outdoor", mekan: "Space", kategori: "Category", bulunamadi: "No products match this filter.", urun: "products", temizle: "Clear filters", meta: "Products | Alya Plastik" },
   ru: { etiket: "ПРОДУКЦИЯ", baslik: "Вся наша продукция", aciklama: "Сначала сад, затем дом: коллекции для улицы и для дома.", ara: "Поиск по названию или коду", tumu: "Все", ic: "Для дома", dis: "Для улицы", mekan: "Назначение", kategori: "Категория", bulunamadi: "Нет товаров, подходящих под фильтр.", urun: "товаров", temizle: "Сбросить фильтры", meta: "Продукция | Alya Plastik" },
   zh: { etiket: "产品", baslik: "全部产品", aciklama: "先看花园，再看家居：探索我们的户外与室内系列。", ara: "按产品名称或编号搜索", tumu: "全部", ic: "室内", dis: "户外", mekan: "场景", kategori: "类别", bulunamadi: "没有符合筛选条件的产品。", urun: "款产品", temizle: "清除筛选", meta: "产品 | Alya Plastik" },
+  de: { etiket: "PRODUKTE", baslik: "Alle unsere Produkte", aciklama: "Erst der Garten, dann das Zuhause: Entdecken Sie unsere Outdoor- und Indoor-Kollektionen.", ara: "Nach Produktname oder Code suchen", tumu: "Alle", ic: "Indoor", dis: "Outdoor", mekan: "Bereich", kategori: "Kategorie", bulunamadi: "Keine Produkte für diesen Filter gefunden.", urun: "Produkte", temizle: "Filter zurücksetzen", meta: "Produkte | Alya Plastik" },
+  fr: { etiket: "PRODUITS", baslik: "Tous nos produits", aciklama: "D'abord le jardin, puis la maison : découvrez nos collections d'extérieur et d'intérieur.", ara: "Rechercher par nom ou code de produit", tumu: "Tous", ic: "Intérieur", dis: "Extérieur", mekan: "Espace", kategori: "Catégorie", bulunamadi: "Aucun produit ne correspond à ce filtre.", urun: "produits", temizle: "Effacer les filtres", meta: "Produits | Alya Plastik" },
+  ar: { etiket: "المنتجات", baslik: "جميع منتجاتنا", aciklama: "الحديقة أولًا ثم المنزل: اكتشف مجموعاتنا للاستخدام الخارجي والداخلي.", ara: "ابحث باسم المنتج أو رمزه", tumu: "الكل", ic: "داخلي", dis: "خارجي", mekan: "المكان", kategori: "الفئة", bulunamadi: "لا توجد منتجات مطابقة لهذه التصفية.", urun: "منتج", temizle: "مسح التصفية", meta: "المنتجات | Alya Plastik" },
 };
 
 export const IM: Record<Dil, { baslik: string; aciklama: string }> = {
@@ -11,4 +14,7 @@ export const IM: Record<Dil, { baslik: string; aciklama: string }> = {
   en: { baslik: "Contact", aciklama: "Reach us for wholesale orders, custom molds, export and catalog requests. Your quote is ready within 72 hours." },
   ru: { baslik: "Контакты", aciklama: "Свяжитесь с нами по вопросам опта, индивидуальных пресс-форм, экспорта и каталога. Предложение — в течение 72 часов." },
   zh: { baslik: "联系我们", aciklama: "批发订单、定制模具、出口和目录需求，欢迎联系我们。72小时内提供报价。" },
+  de: { baslik: "Kontakt", aciklama: "Kontaktieren Sie uns für Großbestellungen, Sonderwerkzeuge, Export und Katalogwünsche. Ihr Angebot liegt innerhalb von 72 Stunden vor." },
+  fr: { baslik: "Contact", aciklama: "Contactez-nous pour les commandes en gros, les moules sur mesure, l'export et les demandes de catalogue. Votre devis est prêt sous 72 heures." },
+  ar: { baslik: "اتصل بنا", aciklama: "تواصل معنا لطلبات الجملة والقوالب المخصصة والتصدير وطلبات الكتالوج. يكون عرض السعر جاهزًا خلال 72 ساعة." },
 };

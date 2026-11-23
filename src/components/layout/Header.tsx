@@ -9,7 +9,7 @@ import MegaMenu from "@/components/layout/MegaMenu";
 
 // Dil koduna karşılık bayrak emojisi (İngilizce için nötr/uluslararası bir seçim olarak İngiltere bayrağı kullanılmıyor,
 // dünya genelinde "İngilizce" için en yaygın kabul gören seçenek olduğundan GB bayrağı tercih edildi).
-const BAYRAK: Record<Dil, string> = { tr: "🇹🇷", en: "🇬🇧", ru: "🇷🇺", zh: "🇨🇳" };
+const BAYRAK: Record<Dil, string> = { tr: "🇹🇷", en: "🇬🇧", ru: "🇷🇺", zh: "🇨🇳", ar: "🇸🇦", de: "🇩🇪", fr: "🇫🇷" };
 
 // Modül seviyesinde tanımlı: render içinde tanımlanırsa Header her state değişikliğinde
 // (scroll, menü aç/kapa) bu bileşeni yeniden yaratır ve React onu gereksiz yere unmount/remount eder.

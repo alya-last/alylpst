@@ -5,7 +5,7 @@ import { getSettings } from "@/lib/supabase";
 import { DILLER, getKategoriAdlari, HREFLANG, SITE_URL, ad, aciklama, getBenzer, getTumUrunler, getUrun, isDil, kisalt, urunUrl, type Dil } from "@/lib/urun-sayfasi";
 
 export const revalidate = 300;
-const LOCALE: Record<string, string> = { en: "en_US", ru: "ru_RU", zh: "zh_CN" };
+const LOCALE: Record<string, string> = { en: "en_US", ru: "ru_RU", zh: "zh_CN", ar: "ar_AR", de: "de_DE", fr: "fr_FR" };
 
 // Her ürün için tüm diller üretilir — çevirisi olmayanlar Türkçe açıklamayla yayınlanır (bkz.
 // aciklama()); dil değiştirici bu sayede ürün sayfasında kalabiliyor, Türkçe'ye fırlatılmıyor.

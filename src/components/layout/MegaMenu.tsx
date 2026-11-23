@@ -21,6 +21,9 @@ const METIN: Record<Dil, { baslik: string; alt: string; tumu: string; yeni: stri
   en: { baslik: "PRODUCT CATEGORIES", alt: "200+ models, backed by 55+ years of manufacturing", tumu: "See All Products", yeni: "NEW" },
   ru: { baslik: "КАТЕГОРИИ ТОВАРОВ", alt: "200+ моделей и более 55 лет производственного опыта", tumu: "Все товары", yeni: "НОВОЕ" },
   zh: { baslik: "产品分类", alt: "55年以上生产经验，200多款产品", tumu: "查看全部产品", yeni: "新品" },
+  de: { baslik: "PRODUKTKATEGORIEN", alt: "Über 200 Modelle aus mehr als 55 Jahren Fertigungserfahrung", tumu: "Alle Produkte ansehen", yeni: "NEU" },
+  fr: { baslik: "CATÉGORIES DE PRODUITS", alt: "Plus de 200 modèles, forts de plus de 55 ans d'expérience de fabrication", tumu: "Voir tous les produits", yeni: "NOUVEAU" },
+  ar: { baslik: "فئات المنتجات", alt: "أكثر من 200 طراز بخبرة تصنيع تتجاوز 55 عامًا", tumu: "عرض كل المنتجات", yeni: "جديد" },
 };
 
 export default function MegaMenu({ dil, kategoriAd, label }: { dil: Dil; kategoriAd: Record<string, string>; label: string }) {

@@ -7,7 +7,7 @@ import { DILLER, DIL_AD, HREFLANG, type Dil, kurumsalYolu, urunLinki, ad } from 
 import { dilYolu } from "@/lib/site-metin";
 import { Y } from "./metin";
 
-const BAYRAK: Record<Dil, string> = { tr: "🇹🇷", en: "🇬🇧", ru: "🇷🇺", zh: "🇨🇳" };
+const BAYRAK: Record<Dil, string> = { tr: "🇹🇷", en: "🇬🇧", ru: "🇷🇺", zh: "🇨🇳", ar: "🇸🇦", de: "🇩🇪", fr: "🇫🇷" };
 
 // Dil seçici: küre ikonlu açılır düğme (bayrak + dil adı)
 function DilSecici({ dil, altDiller }: { dil: Dil; altDiller?: Partial<Record<Dil, string>> }) {

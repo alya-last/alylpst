@@ -6,6 +6,9 @@ const T: Record<Dil, { baslik: string; adim: [string, string, string]; dugme: st
   en: { baslik: "How to order", adim: ["Pick your models", "Request a quote", "We handle shipping"], dugme: "Request a quote" },
   ru: { baslik: "Как заказать", adim: ["Выберите модели", "Запросите предложение", "Отгрузку берём на себя"], dugme: "Запросить цену" },
   zh: { baslik: "如何下单", adim: ["选择型号", "索取报价", "我们负责发货"], dugme: "获取报价" },
+  de: { baslik: "So bestellen Sie", adim: ["Modelle auswählen", "Angebot anfordern", "Wir übernehmen den Versand"], dugme: "Angebot anfordern" },
+  fr: { baslik: "Comment commander", adim: ["Choisissez vos modèles", "Demandez un devis", "Nous gérons l'expédition"], dugme: "Demander un devis" },
+  ar: { baslik: "كيف تطلب", adim: ["اختر الطرازات", "اطلب عرض سعر", "نتولى نحن الشحن"], dugme: "اطلب عرض سعر" },
 };
 
 // Tek satırlık "nasıl sipariş verilir" şeridi (3 adım + teklif butonu); az yer kaplar, toptan müşteriyi iletişime yönlendirir.

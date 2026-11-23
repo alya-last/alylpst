@@ -400,8 +400,8 @@ export default function AdminUrunlerPage() {
         {gorselNot && <p style={{ fontSize: 12, color: 'var(--adm-tx3)', margin: '8px 0 0', lineHeight: 1.55 }}><b>Görsel:</b> {gorselNot.tur} — {gorselNot.gorunum} <br /><b>Site uygunluğu:</b> {gorselNot.site_uygunlugu}</p>}
         {Object.keys(form.description_i18n || {}).some(k => k !== 'seo') && <>
           <Divider label="Çeviriler (AI — yayınlamadan önce kontrol et)" />
-          {(['en', 'ru', 'zh'] as const).filter(k => form.description_i18n?.[k] != null).map(k => (
-            <Field key={k} label={{ en: 'İngilizce', ru: 'Rusça', zh: 'Çince (Basitleştirilmiş)' }[k]}>
+          {(['en', 'ru', 'zh', 'ar', 'de', 'fr'] as const).filter(k => form.description_i18n?.[k] != null).map(k => (
+            <Field key={k} label={{ en: 'İngilizce', ru: 'Rusça', zh: 'Çince (Basitleştirilmiş)', ar: 'Arapça', de: 'Almanca', fr: 'Fransızca' }[k]}>
               <textarea className="adm-inp" rows={2} value={form.description_i18n[k]} onChange={e => setForm((f: any) => ({ ...f, description_i18n: { ...f.description_i18n, [k]: e.target.value } }))} />
             </Field>))}
           {form.description_i18n?.seo && <p style={{ fontSize: 12, color: 'var(--adm-tx3)', margin: '4px 0 0' }}><b>SEO başlık önerisi:</b> {form.description_i18n.seo.baslik}<br /><b>SEO açıklama önerisi:</b> {form.description_i18n.seo.aciklama}</p>}
